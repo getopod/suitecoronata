@@ -73,6 +73,17 @@ const isStandardMoveValid = (movingCards: Card[], targetPile: Pile): boolean => 
   return false;
 };
 
+// UI helper: human-readable rank display
+const getRankDisplay = (r: Rank) => {
+   if (r === 0) return '';
+   if ((r as number) === -1) return '?';
+   if (r === 1) return 'A';
+   if (r === 11) return 'J';
+   if (r === 12) return 'Q';
+   if (r === 13) return 'K';
+   return r;
+};
+
 // ==========================================
 // 5. COMPONENT: APP
 // ==========================================
@@ -562,7 +573,7 @@ export default function SolitaireEngine() {
     const isSelected = gameState.selectedCardIds?.includes(card.id);
     const isHintTarget = hintTargets.includes(pileId) && index === pile.cards.length - 1;
     const color = getCardColor(visualCard.suit);
-    const getRankDisplay = (r: Rank) => { if (r === 0) return ''; if ((r as number) === -1) return '?'; if (r === 1) return 'A'; if (r === 11) return 'J'; if (r === 12) return 'Q'; if (r === 13) return 'K'; return r; };
+    
     
     let handStyle = {};
     // No transform on hover, just static position. Bottom 30px to peek out behind HUD.
@@ -588,6 +599,7 @@ export default function SolitaireEngine() {
                onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
                onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick(pileId, index); }}
                aria-label={`Face down card ${card.id}`}
+                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); handleDoubleClick(pileId, index); } }}
             >
                <div className="w-8 h-12 border border-blue-400/30 rounded flex items-center justify-center"><LayoutGrid className="text-blue-300 opacity-50" size={16} /></div>
             </button>
@@ -601,6 +613,7 @@ export default function SolitaireEngine() {
             style={pileId === 'hand' ? handStyle : { top: `${pileId.includes('tableau') ? index * 12 : 0}px`, zIndex: isSelected ? 60 : index }}
             onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
             onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick(pileId, index); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); handleDoubleClick(pileId, index); } }}
             aria-label={`${getRankDisplay(visualCard.rank)} ${visualCard.suit} card`}
          >
         <div className={`relative w-full h-full duration-500 transform-style-3d transition-transform ${visualCard.faceUp ? 'rotate-y-0' : 'rotate-y-180'}`}>
@@ -1004,7 +1017,12 @@ export default function SolitaireEngine() {
                            const charges = gameState.charges[effect.id] ?? effect.maxCharges;
                            
                            return (
-                              <div key={effect.id} onClick={() => { if ((effect as any).type !== 'blessing') toggleEffect(effect.id); }} className={`p-2 rounded border cursor-pointer text-xs flex justify-between items-center transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : 'bg-slate-700/30 border-slate-600'} ${isReady ? 'ring-1 ring-yellow-400 bg-yellow-900/20' : ''}`}>
+                              <button
+                                 key={effect.id}
+                                 type="button"
+                                 onClick={() => { if ((effect as any).type !== 'blessing') toggleEffect(effect.id); }}
+                                 aria-label={`Toggle effect ${effect.name}`}
+                                 className={`p-2 rounded border cursor-pointer text-xs flex justify-between items-center transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : 'bg-slate-700/30 border-slate-600'} ${isReady ? 'ring-1 ring-yellow-400 bg-yellow-900/20' : ''}`}>
                                  <div>
                                      <div className="font-bold text-slate-200 flex gap-1 items-center">
                                          {effect.name} 
@@ -1013,7 +1031,7 @@ export default function SolitaireEngine() {
                                      <div className="text-slate-400 text-[10px]">{effect.description}</div>
                                  </div>
                                  {isActive && <div className="w-2 h-2 bg-green-400 rounded-full"></div>}
-                              </div>
+                              </button>
                            );
                         })}
                         {gameState.ownedEffects.length === 0 && !gameState.debugUnlockAll && <div className="text-center text-slate-500 text-xs py-4">No effects owned yet. Visit the Trade!</div>}
