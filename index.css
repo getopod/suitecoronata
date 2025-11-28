@@ -1,0 +1,44 @@
+/* Global styles and small helper utilities for SuiteCoronata */
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: #0f172a;
+  color: rgba(255,255,255,0.87);
+}
+
+#root,
+#root > .dark {
+  min-height: 100vh;
+  width: 100%;
+  background-color: #0f172a;
+  color: rgba(255,255,255,0.87);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #0f172a; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* 3D flip helpers used by the card render */
+.perspective-1000 { perspective: 1000px; }
+.transform-style-3d { transform-style: preserve-3d; }
+.backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.rotate-y-180 { transform: rotateY(180deg); }
+.rotate-y-0 { transform: rotateY(0deg); }
+
+/* Small utilities */
+button, .clickable { cursor: pointer; }
+.hidden-dim { filter: grayscale(100%) blur(2px); opacity: 0.6; }

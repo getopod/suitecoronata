@@ -1,0 +1,5 @@
+{
+  "name": "Solitaire Rogue",
+  "description": "A roguelike solitaire deck-builder where you cheat, break rules, and battle RNG.",
+  "requestFramePermissions": []
+}
