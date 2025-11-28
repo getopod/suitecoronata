@@ -593,14 +593,16 @@ export default function SolitaireEngine() {
             </button>
          );
       }
-    return (
-      <div 
-        key={card.id} 
-        className={`absolute w-11 h-16 bg-transparent perspective-1000 select-none ${isSelected ? 'z-[60]' : ''}`}
-        style={pileId === 'hand' ? handStyle : { top: `${pileId.includes('tableau') ? index * 12 : 0}px`, zIndex: isSelected ? 60 : index }}
-        onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }} 
-        onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick(pileId, index); }}
-      >
+      return (
+         <button
+            key={card.id}
+            type="button"
+            className={`absolute w-11 h-16 bg-transparent perspective-1000 select-none ${isSelected ? 'z-[60]' : ''}`}
+            style={pileId === 'hand' ? handStyle : { top: `${pileId.includes('tableau') ? index * 12 : 0}px`, zIndex: isSelected ? 60 : index }}
+            onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
+            onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick(pileId, index); }}
+            aria-label={`${getRankDisplay(visualCard.rank)} ${visualCard.suit} card`}
+         >
         <div className={`relative w-full h-full duration-500 transform-style-3d transition-transform ${visualCard.faceUp ? 'rotate-y-0' : 'rotate-y-180'}`}>
           <div className={`absolute inset-0 backface-hidden bg-white rounded shadow-md flex flex-col items-center justify-between p-0.5 border border-gray-300 ${isHintTarget || isSelected ? 'ring-2 ring-yellow-400' : ''}`}
                style={{ opacity: visualCard.meta?.disabled ? 0.5 : 1, filter: visualCard.meta?.hiddenDimension ? 'grayscale(100%) blur(2px)' : 'none' }}>
@@ -634,8 +636,8 @@ export default function SolitaireEngine() {
   
   // ... (Rest of Component - Render Logic - Identical) ...
   // ...
-  const foundationPiles = (Object.values(gameState.piles) as Pile[]).filter(p => p.type === 'foundation').sort((a, b) => a.id.localeCompare(b.id));
-  const tableauPiles = (Object.values(gameState.piles) as Pile[]).filter(p => p.type === 'tableau').sort((a, b) => parseInt(a.id.split('-')[1]) - parseInt(b.id.split('-')[1]));
+   const foundationPiles = (Object.values(gameState.piles) as Pile[]).filter(p => p.type === 'foundation').sort((a, b) => a.id.localeCompare(b.id));
+   const tableauPiles = (Object.values(gameState.piles) as Pile[]).filter(p => p.type === 'tableau').sort((a, b) => Number.parseInt(a.id.split('-')[1] as string, 10) - Number.parseInt(b.id.split('-')[1] as string, 10));
   const currentEncounter = runPlan[gameState.runIndex];
   const currentThreat = EFFECTS_REGISTRY.find(e => e.id === currentEncounter?.effectId);
 
@@ -700,10 +702,10 @@ export default function SolitaireEngine() {
                  <h2 className="text-2xl font-bold text-center text-purple-200">Choose Your Path</h2>
                  <div className="grid grid-cols-1 gap-4">
                     {gameState.wanderOptions.map(opt => (
-                       <div key={opt.id} onClick={() => chooseWanderOption(opt)} className="bg-slate-800/80 border border-slate-600 hover:border-purple-400 p-6 rounded-xl cursor-pointer transition-all hover:scale-[1.02] shadow-xl">
+                       <button key={opt.id} type="button" onClick={() => chooseWanderOption(opt)} aria-label={`Wander option: ${opt.label}`} className="bg-slate-800/80 border border-slate-600 hover:border-purple-400 p-6 rounded-xl transition-all hover:scale-[1.02] shadow-xl text-left">
                           <div className="flex items-center gap-3 mb-2"><MapIcon className="text-purple-400" /><h3 className="text-xl font-bold">{opt.label}</h3></div>
                           <p className="text-slate-400 text-sm">{opt.description}</p>
-                       </div>
+                       </button>
                     ))}
                  </div>
               </div>
@@ -740,35 +742,40 @@ export default function SolitaireEngine() {
     <div className="h-screen w-full bg-slate-900 text-slate-100 font-sans flex flex-col overflow-hidden relative">
       <div className="flex-1 w-full max-w-2xl mx-auto p-2 pb-48 overflow-y-auto">
         <div className="grid grid-cols-7 gap-1 mb-4">
-           <div className="relative w-full aspect-[2/3]">
-             <div className="w-full h-full bg-blue-900 border border-slate-600 rounded flex items-center justify-center cursor-pointer" onClick={() => discardAndDrawHand()}>
-                <div className="absolute -top-2 -left-1 bg-slate-700 text-[8px] px-1 rounded-full border border-slate-500 z-10">Draw</div>
-                {gameState.piles.deck.cards.length > 0 ? <div className="font-bold text-blue-300 text-xs">{gameState.piles.deck.cards.length}</div> : <RefreshCw className="text-slate-600 w-4 h-4" />}
-             </div>
-           </div>
+                <div className="relative w-full aspect-[2/3]">
+                   <button type="button" className="w-full h-full bg-blue-900 border border-slate-600 rounded flex items-center justify-center" onClick={() => discardAndDrawHand()} aria-label="Draw from deck">
+                        <div className="absolute -top-2 -left-1 bg-slate-700 text-[8px] px-1 rounded-full border border-slate-500 z-10">Draw</div>
+                        {gameState.piles.deck.cards.length > 0 ? <div className="font-bold text-blue-300 text-xs">{gameState.piles.deck.cards.length}</div> : <RefreshCw className="text-slate-600 w-4 h-4" />}
+                   </button>
+                </div>
            <div className="col-span-2 flex items-center justify-center">
               {currentThreat && (
-                 <div className="w-11 h-16 bg-red-900/50 border-2 border-red-500/50 rounded flex flex-col items-center justify-center text-center p-0.5 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.4)] cursor-help" onClick={() => alert(`${currentThreat.name}: ${currentThreat.description}`)}>
+                 <button type="button" aria-label={`Threat: ${currentThreat.name}`} className="w-11 h-16 bg-red-900/50 border-2 border-red-500/50 rounded flex flex-col items-center justify-center text-center p-0.5 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.4)]" onClick={() => alert(`${currentThreat.name}: ${currentThreat.description}`)}>
                     <Skull size={12} className="text-red-400 mb-0.5" />
                     <div className="text-[6px] font-bold leading-tight text-red-200 line-clamp-2">{currentThreat.name}</div>
                     <div className="text-[5px] text-red-300 leading-tight line-clamp-3 opacity-75">{currentThreat.description}</div>
-                 </div>
+                 </button>
               )}
            </div>
-           {foundationPiles.map(pile => (
-             <div key={pile.id} className="relative w-full aspect-[2/3] bg-slate-800/50 rounded border border-slate-700 flex items-center justify-center" onClick={() => handleCardClick(pile.id, -1)}>
-               {pile.cards.length === 0 && <span className="text-xl opacity-20 text-white">♠</span>}
-               {pile.cards.map((c, i) => renderCard(c, i, pile.id))}
-             </div>
-           ))}
+                {foundationPiles.map(pile => (
+                   <div key={pile.id} className="relative w-full aspect-[2/3] bg-slate-800/50 rounded border border-slate-700 flex items-center justify-center">
+                      {pile.cards.length === 0 ? (
+                         <button type="button" aria-label={`Empty foundation ${pile.id}`} className="text-xl opacity-20 text-white bg-transparent border-0" onClick={() => handleCardClick(pile.id, -1)}>♠</button>
+                      ) : null}
+                      {pile.cards.map((c, i) => renderCard(c, i, pile.id))}
+                   </div>
+                ))}
         </div>
         <div className="grid grid-cols-7 gap-1 h-full">
-           {tableauPiles.map(pile => (
-            <div key={pile.id} className="relative w-full h-full" onClick={() => { if (pile.cards.length === 0) handleCardClick(pile.id, -1); }}>
-               {pile.locked && <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-20 text-red-500"><Lock size={10} /></div>}
-               {pile.cards.map((c, idx) => renderCard(c, idx, pile.id))}
-            </div>
-          ))}
+               {tableauPiles.map(pile => (
+                  <div key={pile.id} className="relative w-full h-full">
+                      {pile.locked && <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-20 text-red-500"><Lock size={10} /></div>}
+                      {pile.cards.length === 0 && (
+                         <button type="button" aria-label={`Empty ${pile.id}`} className="absolute inset-0 w-full h-full bg-transparent" onClick={() => handleCardClick(pile.id, -1)} />
+                      )}
+                      {pile.cards.map((c, idx) => renderCard(c, idx, pile.id))}
+                  </div>
+               ))}
         </div>
       </div>
 
@@ -810,14 +817,19 @@ export default function SolitaireEngine() {
                <div className="bg-orange-900/80 text-orange-200 text-xs text-center p-1 mb-1 rounded animate-pulse">Select a card in HAND to discard</div>
             )}
             <div className="flex justify-between px-2 mb-2 relative group">
-               {runPlan.map((enc, i) => (
-                  <div key={i} className={`w-2 h-2 rounded-full cursor-pointer ${i < gameState.runIndex ? 'bg-green-500' : i === gameState.runIndex ? 'bg-white animate-pulse' : enc.type === 'danger' ? 'bg-red-900' : 'bg-slate-700'}`} 
-                       onClick={() => {
-                          const eff = EFFECTS_REGISTRY.find(e => e.id === enc.effectId);
-                          alert(`${enc.type.toUpperCase()}: ${eff?.name}\n${eff?.description}`);
-                       }}
-                  ></div>
-               ))}
+               {runPlan.map((enc, i) => {
+                  const eff = EFFECTS_REGISTRY.find(e => e.id === enc.effectId);
+                  const cls = `w-2 h-2 rounded-full ${i < gameState.runIndex ? 'bg-green-500' : i === gameState.runIndex ? 'bg-white animate-pulse' : enc.type === 'danger' ? 'bg-red-900' : 'bg-slate-700'}`;
+                  return (
+                     <button
+                        key={i}
+                        type="button"
+                        className={cls}
+                        onClick={() => alert(`${enc.type.toUpperCase()}: ${eff?.name}\n${eff?.description}`)}
+                        aria-label={`Encounter ${i + 1} ${enc.type} ${eff?.name ?? ''}`}
+                     />
+                  );
+               })}
             </div>
             <div className="flex items-center gap-2 mb-2">
                <div className="flex-1">
@@ -868,7 +880,7 @@ export default function SolitaireEngine() {
                   ) : activeDrawer === 'test' ? (
                      <div className="flex flex-col gap-4">
                         <div className="flex items-center gap-2">
-                           <input type="number" value={testAmount} onChange={(e) => setTestAmount(parseInt(e.target.value))} className="bg-slate-900 border border-slate-600 rounded p-2 text-white w-24" />
+                           <input type="number" value={testAmount} onChange={(e) => setTestAmount(Number.parseInt((e.target as HTMLInputElement).value, 10) || 0)} className="bg-slate-900 border border-slate-600 rounded p-2 text-white w-24" />
                            <span className="text-xs text-slate-400">Amount</span>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
