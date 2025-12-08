@@ -921,34 +921,89 @@ export default function SolitaireEngine({
                        ))}
                     </div>
 
-                    {/* Achievements - Clickable with requirements */}
-                    <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-2">Achievements</h3>
+                    {/* Feats - Clickable with requirements */}
+                    <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-2">Feats ({48} total)</h3>
                     <div className="space-y-2">
                        {[
-                          { emoji: '🏆', name: 'First Victory', req: 'Win your first run', unlocked: true },
-                          { emoji: '⭐', name: 'Rising Star', req: 'Win 5 runs', unlocked: true },
-                          { emoji: '🎯', name: 'Sharpshooter', req: 'Complete a run without using hints', unlocked: true },
-                          { emoji: '💎', name: 'Collector', req: 'Find 20 unique effects', unlocked: true },
-                          { emoji: '🔥', name: 'On Fire', req: 'Win 3 runs in a row', unlocked: true },
-                          { emoji: '❄️', name: 'Cool Customer', req: 'Win without taking any curses', unlocked: false },
-                          { emoji: '⚡', name: 'Speed Demon', req: 'Complete a run in under 10 minutes', unlocked: false },
-                          { emoji: '🌟', name: 'Perfectionist', req: 'Win with all 4 foundations complete', unlocked: false },
-                       ].map((ach, i) => (
+                          // Speed feats
+                          { emoji: '🏆', name: 'Speedrunner', req: 'Win a run in under 15 minutes', reward: 'Speed trophy', unlocked: false },
+                          { emoji: '☄️', name: 'Comet', req: 'Win a run in under 7 minutes', reward: 'Comet badge', unlocked: false },
+                          { emoji: '⚡', name: 'Going Pro', req: 'Win a run in under 5 minutes', reward: 'Pro speed', unlocked: false },
+                          // Challenge feats
+                          { emoji: '🎯', name: 'Minimalist', req: 'Win with no exploits', reward: 'Minimalist sash', unlocked: false },
+                          { emoji: '💪', name: 'Self-Reliant', req: 'Win without blessings', reward: 'Self-reliant emblem', unlocked: false },
+                          { emoji: '⛓️', name: 'Burdened', req: 'Win with 5+ curses', reward: 'Burden badge', unlocked: false },
+                          { emoji: '🌋', name: 'Calamitous', req: 'Win with 10+ curses', reward: 'Calamity sigil', unlocked: false },
+                          { emoji: '🧘', name: 'The Ascetic', req: 'Win with 0 coins spent', reward: 'Ascetic ribbon', unlocked: false },
+                          { emoji: '🕳️', name: 'Embrace the Void', req: 'All 6 curse types active', reward: 'Void emblem', unlocked: false },
+                          { emoji: '🔺', name: 'The Trifecta', req: 'No exploits, blessings, or coins used', reward: 'Trifecta badge', unlocked: false },
+                          { emoji: '🥔', name: 'Peasantry', req: 'Never buy from Trader this run', reward: 'Peasant badge', unlocked: false },
+                          // Milestone feats
+                          { emoji: '👣', name: 'First Steps', req: 'Complete your first run (win or lose)', reward: 'Starter card back', unlocked: false },
+                          { emoji: '🏆', name: 'First Victory', req: 'Win your first run', reward: 'Victory card back', unlocked: false },
+                          { emoji: '✨', name: 'Glory', req: 'Win 3 consecutive runs', reward: 'Achievement', unlocked: false },
+                          { emoji: '👑', name: 'Dominance', req: 'Win 10 consecutive runs', reward: 'Achievement', unlocked: false },
+                          { emoji: '🌟', name: 'Immortality', req: 'Win 30 consecutive runs', reward: 'Achievement', unlocked: false },
+                          // Ascension feats
+                          { emoji: '🧗', name: 'The Climber', req: 'Win on ascension levels 1-10', reward: 'Ascension Mastery', unlocked: false },
+                          { emoji: '👑', name: 'Crowning Glory', req: 'Ascension 10 + 10+ curses active', reward: 'Legendary crown', unlocked: false },
+                          { emoji: '🐀', name: 'Packrat', req: '20+ curse cards in deck at victory', reward: 'Packrat chest', unlocked: false },
+                          { emoji: '✨', name: 'Pristine', req: 'Win with zero curses gained', reward: 'Pristine laurel', unlocked: false },
+                          { emoji: '🛡️', name: 'Untouchable', req: 'Ascension 5+ and no curses', reward: 'Untouchable crown', unlocked: false },
+                          { emoji: '🧘', name: 'True Ascetic', req: 'Ascension 5+ with 0 coins spent', reward: 'True ascetic', unlocked: false },
+                          // Hand size feats
+                          { emoji: '💎', name: 'Glass Cannon', req: 'Permanent hand size <= 3', reward: 'Glass badge', unlocked: false },
+                          { emoji: '📦', name: 'Hoarder', req: 'Permanent hand size >= 13', reward: 'Hoarder trophy', unlocked: false },
+                          { emoji: '📚', name: 'Librarian', req: 'Permanent hand size >= 52', reward: 'Librarian tome', unlocked: false },
+                          // Style feats
+                          { emoji: '⬛', name: 'Monochrome', req: '90% plays from a single suit', reward: 'Monochrome medal', unlocked: false },
+                          { emoji: '🎪', name: 'Maximalist', req: '15+ exploits acquired', reward: 'Maximalist banner', unlocked: false },
+                          { emoji: '🙏', name: 'Favored', req: '15+ blessings used', reward: 'Favored amulet', unlocked: false },
+                          { emoji: '👑', name: 'The True Crown', req: 'Asc10 + 0 coins + 0 exploits + 5+ curses', reward: 'True crown', unlocked: false },
+                          // Encounter feats
+                          { emoji: '1️⃣', name: 'One & Done', req: 'No reshuffles during encounter', reward: 'One&Done ribbon', unlocked: false },
+                          { emoji: '⚙️', name: 'Efficiency', req: 'Win encounter in <=3 turns', reward: 'Efficiency gear', unlocked: false },
+                          { emoji: '🙌', name: 'Look Ma, No Hands', req: 'Win without shuffles/discards', reward: 'Hands-free token', unlocked: false },
+                          { emoji: '🏳️', name: "I've Seen Enough", req: 'Resign after 52+ plays', reward: 'White flag', unlocked: false },
+                          { emoji: '🔀', name: 'Riffle', req: '10+ shuffles used', reward: 'Riffle ribbon', unlocked: false },
+                          { emoji: '🧹', name: 'Cleanup', req: '15+ discards used', reward: 'Cleanup badge', unlocked: false },
+                          // Card combo feats
+                          { emoji: '🃏', name: 'Royal Decree', req: 'Play a 5-card same-suit straight in an encounter', reward: 'Royal decree', unlocked: false },
+                          { emoji: '4️⃣', name: 'Four of a Kind', req: 'Play four-of-a-kind in an encounter', reward: 'Four-of-a-kind medal', unlocked: false },
+                          { emoji: '📊', name: 'Full Sequence', req: 'Play 5-card straight in encounter', reward: 'Sequence sash', unlocked: false },
+                          { emoji: '👸', name: 'Royal Court', req: 'Win encounter using only face cards', reward: 'Courtly cloak', unlocked: false },
+                          // Wander feats
+                          { emoji: '🚶', name: 'Wanderer 50', req: '50 wanders completed', reward: 'Wanderer medal', unlocked: false },
+                          { emoji: '🏃', name: 'Wanderer 100', req: '100 wanders completed', reward: 'Wanderer trophy', unlocked: false },
+                          { emoji: '🌍', name: 'Wanderer 500', req: '500 wanders completed', reward: 'Wanderer crown', unlocked: false },
+                          // Combat feats
+                          { emoji: '⚔️', name: 'Danger Seeker I', req: '25 dangers defeated', reward: 'Danger Seeker I', unlocked: false },
+                          { emoji: '🗡️', name: 'Danger Seeker II', req: '50 dangers defeated', reward: 'Danger Seeker II', unlocked: false },
+                          { emoji: '🔱', name: 'Danger Seeker III', req: '100 dangers defeated', reward: 'Danger Seeker III', unlocked: false },
+                          // Win milestones
+                          { emoji: '🎖️', name: 'Veteran', req: '10 wins', reward: 'Veteran badge', unlocked: false },
+                          { emoji: '🏅', name: 'Champion', req: '25 wins', reward: 'Champion crest', unlocked: false },
+                          { emoji: '🌟', name: 'Legend', req: '50 wins', reward: 'Legendary laurel', unlocked: false },
+                          { emoji: '🏆', name: 'World Champion', req: '100 wins', reward: 'World champion trophy', unlocked: false },
+                       ].map((feat, i) => (
                           <button
                              key={i}
                              onClick={() => setExpandedAchievement(expandedAchievement === i ? null : i)}
                              className={`w-full p-3 rounded-lg text-left transition-all ${
-                                ach.unlocked ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-800/30 opacity-50'
+                                feat.unlocked ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-800/30 opacity-60'
                              }`}>
                              <div className="flex items-center gap-3">
-                                <span className={`text-2xl ${!ach.unlocked && 'grayscale'}`}>{ach.emoji}</span>
+                                <span className={`text-2xl ${!feat.unlocked && 'grayscale'}`}>{feat.unlocked ? feat.emoji : '🔒'}</span>
                                 <div className="flex-1">
                                    <div className="font-bold text-sm flex items-center gap-2">
-                                      {ach.name}
-                                      {ach.unlocked && <span className="text-[10px] bg-emerald-600 px-1.5 py-0.5 rounded">Unlocked</span>}
+                                      {feat.name}
+                                      {feat.unlocked && <span className="text-[10px] bg-emerald-600 px-1.5 py-0.5 rounded">Unlocked</span>}
                                    </div>
                                    {expandedAchievement === i && (
-                                      <div className="text-xs text-slate-400 mt-1 animate-in fade-in">{ach.req}</div>
+                                      <div className="text-xs text-slate-400 mt-1 animate-in fade-in">
+                                         <div>{feat.req}</div>
+                                         <div className="text-yellow-500 mt-0.5">Reward: {feat.reward}</div>
+                                      </div>
                                    )}
                                 </div>
                                 <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedAchievement === i ? 'rotate-180' : ''}`} />
@@ -967,171 +1022,170 @@ export default function SolitaireEngine({
                     <h2 className="text-2xl font-bold">Settings</h2>
                     <button onClick={() => setShowSettings(false)}><X /></button>
                  </div>
-                 <div className="flex-1 overflow-y-auto space-y-6">
-                    {/* Gameplay */}
-                    <div>
-                       <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-3">Gameplay</h3>
-                       <div className="space-y-3">
-                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                             <div><div className="font-medium">Auto-flip Cards</div><div className="text-xs text-slate-400">Automatically flip face-down cards</div></div>
-                             <div className="w-12 h-6 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                 <div className="flex-1 overflow-y-auto space-y-2">
+                    {/* Gameplay - Collapsible */}
+                    <div className="bg-slate-800/50 rounded-lg overflow-hidden">
+                       <button 
+                          onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'gameplay' ? null : 'gameplay')}
+                          className="w-full flex items-center justify-between p-3 hover:bg-slate-800">
+                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Gameplay</h3>
+                          <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'gameplay' ? 'rotate-180' : ''}`} />
+                       </button>
+                       {expandedSettingsSection === 'gameplay' && (
+                          <div className="space-y-2 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
+                             <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                <div><div className="font-medium text-sm">Auto-flip Cards</div><div className="text-xs text-slate-400">Automatically flip face-down cards</div></div>
+                                <div className="w-12 h-6 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                             </div>
+                             <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                <div><div className="font-medium text-sm">Confirm Moves</div><div className="text-xs text-slate-400">Ask before making moves</div></div>
+                                <div className="w-12 h-6 bg-slate-600 rounded-full relative cursor-pointer"><div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                             </div>
+                             <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                <div><div className="font-medium text-sm">Confirm Resign</div><div className="text-xs text-slate-400">Ask before giving up a run</div></div>
+                                <div className="w-12 h-6 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                             </div>
+                             <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                <div><div className="font-medium text-sm">Show Hints</div><div className="text-xs text-slate-400">Highlight valid moves</div></div>
+                                <div className="w-12 h-6 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                             </div>
                           </div>
-                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                             <div><div className="font-medium">Confirm Moves</div><div className="text-xs text-slate-400">Ask before making moves</div></div>
-                             <div className="w-12 h-6 bg-slate-600 rounded-full relative cursor-pointer"><div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
-                          </div>
-                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                             <div><div className="font-medium">Confirm Resign</div><div className="text-xs text-slate-400">Ask before giving up a run</div></div>
-                             <div className="w-12 h-6 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
-                          </div>
-                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                             <div><div className="font-medium">Show Hints</div><div className="text-xs text-slate-400">Highlight valid moves</div></div>
-                             <div className="w-12 h-6 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
-                          </div>
-                       </div>
+                       )}
                     </div>
 
-                    {/* Music - Expandable */}
-                    <div>
+                    {/* Audio - Collapsible (Music + SFX combined) */}
+                    <div className="bg-slate-800/50 rounded-lg overflow-hidden">
                        <button 
-                          onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'music' ? null : 'music')}
-                          className="w-full flex items-center justify-between mb-3">
-                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Music</h3>
-                          <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'music' ? 'rotate-180' : ''}`} />
+                          onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'audio' ? null : 'audio')}
+                          className="w-full flex items-center justify-between p-3 hover:bg-slate-800">
+                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Audio</h3>
+                          <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'audio' ? 'rotate-180' : ''}`} />
                        </button>
-                       <div className="space-y-3">
-                          <div className="p-3 bg-slate-800 rounded-lg">
-                             <div className="flex justify-between mb-2"><span>Music Volume</span><span className="text-slate-400">60%</span></div>
-                             <div className="h-2 bg-slate-700 rounded-full"><div className="h-2 bg-emerald-500 rounded-full" style={{width: '60%'}}></div></div>
-                          </div>
-                          {expandedSettingsSection === 'music' && (
-                             <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                                   <span className="text-sm">Menu Music</span>
-                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
+                       {expandedSettingsSection === 'audio' && (
+                          <div className="space-y-3 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
+                             {/* Master */}
+                             <div className="p-3 bg-slate-700/50 rounded-lg">
+                                <div className="flex justify-between mb-2"><span className="text-sm">Master Volume</span><span className="text-slate-400 text-sm">80%</span></div>
+                                <div className="h-2 bg-slate-600 rounded-full"><div className="h-2 bg-emerald-500 rounded-full" style={{width: '80%'}}></div></div>
+                             </div>
+                             {/* Music Section */}
+                             <div className="border-t border-slate-600 pt-3">
+                                <div className="text-xs text-slate-400 uppercase mb-2">Music</div>
+                                <div className="p-3 bg-slate-700/50 rounded-lg mb-2">
+                                   <div className="flex justify-between mb-2"><span className="text-sm">Music Volume</span><span className="text-slate-400 text-sm">60%</span></div>
+                                   <div className="h-2 bg-slate-600 rounded-full"><div className="h-2 bg-emerald-500 rounded-full" style={{width: '60%'}}></div></div>
                                 </div>
-                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                                   <span className="text-sm">Gameplay Music</span>
-                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
-                                </div>
-                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                                   <span className="text-sm">Shop Music</span>
-                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
-                                </div>
-                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                                   <span className="text-sm">Wander Music</span>
-                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
+                                <div className="space-y-1">
+                                   {['Menu Music', 'Gameplay Music', 'Shop Music', 'Wander Music'].map(item => (
+                                      <div key={item} className="flex items-center justify-between p-2 bg-slate-700/30 rounded">
+                                         <span className="text-xs">{item}</span>
+                                         <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
+                                      </div>
+                                   ))}
                                 </div>
                              </div>
-                          )}
-                       </div>
-                    </div>
-
-                    {/* Sound Effects - Expandable */}
-                    <div>
-                       <button 
-                          onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'sfx' ? null : 'sfx')}
-                          className="w-full flex items-center justify-between mb-3">
-                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Sound Effects</h3>
-                          <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'sfx' ? 'rotate-180' : ''}`} />
-                       </button>
-                       <div className="space-y-3">
-                          <div className="p-3 bg-slate-800 rounded-lg">
-                             <div className="flex justify-between mb-2"><span>SFX Volume</span><span className="text-slate-400">100%</span></div>
-                             <div className="h-2 bg-slate-700 rounded-full"><div className="h-2 bg-emerald-500 rounded-full" style={{width: '100%'}}></div></div>
-                          </div>
-                          {expandedSettingsSection === 'sfx' && (
-                             <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                                   <span className="text-sm">Card Flip</span>
-                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
+                             {/* SFX Section */}
+                             <div className="border-t border-slate-600 pt-3">
+                                <div className="text-xs text-slate-400 uppercase mb-2">Sound Effects</div>
+                                <div className="p-3 bg-slate-700/50 rounded-lg mb-2">
+                                   <div className="flex justify-between mb-2"><span className="text-sm">SFX Volume</span><span className="text-slate-400 text-sm">100%</span></div>
+                                   <div className="h-2 bg-slate-600 rounded-full"><div className="h-2 bg-emerald-500 rounded-full" style={{width: '100%'}}></div></div>
                                 </div>
-                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                                   <span className="text-sm">Card Place</span>
-                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
-                                </div>
-                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                                   <span className="text-sm">Invalid Move</span>
-                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
-                                </div>
-                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                                   <span className="text-sm">Score Points</span>
-                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
-                                </div>
-                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                                   <span className="text-sm">Level Complete</span>
-                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
-                                </div>
-                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                                   <span className="text-sm">UI Clicks</span>
-                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
+                                <div className="space-y-1">
+                                   {['Card Flip', 'Card Place', 'Invalid Move', 'Score Points', 'Level Complete', 'UI Clicks'].map(item => (
+                                      <div key={item} className="flex items-center justify-between p-2 bg-slate-700/30 rounded">
+                                         <span className="text-xs">{item}</span>
+                                         <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
+                                      </div>
+                                   ))}
                                 </div>
                              </div>
-                          )}
-                       </div>
+                          </div>
+                       )}
                     </div>
 
-                    {/* Accessibility */}
-                    <div>
-                       <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-3">Accessibility</h3>
-                       <div className="space-y-3">
-                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                             <div><div className="font-medium">Reduce Motion</div><div className="text-xs text-slate-400">Minimize animations throughout the app</div></div>
-                             <div className="w-12 h-6 bg-slate-600 rounded-full relative cursor-pointer"><div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                    {/* Accessibility - Collapsible */}
+                    <div className="bg-slate-800/50 rounded-lg overflow-hidden">
+                       <button 
+                          onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'accessibility' ? null : 'accessibility')}
+                          className="w-full flex items-center justify-between p-3 hover:bg-slate-800">
+                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Accessibility</h3>
+                          <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'accessibility' ? 'rotate-180' : ''}`} />
+                       </button>
+                       {expandedSettingsSection === 'accessibility' && (
+                          <div className="space-y-2 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
+                             <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                <div><div className="font-medium text-sm">Reduce Motion</div><div className="text-xs text-slate-400">Minimize animations throughout the app</div></div>
+                                <div className="w-12 h-6 bg-slate-600 rounded-full relative cursor-pointer"><div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                             </div>
+                             <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                <div><div className="font-medium text-sm">High Contrast</div><div className="text-xs text-slate-400">Increase contrast for better visibility</div></div>
+                                <div className="w-12 h-6 bg-slate-600 rounded-full relative cursor-pointer"><div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                             </div>
+                             <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                <div><div className="font-medium text-sm">Color Blind Mode</div><div className="text-xs text-slate-400">Adjust colors for color vision deficiency</div></div>
+                                <select className="bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm">
+                                   <option>Off</option>
+                                   <option>Deuteranopia (Green-weak)</option>
+                                   <option>Protanopia (Red-weak)</option>
+                                   <option>Tritanopia (Blue-weak)</option>
+                                   <option>Achromatopsia (Monochrome)</option>
+                                </select>
+                             </div>
                           </div>
-                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                             <div><div className="font-medium">High Contrast</div><div className="text-xs text-slate-400">Increase contrast for better visibility</div></div>
-                             <div className="w-12 h-6 bg-slate-600 rounded-full relative cursor-pointer"><div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
-                          </div>
-                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                             <div><div className="font-medium">Color Blind Mode</div><div className="text-xs text-slate-400">Adjust colors for color vision deficiency</div></div>
-                             <select className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm">
-                                <option>Off</option>
-                                <option>Deuteranopia (Green-weak)</option>
-                                <option>Protanopia (Red-weak)</option>
-                                <option>Tritanopia (Blue-weak)</option>
-                                <option>Achromatopsia (Monochrome)</option>
-                             </select>
-                          </div>
-                       </div>
+                       )}
                     </div>
 
-                    {/* Display */}
-                    <div>
-                       <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-3">Display</h3>
-                       <div className="space-y-3">
-                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                             <div><div className="font-medium">Card Style</div><div className="text-xs text-slate-400">Visual appearance of cards</div></div>
-                             <select className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm">
-                                <option>Classic</option>
-                                <option>Modern</option>
-                                <option>Minimal</option>
-                                <option>High Contrast</option>
-                             </select>
+                    {/* Display - Collapsible */}
+                    <div className="bg-slate-800/50 rounded-lg overflow-hidden">
+                       <button 
+                          onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'display' ? null : 'display')}
+                          className="w-full flex items-center justify-between p-3 hover:bg-slate-800">
+                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Display</h3>
+                          <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'display' ? 'rotate-180' : ''}`} />
+                       </button>
+                       {expandedSettingsSection === 'display' && (
+                          <div className="space-y-2 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
+                             <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                <div><div className="font-medium text-sm">Card Style</div><div className="text-xs text-slate-400">Visual appearance of cards</div></div>
+                                <select className="bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm">
+                                   <option>Classic</option>
+                                   <option>Modern</option>
+                                   <option>Minimal</option>
+                                   <option>High Contrast</option>
+                                </select>
+                             </div>
+                             <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                <div><div className="font-medium text-sm">Card Animations</div><div className="text-xs text-slate-400">Enable smooth card animations</div></div>
+                                <div className="w-12 h-6 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                             </div>
                           </div>
-                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                             <div><div className="font-medium">Card Animations</div><div className="text-xs text-slate-400">Enable smooth card animations</div></div>
-                             <div className="w-12 h-6 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
-                          </div>
-                       </div>
+                       )}
                     </div>
 
-                    {/* Data */}
-                    <div>
-                       <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-3">Data</h3>
-                       <div className="space-y-2">
-                          <button className="w-full p-3 bg-slate-800 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
-                             <span>Export Save Data</span>
-                             <span className="text-slate-500">→</span>
-                          </button>
-                          <button className="w-full p-3 bg-slate-800 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
-                             <span>Import Save Data</span>
-                             <span className="text-slate-500">→</span>
-                          </button>
-                          <button className="w-full p-3 bg-red-900/30 border border-red-800 rounded-lg text-left hover:bg-red-900/50 text-red-300">
-                             Reset All Progress
-                          </button>
-                       </div>
+                    {/* Data - Collapsible */}
+                    <div className="bg-slate-800/50 rounded-lg overflow-hidden">
+                       <button 
+                          onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'data' ? null : 'data')}
+                          className="w-full flex items-center justify-between p-3 hover:bg-slate-800">
+                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Data</h3>
+                          <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'data' ? 'rotate-180' : ''}`} />
+                       </button>
+                       {expandedSettingsSection === 'data' && (
+                          <div className="space-y-2 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
+                             <button className="w-full p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
+                                <span className="text-sm">Export Save Data</span>
+                                <span className="text-slate-500">→</span>
+                             </button>
+                             <button className="w-full p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
+                                <span className="text-sm">Import Save Data</span>
+                                <span className="text-slate-500">→</span>
+                             </button>
+                             <button className="w-full p-3 bg-red-900/30 border border-red-800 rounded-lg text-left hover:bg-red-900/50 text-red-300 text-sm">
+                                Reset All Progress
+                             </button>
+                          </div>
+                       )}
                     </div>
                  </div>
               </div>
