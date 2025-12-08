@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { LayoutGrid, Sparkles, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, HelpCircle, RefreshCw, X, Gift, Trophy, ArrowLeftRight, SkipBack, SkipForward, MessageSquare, FlaskConical, Save, Flag, Settings, ChevronDown, Pause, ShoppingCart, User, Unlock, Map as MapIcon } from 'lucide-react';
+import { LayoutGrid, Sparkles, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, HelpCircle, RefreshCw, X, Gift, Trophy, ArrowLeftRight, SkipBack, SkipForward, MessageSquare, FlaskConical, Save, Flag, Settings, ChevronDown, Pause, ShoppingCart, User, Unlock, Map as MapIcon, BarChart3 } from 'lucide-react';
 import { Card, GameState, Pile, Rank, Suit, MoveContext, Encounter, GameEffect, Wander, WanderChoice, MinigameResult } from './types';
 import { getCardColor, generateNewBoard } from './data/effects';
 import { Minigames } from './utils/minigames';
@@ -126,6 +126,33 @@ const getRarityColor = (rarity?: string): { bg: string; text: string; border: st
    }
 };
 
+// Icon helper - converts effect name to icon path with type fallback
+const getEffectIcon = (name: string, type: 'exploit' | 'curse' | 'blessing' | 'danger' | 'fear') => {
+   // Convert name to filename: lowercase, replace spaces/special chars with underscores
+   const filename = name.toLowerCase()
+      .replace(/'/g, '_s_')  // apostrophe s becomes _s_
+      .replace(/&/g, '__')   // ampersand becomes double underscore
+      .replace(/[^a-z0-9]/g, '_')  // replace non-alphanumeric with underscore
+      .replace(/_+/g, '_')  // collapse multiple underscores
+      .replace(/^_|_$/g, ''); // trim leading/trailing underscores
+   
+   return `/icons/${filename}.webp`;
+};
+
+// Category icon paths
+const categoryIcons: Record<string, string> = {
+   danger: '/icons/danger.webp',
+   dangers: '/icons/danger.webp',
+   fear: '/icons/fear.webp',
+   fears: '/icons/fear.webp',
+   blessing: '/icons/blessing.webp',
+   blessings: '/icons/blessing.webp',
+   exploit: '/icons/exploit.webp',
+   exploits: '/icons/exploit.webp',
+   curse: '/icons/curse.webp',
+   curses: '/icons/curse.webp',
+};
+
 // ==========================================
 // 5. COMPONENT: APP
 // ==========================================
@@ -156,6 +183,7 @@ export default function SolitaireEngine({
   const [howToPage, setHowToPage] = useState(0);
   const [selectedMode, setSelectedMode] = useState('coronata');
   const [glossaryTab, setGlossaryTab] = useState<'dangers'|'fears'|'blessings'|'exploits'|'curses'>('dangers');
+  const [profileTab, setProfileTab] = useState<'stats'|'feats'|'recaps'>('stats');
   const [expandedAchievement, setExpandedAchievement] = useState<number | null>(null);
   const [expandedSettingsSection, setExpandedSettingsSection] = useState<string | null>(null);
   
@@ -838,6 +866,7 @@ export default function SolitaireEngine({
      return (
         <div className="h-screen w-full bg-slate-900 text-white flex flex-col items-center justify-center p-4 gap-8">
            <div className="text-center space-y-2">
+              <img src="/logo-48x72.png" alt="Coronata" className="w-12 h-auto mx-auto mb-2" />
               <h1 className="text-5xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-purple-400 to-blue-600">CORONATA</h1>
               <p className="text-slate-400">Rogue-like Solitaire</p>
            </div>
@@ -915,145 +944,350 @@ export default function SolitaireEngine({
                     <h2 className="text-2xl font-bold">Profile</h2>
                     <button onClick={() => setShowProfile(false)}><X /></button>
                  </div>
+
+                 {/* Avatar & Name */}
+                 <div className="flex items-center gap-4 mb-4 p-4 bg-slate-800 rounded-xl">
+                    <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-600 rounded-full flex items-center justify-center text-2xl">🃏</div>
+                    <div>
+                       <div className="font-bold text-xl">Player One</div>
+                       <div className="text-slate-400 text-sm">Joined Nov 2024</div>
+                    </div>
+                 </div>
+
+                 {/* Profile Tab Bar */}
+                 <div className="flex gap-1 mb-4">
+                    {(['stats', 'feats', 'recaps'] as const).map(tab => (
+                       <button
+                          key={tab}
+                          onClick={() => setProfileTab(tab)}
+                          className={`flex-1 py-2 px-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all ${
+                             profileTab === tab
+                                ? 'bg-slate-700 text-white'
+                                : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
+                          }`}>
+                          {tab === 'stats' && <BarChart3 size={16} />}
+                          {tab === 'feats' && <img src="/icons/feats.webp" alt="" className="w-4 h-4" />}
+                          {tab === 'recaps' && <img src="/icons/run_history.webp" alt="" className="w-4 h-4" />}
+                          {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                       </button>
+                    ))}
+                 </div>
+
                  <div className="flex-1 overflow-y-auto">
-                    {/* Avatar & Name */}
-                    <div className="flex items-center gap-4 mb-6 p-4 bg-slate-800 rounded-xl">
-                       <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-600 rounded-full flex items-center justify-center text-2xl">🃏</div>
-                       <div>
-                          <div className="font-bold text-xl">Player One</div>
-                          <div className="text-slate-400 text-sm">Joined Nov 2024</div>
-                       </div>
-                    </div>
-
-                    {/* Stats Grid */}
-                    <div className="grid grid-cols-2 gap-3 mb-6">
-                       <div className="bg-slate-800 p-4 rounded-xl text-center">
-                          <div className="text-3xl font-bold text-emerald-400">12</div>
-                          <div className="text-xs text-slate-400 uppercase">Runs Won</div>
-                       </div>
-                       <div className="bg-slate-800 p-4 rounded-xl text-center">
-                          <div className="text-3xl font-bold text-red-400">8</div>
-                          <div className="text-xs text-slate-400 uppercase">Runs Lost</div>
-                       </div>
-                       <div className="bg-slate-800 p-4 rounded-xl text-center">
-                          <div className="text-3xl font-bold text-yellow-400">60%</div>
-                          <div className="text-xs text-slate-400 uppercase">Win Rate</div>
-                       </div>
-                       <div className="bg-slate-800 p-4 rounded-xl text-center">
-                          <div className="text-3xl font-bold text-purple-400">23</div>
-                          <div className="text-xs text-slate-400 uppercase">Effects Found</div>
-                       </div>
-                    </div>
-
-                    {/* Recent Runs */}
-                    <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-2">Recent Runs</h3>
-                    <div className="space-y-2 mb-6">
-                       {[
-                          { result: 'won', score: 4521, encounters: 15, date: '2 hours ago' },
-                          { result: 'lost', score: 2100, encounters: 9, date: 'Yesterday' },
-                          { result: 'won', score: 3890, encounters: 15, date: '3 days ago' },
-                       ].map((run, i) => (
-                          <div key={i} className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                             <div className="flex items-center gap-2">
-                                {run.result === 'won' ? <Trophy size={16} className="text-yellow-400" /> : <Skull size={16} className="text-red-400" />}
-                                <span className="font-bold">{run.score}</span>
-                                <span className="text-slate-500 text-xs">({run.encounters}/15)</span>
+                    {/* STATS TAB */}
+                    {profileTab === 'stats' && (
+                       <>
+                          {/* Stats Grid */}
+                          <div className="grid grid-cols-2 gap-3 mb-6">
+                             <div className="bg-slate-800 p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-emerald-400">12</div>
+                                <div className="text-xs text-slate-400 uppercase">Runs Won</div>
                              </div>
-                             <span className="text-slate-500 text-xs">{run.date}</span>
+                             <div className="bg-slate-800 p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-red-400">8</div>
+                                <div className="text-xs text-slate-400 uppercase">Runs Lost</div>
+                             </div>
+                             <div className="bg-slate-800 p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-yellow-400">60%</div>
+                                <div className="text-xs text-slate-400 uppercase">Win Rate</div>
+                             </div>
+                             <div className="bg-slate-800 p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-purple-400">23</div>
+                                <div className="text-xs text-slate-400 uppercase">Effects Found</div>
+                             </div>
                           </div>
-                       ))}
-                    </div>
 
-                    {/* Feats - Clickable with requirements */}
-                    <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-2">Feats ({48} total)</h3>
-                    <div className="space-y-2">
-                       {[
-                          // Speed feats
-                          { emoji: '🏆', name: 'Speedrunner', req: 'Win a run in under 15 minutes', reward: 'Speed trophy', unlocked: false },
-                          { emoji: '☄️', name: 'Comet', req: 'Win a run in under 7 minutes', reward: 'Comet badge', unlocked: false },
-                          { emoji: '⚡', name: 'Going Pro', req: 'Win a run in under 5 minutes', reward: 'Pro speed', unlocked: false },
-                          // Challenge feats
-                          { emoji: '🎯', name: 'Minimalist', req: 'Win with no exploits', reward: 'Minimalist sash', unlocked: false },
-                          { emoji: '💪', name: 'Self-Reliant', req: 'Win without blessings', reward: 'Self-reliant emblem', unlocked: false },
-                          { emoji: '⛓️', name: 'Burdened', req: 'Win with 5+ curses', reward: 'Burden badge', unlocked: false },
-                          { emoji: '🌋', name: 'Calamitous', req: 'Win with 10+ curses', reward: 'Calamity sigil', unlocked: false },
-                          { emoji: '🧘', name: 'The Ascetic', req: 'Win with 0 coins spent', reward: 'Ascetic ribbon', unlocked: false },
-                          { emoji: '🕳️', name: 'Embrace the Void', req: 'All 6 curse types active', reward: 'Void emblem', unlocked: false },
-                          { emoji: '🔺', name: 'The Trifecta', req: 'No exploits, blessings, or coins used', reward: 'Trifecta badge', unlocked: false },
-                          { emoji: '🥔', name: 'Peasantry', req: 'Never buy from Trader this run', reward: 'Peasant badge', unlocked: false },
-                          // Milestone feats
-                          { emoji: '👣', name: 'First Steps', req: 'Complete your first run (win or lose)', reward: 'Starter card back', unlocked: false },
-                          { emoji: '🏆', name: 'First Victory', req: 'Win your first run', reward: 'Victory card back', unlocked: false },
-                          { emoji: '✨', name: 'Glory', req: 'Win 3 consecutive runs', reward: 'Achievement', unlocked: false },
-                          { emoji: '👑', name: 'Dominance', req: 'Win 10 consecutive runs', reward: 'Achievement', unlocked: false },
-                          { emoji: '🌟', name: 'Immortality', req: 'Win 30 consecutive runs', reward: 'Achievement', unlocked: false },
-                          // Ascension feats
-                          { emoji: '🧗', name: 'The Climber', req: 'Win on ascension levels 1-10', reward: 'Ascension Mastery', unlocked: false },
-                          { emoji: '👑', name: 'Crowning Glory', req: 'Ascension 10 + 10+ curses active', reward: 'Legendary crown', unlocked: false },
-                          { emoji: '🐀', name: 'Packrat', req: '20+ curse cards in deck at victory', reward: 'Packrat chest', unlocked: false },
-                          { emoji: '✨', name: 'Pristine', req: 'Win with zero curses gained', reward: 'Pristine laurel', unlocked: false },
-                          { emoji: '🛡️', name: 'Untouchable', req: 'Ascension 5+ and no curses', reward: 'Untouchable crown', unlocked: false },
-                          { emoji: '🧘', name: 'True Ascetic', req: 'Ascension 5+ with 0 coins spent', reward: 'True ascetic', unlocked: false },
-                          // Hand size feats
-                          { emoji: '💎', name: 'Glass Cannon', req: 'Permanent hand size <= 3', reward: 'Glass badge', unlocked: false },
-                          { emoji: '📦', name: 'Hoarder', req: 'Permanent hand size >= 13', reward: 'Hoarder trophy', unlocked: false },
-                          { emoji: '📚', name: 'Librarian', req: 'Permanent hand size >= 52', reward: 'Librarian tome', unlocked: false },
-                          // Style feats
-                          { emoji: '⬛', name: 'Monochrome', req: '90% plays from a single suit', reward: 'Monochrome medal', unlocked: false },
-                          { emoji: '🎪', name: 'Maximalist', req: '15+ exploits acquired', reward: 'Maximalist banner', unlocked: false },
-                          { emoji: '🙏', name: 'Favored', req: '15+ blessings used', reward: 'Favored amulet', unlocked: false },
-                          { emoji: '👑', name: 'The True Crown', req: 'Asc10 + 0 coins + 0 exploits + 5+ curses', reward: 'True crown', unlocked: false },
-                          // Encounter feats
-                          { emoji: '1️⃣', name: 'One & Done', req: 'No reshuffles during encounter', reward: 'One&Done ribbon', unlocked: false },
-                          { emoji: '⚙️', name: 'Efficiency', req: 'Win encounter in <=3 turns', reward: 'Efficiency gear', unlocked: false },
-                          { emoji: '🙌', name: 'Look Ma, No Hands', req: 'Win without shuffles/discards', reward: 'Hands-free token', unlocked: false },
-                          { emoji: '🏳️', name: "I've Seen Enough", req: 'Resign after 52+ plays', reward: 'White flag', unlocked: false },
-                          { emoji: '🔀', name: 'Riffle', req: '10+ shuffles used', reward: 'Riffle ribbon', unlocked: false },
-                          { emoji: '🧹', name: 'Cleanup', req: '15+ discards used', reward: 'Cleanup badge', unlocked: false },
-                          // Card combo feats
-                          { emoji: '🃏', name: 'Royal Decree', req: 'Play a 5-card same-suit straight in an encounter', reward: 'Royal decree', unlocked: false },
-                          { emoji: '4️⃣', name: 'Four of a Kind', req: 'Play four-of-a-kind in an encounter', reward: 'Four-of-a-kind medal', unlocked: false },
-                          { emoji: '📊', name: 'Full Sequence', req: 'Play 5-card straight in encounter', reward: 'Sequence sash', unlocked: false },
-                          { emoji: '👸', name: 'Royal Court', req: 'Win encounter using only face cards', reward: 'Courtly cloak', unlocked: false },
-                          // Wander feats
-                          { emoji: '🚶', name: 'Wanderer 50', req: '50 wanders completed', reward: 'Wanderer medal', unlocked: false },
-                          { emoji: '🏃', name: 'Wanderer 100', req: '100 wanders completed', reward: 'Wanderer trophy', unlocked: false },
-                          { emoji: '🌍', name: 'Wanderer 500', req: '500 wanders completed', reward: 'Wanderer crown', unlocked: false },
-                          // Combat feats
-                          { emoji: '⚔️', name: 'Danger Seeker I', req: '25 dangers defeated', reward: 'Danger Seeker I', unlocked: false },
-                          { emoji: '🗡️', name: 'Danger Seeker II', req: '50 dangers defeated', reward: 'Danger Seeker II', unlocked: false },
-                          { emoji: '🔱', name: 'Danger Seeker III', req: '100 dangers defeated', reward: 'Danger Seeker III', unlocked: false },
-                          // Win milestones
-                          { emoji: '🎖️', name: 'Veteran', req: '10 wins', reward: 'Veteran badge', unlocked: false },
-                          { emoji: '🏅', name: 'Champion', req: '25 wins', reward: 'Champion crest', unlocked: false },
-                          { emoji: '🌟', name: 'Legend', req: '50 wins', reward: 'Legendary laurel', unlocked: false },
-                          { emoji: '🏆', name: 'World Champion', req: '100 wins', reward: 'World champion trophy', unlocked: false },
-                       ].map((feat, i) => (
-                          <button
-                             key={i}
-                             onClick={() => setExpandedAchievement(expandedAchievement === i ? null : i)}
-                             className={`w-full p-3 rounded-lg text-left transition-all ${
-                                feat.unlocked ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-800/30 opacity-60'
-                             }`}>
-                             <div className="flex items-center gap-3">
-                                <span className={`text-2xl ${!feat.unlocked && 'grayscale'}`}>{feat.unlocked ? feat.emoji : '🔒'}</span>
-                                <div className="flex-1">
-                                   <div className="font-bold text-sm flex items-center gap-2">
-                                      {feat.name}
-                                      {feat.unlocked && <span className="text-[10px] bg-emerald-600 px-1.5 py-0.5 rounded">Unlocked</span>}
+                          {/* Recent Runs Summary */}
+                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-2">Recent Runs</h3>
+                          <div className="space-y-2">
+                             {[
+                                { result: 'won', score: 4521, encounters: 15, date: '2 hours ago' },
+                                { result: 'lost', score: 2100, encounters: 9, date: 'Yesterday' },
+                                { result: 'won', score: 3890, encounters: 15, date: '3 days ago' },
+                             ].map((run, i) => (
+                                <div key={i} className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                                   <div className="flex items-center gap-2">
+                                      {run.result === 'won' ? <Trophy size={16} className="text-yellow-400" /> : <Skull size={16} className="text-red-400" />}
+                                      <span className="font-bold">{run.score}</span>
+                                      <span className="text-slate-500 text-xs">({run.encounters}/15)</span>
                                    </div>
-                                   {expandedAchievement === i && (
-                                      <div className="text-xs text-slate-400 mt-1 animate-in fade-in">
-                                         <div>{feat.req}</div>
-                                         <div className="text-yellow-500 mt-0.5">Reward: {feat.reward}</div>
-                                      </div>
-                                   )}
+                                   <span className="text-slate-500 text-xs">{run.date}</span>
                                 </div>
-                                <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedAchievement === i ? 'rotate-180' : ''}`} />
-                             </div>
-                          </button>
-                       ))}
-                    </div>
+                             ))}
+                          </div>
+                       </>
+                    )}
+
+                    {/* FEATS TAB */}
+                    {profileTab === 'feats' && (
+                       <>
+                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-2">Feats (48 total)</h3>
+                          <div className="space-y-2">
+                             {[
+                                // Speed feats
+                                { emoji: '🏆', name: 'Speedrunner', req: 'Win a run in under 15 minutes', reward: 'Speed trophy', unlocked: false },
+                                { emoji: '☄️', name: 'Comet', req: 'Win a run in under 7 minutes', reward: 'Comet badge', unlocked: false },
+                                { emoji: '⚡', name: 'Going Pro', req: 'Win a run in under 5 minutes', reward: 'Pro speed', unlocked: false },
+                                // Challenge feats
+                                { emoji: '🎯', name: 'Minimalist', req: 'Win with no exploits', reward: 'Minimalist sash', unlocked: false },
+                                { emoji: '💪', name: 'Self-Reliant', req: 'Win without blessings', reward: 'Self-reliant emblem', unlocked: false },
+                                { emoji: '⛓️', name: 'Burdened', req: 'Win with 5+ curses', reward: 'Burden badge', unlocked: false },
+                                { emoji: '🌋', name: 'Calamitous', req: 'Win with 10+ curses', reward: 'Calamity sigil', unlocked: false },
+                                { emoji: '🧘', name: 'The Ascetic', req: 'Win with 0 coins spent', reward: 'Ascetic ribbon', unlocked: false },
+                                { emoji: '🕳️', name: 'Embrace the Void', req: 'All 6 curse types active', reward: 'Void emblem', unlocked: false },
+                                { emoji: '🔺', name: 'The Trifecta', req: 'No exploits, blessings, or coins used', reward: 'Trifecta badge', unlocked: false },
+                                { emoji: '🥔', name: 'Peasantry', req: 'Never buy from Trader this run', reward: 'Peasant badge', unlocked: false },
+                                // Milestone feats
+                                { emoji: '👣', name: 'First Steps', req: 'Complete your first run (win or lose)', reward: 'Starter card back', unlocked: false },
+                                { emoji: '🏆', name: 'First Victory', req: 'Win your first run', reward: 'Victory card back', unlocked: false },
+                                { emoji: '✨', name: 'Glory', req: 'Win 3 consecutive runs', reward: 'Achievement', unlocked: false },
+                                { emoji: '👑', name: 'Dominance', req: 'Win 10 consecutive runs', reward: 'Achievement', unlocked: false },
+                                { emoji: '🌟', name: 'Immortality', req: 'Win 30 consecutive runs', reward: 'Achievement', unlocked: false },
+                                // Ascension feats
+                                { emoji: '🧗', name: 'The Climber', req: 'Win on ascension levels 1-10', reward: 'Ascension Mastery', unlocked: false },
+                                { emoji: '👑', name: 'Crowning Glory', req: 'Ascension 10 + 10+ curses active', reward: 'Legendary crown', unlocked: false },
+                                { emoji: '🐀', name: 'Packrat', req: '20+ curse cards in deck at victory', reward: 'Packrat chest', unlocked: false },
+                                { emoji: '✨', name: 'Pristine', req: 'Win with zero curses gained', reward: 'Pristine laurel', unlocked: false },
+                                { emoji: '🛡️', name: 'Untouchable', req: 'Ascension 5+ and no curses', reward: 'Untouchable crown', unlocked: false },
+                                { emoji: '🧘', name: 'True Ascetic', req: 'Ascension 5+ with 0 coins spent', reward: 'True ascetic', unlocked: false },
+                                // Hand size feats
+                                { emoji: '💎', name: 'Glass Cannon', req: 'Permanent hand size <= 3', reward: 'Glass badge', unlocked: false },
+                                { emoji: '📦', name: 'Hoarder', req: 'Permanent hand size >= 13', reward: 'Hoarder trophy', unlocked: false },
+                                { emoji: '📚', name: 'Librarian', req: 'Permanent hand size >= 52', reward: 'Librarian tome', unlocked: false },
+                                // Style feats
+                                { emoji: '⬛', name: 'Monochrome', req: '90% plays from a single suit', reward: 'Monochrome medal', unlocked: false },
+                                { emoji: '🎪', name: 'Maximalist', req: '15+ exploits acquired', reward: 'Maximalist banner', unlocked: false },
+                                { emoji: '🙏', name: 'Favored', req: '15+ blessings used', reward: 'Favored amulet', unlocked: false },
+                                { emoji: '👑', name: 'The True Crown', req: 'Asc10 + 0 coins + 0 exploits + 5+ curses', reward: 'True crown', unlocked: false },
+                                // Encounter feats
+                                { emoji: '1️⃣', name: 'One & Done', req: 'No reshuffles during encounter', reward: 'One&Done ribbon', unlocked: false },
+                                { emoji: '⚙️', name: 'Efficiency', req: 'Win encounter in <=3 turns', reward: 'Efficiency gear', unlocked: false },
+                                { emoji: '🙌', name: 'Look Ma, No Hands', req: 'Win without shuffles/discards', reward: 'Hands-free token', unlocked: false },
+                                { emoji: '🏳️', name: "I've Seen Enough", req: 'Resign after 52+ plays', reward: 'White flag', unlocked: false },
+                                { emoji: '🔀', name: 'Riffle', req: '10+ shuffles used', reward: 'Riffle ribbon', unlocked: false },
+                                { emoji: '🧹', name: 'Cleanup', req: '15+ discards used', reward: 'Cleanup badge', unlocked: false },
+                                // Card combo feats
+                                { emoji: '🃏', name: 'Royal Decree', req: 'Play a 5-card same-suit straight in an encounter', reward: 'Royal decree', unlocked: false },
+                                { emoji: '4️⃣', name: 'Four of a Kind', req: 'Play four-of-a-kind in an encounter', reward: 'Four-of-a-kind medal', unlocked: false },
+                                { emoji: '📊', name: 'Full Sequence', req: 'Play 5-card straight in encounter', reward: 'Sequence sash', unlocked: false },
+                                { emoji: '👸', name: 'Royal Court', req: 'Win encounter using only face cards', reward: 'Courtly cloak', unlocked: false },
+                                // Wander feats
+                                { emoji: '🚶', name: 'Wanderer 50', req: '50 wanders completed', reward: 'Wanderer medal', unlocked: false },
+                                { emoji: '🏃', name: 'Wanderer 100', req: '100 wanders completed', reward: 'Wanderer trophy', unlocked: false },
+                                { emoji: '🌍', name: 'Wanderer 500', req: '500 wanders completed', reward: 'Wanderer crown', unlocked: false },
+                                // Combat feats
+                                { emoji: '⚔️', name: 'Danger Seeker I', req: '25 dangers defeated', reward: 'Danger Seeker I', unlocked: false },
+                                { emoji: '🗡️', name: 'Danger Seeker II', req: '50 dangers defeated', reward: 'Danger Seeker II', unlocked: false },
+                                { emoji: '🔱', name: 'Danger Seeker III', req: '100 dangers defeated', reward: 'Danger Seeker III', unlocked: false },
+                                // Win milestones
+                                { emoji: '🎖️', name: 'Veteran', req: '10 wins', reward: 'Veteran badge', unlocked: false },
+                                { emoji: '🏅', name: 'Champion', req: '25 wins', reward: 'Champion crest', unlocked: false },
+                                { emoji: '🌟', name: 'Legend', req: '50 wins', reward: 'Legendary laurel', unlocked: false },
+                                { emoji: '🏆', name: 'World Champion', req: '100 wins', reward: 'World champion trophy', unlocked: false },
+                             ].map((feat, i) => (
+                                <button
+                                   key={i}
+                                   onClick={() => setExpandedAchievement(expandedAchievement === i ? null : i)}
+                                   className={`w-full p-3 rounded-lg text-left transition-all ${
+                                      feat.unlocked ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-800/30 opacity-60'
+                                   }`}>
+                                   <div className="flex items-center gap-3">
+                                      <span className={`text-2xl ${!feat.unlocked && 'grayscale'}`}>{feat.unlocked ? feat.emoji : '🔒'}</span>
+                                      <div className="flex-1">
+                                         <div className="font-bold text-sm flex items-center gap-2">
+                                            {feat.name}
+                                            {feat.unlocked && <span className="text-[10px] bg-emerald-600 px-1.5 py-0.5 rounded">Unlocked</span>}
+                                         </div>
+                                         {expandedAchievement === i && (
+                                            <div className="text-xs text-slate-400 mt-1 animate-in fade-in">
+                                               <div>{feat.req}</div>
+                                               <div className="text-yellow-500 mt-0.5">Reward: {feat.reward}</div>
+                                            </div>
+                                         )}
+                                      </div>
+                                      <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedAchievement === i ? 'rotate-180' : ''}`} />
+                                   </div>
+                                </button>
+                             ))}
+                          </div>
+                       </>
+                    )}
+
+                    {/* RUN RECAPS TAB */}
+                    {profileTab === 'recaps' && (
+                       <>
+                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-3">Run History</h3>
+                          <div className="space-y-4">
+                             {[
+                                { 
+                                   id: 1, 
+                                   result: 'won', 
+                                   score: 4521, 
+                                   date: '2 hours ago',
+                                   mode: 'Coronata',
+                                   duration: '12:34',
+                                   exploits: ['Blacksmith', 'Jester', 'Switcheroo', 'Counting Cards'],
+                                   curses: ['Bad Omens', 'Broken Mirror'],
+                                   blessings: ['Maneki-Neko', 'Four Leaf Clover', 'Ladybug'],
+                                   encounters: [
+                                      { type: 'danger', name: 'Beggar', passed: true },
+                                      { type: 'wander', name: 'Wander', passed: true },
+                                      { type: 'danger', name: 'Thief', passed: true },
+                                      { type: 'wander', name: 'Wander', passed: true },
+                                      { type: 'shop', name: 'Shop', passed: true },
+                                      { type: 'danger', name: 'Gambler', passed: true },
+                                      { type: 'wander', name: 'Wander', passed: true },
+                                      { type: 'fear', name: 'Stagefright', passed: true },
+                                      { type: 'danger', name: 'Merchant', passed: true },
+                                      { type: 'wander', name: 'Wander', passed: true },
+                                      { type: 'shop', name: 'Shop', passed: true },
+                                      { type: 'danger', name: 'Diplomat', passed: true },
+                                      { type: 'fear', name: 'Insomnia', passed: true },
+                                      { type: 'wander', name: 'Wander', passed: true },
+                                      { type: 'boss', name: 'Oracle', passed: true },
+                                   ]
+                                },
+                                { 
+                                   id: 2, 
+                                   result: 'lost', 
+                                   score: 2100, 
+                                   date: 'Yesterday',
+                                   mode: 'Coronata',
+                                   duration: '08:22',
+                                   exploits: ['Scholar', 'Risk Management'],
+                                   curses: ['Crippling Doubt', 'Shadow Tax', 'Trembling Hands', 'Echoing Paranoia'],
+                                   blessings: ['Wishbone'],
+                                   encounters: [
+                                      { type: 'danger', name: 'Beggar', passed: true },
+                                      { type: 'wander', name: 'Wander', passed: true },
+                                      { type: 'danger', name: 'Thief', passed: true },
+                                      { type: 'shop', name: 'Shop', passed: true },
+                                      { type: 'danger', name: 'Gambler', passed: true },
+                                      { type: 'fear', name: 'Psychosis', passed: true },
+                                      { type: 'wander', name: 'Wander', passed: true },
+                                      { type: 'danger', name: 'Merchant', passed: false },
+                                      { type: 'danger', name: 'Diplomat', passed: false },
+                                   ]
+                                },
+                                { 
+                                   id: 3, 
+                                   result: 'won', 
+                                   score: 3890, 
+                                   date: '3 days ago',
+                                   mode: 'Coronata',
+                                   duration: '15:47',
+                                   exploits: ['Architect', 'Collector', 'Dreamcatcher', 'Fortune', 'Mulligan'],
+                                   curses: ['Gluttony'],
+                                   blessings: ['Rabbit\'s Foot', 'Knock on Wood'],
+                                   encounters: [
+                                      { type: 'danger', name: 'Beggar', passed: true },
+                                      { type: 'wander', name: 'Wander', passed: true },
+                                      { type: 'danger', name: 'Thief', passed: true },
+                                      { type: 'wander', name: 'Wander', passed: true },
+                                      { type: 'shop', name: 'Shop', passed: true },
+                                      { type: 'danger', name: 'Gambler', passed: true },
+                                      { type: 'wander', name: 'Wander', passed: true },
+                                      { type: 'fear', name: 'Ignorance', passed: true },
+                                      { type: 'danger', name: 'Merchant', passed: true },
+                                      { type: 'wander', name: 'Wander', passed: true },
+                                      { type: 'shop', name: 'Shop', passed: true },
+                                      { type: 'danger', name: 'Diplomat', passed: true },
+                                      { type: 'fear', name: 'Hyperfixation', passed: true },
+                                      { type: 'wander', name: 'Wander', passed: true },
+                                      { type: 'boss', name: 'Oracle', passed: true },
+                                   ]
+                                },
+                             ].map((run) => (
+                                <div key={run.id} className="bg-slate-800 rounded-xl p-4 space-y-3">
+                                   {/* Run Header */}
+                                   <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-3">
+                                         {run.result === 'won' 
+                                            ? <Trophy size={20} className="text-yellow-400" /> 
+                                            : <Skull size={20} className="text-red-400" />}
+                                         <div>
+                                            <div className="font-bold text-lg">{run.score.toLocaleString()}</div>
+                                            <div className="text-xs text-slate-400">{run.mode} • {run.duration}</div>
+                                         </div>
+                                      </div>
+                                      <div className="text-xs text-slate-500">{run.date}</div>
+                                   </div>
+
+                                   {/* Effects Row */}
+                                   <div className="grid grid-cols-3 gap-2 text-xs">
+                                      {/* Exploits */}
+                                      <div className="bg-slate-700/50 rounded-lg p-2">
+                                         <div className="flex items-center gap-1 mb-1.5 text-slate-400">
+                                            <img src={categoryIcons.exploit} alt="" className="w-3 h-3" />
+                                            <span className="uppercase tracking-wider text-[10px]">Exploits</span>
+                                         </div>
+                                         <div className="flex flex-wrap gap-1">
+                                            {run.exploits.map((ex, i) => (
+                                               <img key={i} src={getEffectIcon(ex, 'exploit')} alt={ex} title={ex} className="w-5 h-5 rounded" onError={(e) => { (e.target as HTMLImageElement).src = categoryIcons.exploit; }} />
+                                            ))}
+                                         </div>
+                                      </div>
+                                      {/* Curses */}
+                                      <div className="bg-slate-700/50 rounded-lg p-2">
+                                         <div className="flex items-center gap-1 mb-1.5 text-slate-400">
+                                            <img src={categoryIcons.curse} alt="" className="w-3 h-3" />
+                                            <span className="uppercase tracking-wider text-[10px]">Curses</span>
+                                         </div>
+                                         <div className="flex flex-wrap gap-1">
+                                            {run.curses.map((c, i) => (
+                                               <img key={i} src={getEffectIcon(c, 'curse')} alt={c} title={c} className="w-5 h-5 rounded" onError={(e) => { (e.target as HTMLImageElement).src = categoryIcons.curse; }} />
+                                            ))}
+                                         </div>
+                                      </div>
+                                      {/* Blessings */}
+                                      <div className="bg-slate-700/50 rounded-lg p-2">
+                                         <div className="flex items-center gap-1 mb-1.5 text-slate-400">
+                                            <img src={categoryIcons.blessing} alt="" className="w-3 h-3" />
+                                            <span className="uppercase tracking-wider text-[10px]">Blessings</span>
+                                         </div>
+                                         <div className="flex flex-wrap gap-1">
+                                            {run.blessings.map((b, i) => (
+                                               <img key={i} src={getEffectIcon(b, 'blessing')} alt={b} title={b} className="w-5 h-5 rounded" onError={(e) => { (e.target as HTMLImageElement).src = categoryIcons.blessing; }} />
+                                            ))}
+                                         </div>
+                                      </div>
+                                   </div>
+
+                                   {/* Encounter Progress Bar */}
+                                   <div>
+                                      <div className="flex items-center gap-1 mb-1.5 text-slate-400 text-[10px] uppercase tracking-wider">
+                                         <MapIcon size={10} />
+                                         <span>Journey ({run.encounters.filter(e => e.passed).length}/{run.encounters.length})</span>
+                                      </div>
+                                      <div className="flex gap-0.5">
+                                         {run.encounters.map((enc, i) => {
+                                            const iconMap: Record<string, string> = {
+                                               danger: categoryIcons.danger,
+                                               fear: categoryIcons.fear,
+                                               wander: '/icons/wander.webp',
+                                               shop: '/icons/coin.webp',
+                                               boss: categoryIcons.danger,
+                                            };
+                                            return (
+                                               <div 
+                                                  key={i} 
+                                                  className={`flex-1 h-6 rounded-sm flex items-center justify-center ${
+                                                     enc.passed 
+                                                        ? enc.type === 'boss' ? 'bg-yellow-600' : 'bg-emerald-600/80' 
+                                                        : 'bg-red-600/80'
+                                                  }`}
+                                                  title={`${enc.name}${enc.passed ? '' : ' (Failed)'}`}>
+                                                  <img src={iconMap[enc.type] || categoryIcons.danger} alt="" className="w-3 h-3 opacity-80" />
+                                               </div>
+                                            );
+                                         })}
+                                      </div>
+                                   </div>
+                                </div>
+                             ))}
+                          </div>
+                       </>
+                    )}
                  </div>
               </div>
            )}
@@ -1326,9 +1560,19 @@ export default function SolitaireEngine({
                     <h2 className="text-2xl font-bold">Glossary</h2>
                     <button onClick={() => setShowGlossary(false)}><X /></button>
                  </div>
-                 <div className="flex gap-2 overflow-x-auto pb-2 mb-2">
-                    {['dangers', 'fears', 'blessings', 'exploits', 'curses'].map(cat => (
-                       <button key={cat} onClick={() => setGlossaryTab(cat as any)} className={`px-3 py-1 rounded-full text-xs font-bold capitalize ${glossaryTab === cat ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>{cat}</button>
+                 <div className="flex gap-1 overflow-x-auto pb-2 mb-2">
+                    {(['dangers', 'fears', 'blessings', 'exploits', 'curses'] as const).map(cat => (
+                       <button 
+                          key={cat} 
+                          onClick={() => setGlossaryTab(cat)} 
+                          className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold flex flex-col items-center gap-1 transition-all ${
+                             glossaryTab === cat 
+                                ? 'bg-slate-700 text-white' 
+                                : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
+                          }`}>
+                          <img src={categoryIcons[cat]} alt="" className="w-6 h-6" />
+                          <span className="capitalize">{cat}</span>
+                       </button>
                     ))}
                  </div>
                  <div className="flex-1 overflow-y-auto space-y-2">
@@ -1512,14 +1756,15 @@ export default function SolitaireEngine({
             </div>
             <div className="flex w-full gap-1">
                <button onClick={() => setActiveDrawer(activeDrawer === 'pause' ? null : 'pause')} className={`p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}><Pause size={16} /></button>
-               {['exploit', 'curse', 'blessing'].map((type) => {
+               {(['exploit', 'curse', 'blessing'] as const).map((type) => {
                   const hasReady = effectsRegistry.some(e => e.type === type && isEffectReady(e.id, gameState) && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll));
                   return (
                      <button key={type} onClick={() => setActiveDrawer(activeDrawer === type ? null : type as any)} 
-                        className={`flex-1 py-2 rounded text-[10px] font-bold border flex items-center justify-center gap-1 
+                        className={`flex-1 py-1.5 rounded text-[10px] font-bold border flex flex-col items-center justify-center gap-0.5 
                         ${activeDrawer === type ? 'bg-slate-700 text-white' : 'bg-slate-800 text-slate-400 border-slate-700'}
                         ${hasReady ? 'ring-1 ring-yellow-400 text-yellow-100 bg-yellow-900/20' : ''}`}>
-                        {type.charAt(0).toUpperCase() + type.slice(1)}s
+                        <img src={categoryIcons[type]} alt="" className="w-4 h-4" />
+                        <span>{type.charAt(0).toUpperCase() + type.slice(1)}s</span>
                      </button>
                   );
                })}
