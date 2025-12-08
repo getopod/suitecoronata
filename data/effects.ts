@@ -77,7 +77,6 @@ export const generateNewBoard = (currentScore: number, currentCoins: number, sco
 };
 
 export const EFFECTS_REGISTRY: GameEffect[] = [
-  // --- EXISTING ITEMS ---
   {
     id: 'hostile_takeover',
     name: 'Hostile Takeover',
@@ -108,7 +107,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     type: 'danger',
     description: 'Each shuffle or discard, -10% points then double.',
     onMoveComplete: (state, context) => {
-      if (context.source === 'hand' && context.target === 'deck') {
+      if (context.source === 'waste' && context.target === 'deck') {
         return { score: Math.floor(state.score * 0.9) };
       }
       return {};
@@ -176,7 +175,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
         ['hearts', 'diamonds', 'clubs', 'spades'].forEach(suit => {
           newPiles[`foundation-${suit}`] = { id: `foundation-${suit}`, type: 'foundation', cards: [] };
         });
-        newPiles['hand'] = { id: 'hand', type: 'hand', cards: [] };
+        newPiles['waste'] = { id: 'waste', type: 'waste', cards: [] };
         newPiles['deck'] = { id: 'deck', type: 'deck', cards: allCards.slice(cardIdx) };
         return { piles: newPiles };
       }
@@ -337,13 +336,13 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     type: 'fear',
     description: 'Discard costs 20 coin. Deck cycle costs 10% points.',
     onMoveComplete: (state, context) => {
-      if (context.source === 'hand' && context.target === 'deck') {
+      if (context.source === 'waste' && context.target === 'deck') {
         return { score: Math.floor(state.score * 0.9) };
       }
       return {};
     },
     calculateCoinTransaction: (delta, context) => {
-       if (context.target === 'hand') return delta - 20;
+       if (context.target === 'waste') return delta - 20;
        return delta;
     }
   },
@@ -353,7 +352,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     type: 'danger',
     description: 'Remove 2 cards per shuffle (Deck Cycle).',
     onMoveComplete: (state, context) => {
-      if (context.source === 'hand' && context.target === 'deck') {
+      if (context.source === 'waste' && context.target === 'deck') {
         const deckPile = state.piles['deck'];
         if (deckPile.cards.length > 2) {
           const newCards = [...deckPile.cards];
@@ -489,8 +488,8 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     type: 'danger',
     description: 'Change face up suit & rank per shuffle or discard.',
     onMoveComplete: (state, context) => {
-       const isShuffle = context.source === 'hand' && context.target === 'deck';
-       const isDiscard = context.target === 'hand';
+       const isShuffle = context.source === 'waste' && context.target === 'deck';
+       const isDiscard = context.target === 'waste';
        
        if (isShuffle || isDiscard) {
           const newPiles = { ...state.piles };
@@ -603,7 +602,6 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     description: '3 Tableaus locked. Find Keys in other cards to unlock.',
     onActivate: (state) => {
        const newPiles = { ...state.piles };
-       // We need to only lock existing tableaus
        const tabIds = Object.keys(newPiles).filter(k => k.startsWith('tableau'));
        const lockedIds = tabIds.sort(() => 0.5 - Math.random()).slice(0, 3);
        
@@ -785,11 +783,10 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     type: 'fear',
     description: 'Shuffle all face-up tableau cards on deck cycle.',
     onMoveComplete: (state, context) => {
-      if (context.source === 'hand' && context.target === 'deck') {
+      if (context.source === 'waste' && context.target === 'deck') {
          let faceUpCards: Card[] = [];
          let tableauConfigs: { id: string, count: number }[] = [];
          
-         // Dynamic tableau scan
          Object.keys(state.piles).filter(k => k.startsWith('tableau')).forEach(pileId => {
             const pile = state.piles[pileId];
             const visible = pile.cards.filter(c => c.faceUp);
@@ -1030,7 +1027,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     type: 'curse',
     description: 'Deck cycle costs 50% of current score.',
     onMoveComplete: (state, context) => {
-       if (context.source === 'hand' && context.target === 'deck') {
+       if (context.source === 'waste' && context.target === 'deck') {
           return { score: Math.floor(state.score * 0.5) };
        }
        return {};
@@ -1210,7 +1207,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     type: 'danger',
     description: '3rd card play removes 3 cards from deck.',
     onMoveComplete: (state, context) => {
-       if (context.source === 'deck' || context.source === 'hand') return {};
+       if (context.source === 'deck' || context.source === 'waste') return {};
        const currentCounter = (state.effectState.ruleOf3Counter || 0) + 1;
        if (currentCounter >= 3) {
           const deck = state.piles['deck'];
@@ -1465,16 +1462,14 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     name: 'Slush Fund',
     type: 'exploit',
     description: 'Go into debt up to 200 coins.',
-    // Logic handled in canAfford helper
   },
   {
     id: 'thief',
     name: 'Thief',
     type: 'blessing',
-    description: 'Move buried face-up cards to Hand.',
+    description: 'Move buried face-up cards to Waste.',
     canMove: (cards, source, target, defaultAllowed) => {
-       // Thief special move: Tableau -> Hand
-       if (source.type === 'tableau' && target.type === 'hand' && cards.length === 1) {
+       if (source.type === 'tableau' && target.type === 'waste' && cards.length === 1) {
           return true;
        }
        return defaultAllowed;
@@ -1484,15 +1479,13 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'flesh_wound',
     name: 'Flesh Wound',
     type: 'curse',
-    description: 'Adds Wound to Hand & Bandage to Deck. Find Bandage for +50 coins.',
+    description: 'Adds Wound to Waste & Bandage to Deck. Find Bandage for +50 coins.',
     onActivate: (state) => {
        const newPiles = { ...state.piles };
        
-       // Add Wound to Hand
        const woundCard: Card = { id: 'quest-wound', rank: 0, suit: 'special', faceUp: true, meta: { isWound: true } };
-       newPiles['hand'].cards = [...newPiles['hand'].cards, woundCard];
+       newPiles['waste'].cards = [...newPiles['waste'].cards, woundCard];
 
-       // Add Bandage to Deck (Shuffled)
        const bandageCard: Card = { id: 'quest-bandage', rank: 0, suit: 'special', faceUp: false, meta: { isBandage: true } };
        const deckCards = [...newPiles['deck'].cards, bandageCard];
        deckCards.sort(() => Math.random() - 0.5);
@@ -1501,8 +1494,6 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
        return { piles: newPiles };
     },
     onMoveComplete: (state, context) => {
-       // Check if Bandage was drawn/revealed
-       // If it moves from Deck -> Hand
        const bandage = context.cards.find(c => c.meta?.isBandage);
        if (bandage && context.source === 'deck') {
           return { coins: state.coins + 50 };
@@ -1522,7 +1513,6 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     description: '+2 foundations.',
     onActivate: (state) => {
        const newPiles = { ...state.piles };
-       // Just add 2 blank foundations
        const count = Object.keys(state.piles).filter(k => k.startsWith('foundation')).length;
        newPiles[`foundation-extra-${count}`] = { id: `foundation-extra-${count}`, type: 'foundation', cards: [] };
        newPiles[`foundation-extra-${count+1}`] = { id: `foundation-extra-${count+1}`, type: 'foundation', cards: [] };
@@ -1537,8 +1527,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     onActivate: (state) => {
        const newPiles = { ...state.piles };
        const wildCard: Card = { id: `jester-${Math.random()}`, rank: 0, suit: 'special', faceUp: true, meta: { isWild: true } };
-       // Add to Hand
-       newPiles['hand'].cards = [...newPiles['hand'].cards, wildCard];
+       newPiles['waste'].cards = [...newPiles['waste'].cards, wildCard];
        return { piles: newPiles };
     },
     canMove: (cards, source, target, defaultAllowed) => {
@@ -1556,8 +1545,6 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     type: 'blessing',
     description: 'Shuffle suits in deck or tableau.',
     onActivate: (state) => {
-       // Randomize suits of all face down cards in Deck?
-       // Or randomize suits of ALL cards? "Shuffle suits in deck".
        const newPiles = { ...state.piles };
        const suits: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
        
@@ -1575,8 +1562,6 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     type: 'exploit',
     description: 'When three 7s face up, wager coins & spin to win x3.',
     onMoveComplete: (state) => {
-       // Check if logic already triggered
-       // Simplified: Auto-wager 10 coins
        let visible7s = 0;
        Object.values(state.piles).forEach(pile => {
           pile.cards.forEach(c => {
@@ -1585,7 +1570,6 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
        });
        
        if (visible7s >= 3 && !state.effectState.roseGlassesTriggered) {
-          // Wager 10
           const wager = 10;
           if (state.coins >= wager) {
              const win = Math.random() > 0.5;
@@ -1604,15 +1588,12 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     type: 'curse',
     description: 'Next card becomes correct suit & rank.',
     canMove: (cards, source, target, defaultAllowed, state) => {
-       // Always allow if active?
        if (state.effectState.counterfeitingActive) return true;
        return defaultAllowed;
     },
     onMoveComplete: (state, context) => {
-       // If active, transform the moved card to match target top
        if (state.effectState.counterfeitingActive) {
           const pile = state.piles[context.target];
-          // Get card below the one we just moved
           const newCardIdx = pile.cards.length - 1;
           const anchorIdx = newCardIdx - 1;
           
@@ -1620,8 +1601,6 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
              const anchor = pile.cards[anchorIdx];
              const newCard = pile.cards[newCardIdx];
              
-             // Transform newCard to be valid below anchor
-             // e.g. Rank - 1, Opposite Color
              const targetRank = (anchor.rank - 1) as Rank;
              const targetColor = getCardColor(anchor.suit) === 'red' ? 'black' : 'red';
              const targetSuit: Suit = targetColor === 'red' ? 'hearts' : 'spades';
@@ -1649,19 +1628,16 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'venture_capitol',
     name: 'Venture Capitol',
     type: 'exploit',
-    description: 'Drag Tableau card to Hand to sell for coins (Rank value).',
+    description: 'Drag Tableau card to Waste to sell for coins (Rank value).',
     canMove: (cards, source, target, defaultAllowed) => {
-       // Tableau -> Hand (Selling)
-       if (source.type === 'tableau' && target.type === 'hand' && cards.length === 1) {
+       if (source.type === 'tableau' && target.type === 'waste' && cards.length === 1) {
           return true;
        }
        return defaultAllowed;
     },
     onMoveComplete: (state, context) => {
-       if (context.source.includes('tableau') && context.target === 'hand') {
-          // Sells for rank value (1-13)
+       if (context.source.includes('tableau') && context.target === 'waste') {
           const value = context.cards[0].rank;
-          // Card is moved to hand by default logic, we just add coins
           return { coins: state.coins + value };
        }
        return {};
@@ -1677,25 +1653,19 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
        
        if (target.type === 'tableau' && target.cards.length > 0) {
           const targetCard = target.cards[target.cards.length - 1];
-          // Standard: Rank - 1. Reverse: Rank + 1.
-          // Also still Alt Color
           if (targetCard.faceUp) {
              const isColorAlt = getCardColor(moving.suit) !== getCardColor(targetCard.suit);
              if (isColorAlt && moving.rank === targetCard.rank + 1) return true; 
-             // Block standard if we want strict reversal? The prompt implies "Mirror rules".
              if (isColorAlt && moving.rank === targetCard.rank - 1) return false;
           }
        }
        
        if (target.type === 'foundation') {
           const targetCard = target.cards[target.cards.length - 1];
-          // Standard: Rank + 1. Reverse: Rank - 1.
-          // Start foundation with Kings?
           if (targetCard) {
              if (moving.suit === targetCard.suit && moving.rank === targetCard.rank - 1) return true;
              if (moving.suit === targetCard.suit && moving.rank === targetCard.rank + 1) return false;
           } else {
-             // Empty foundation takes King (13) instead of Ace (1)
              if (moving.rank === 13) return true;
              if (moving.rank === 1) return false;
           }
@@ -1745,18 +1715,13 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'synchronicity',
     name: 'Synchronicity',
     type: 'uncommon',
-    description: 'On win, +5 coin for each face-down card remaining (impossible in standard, but possible with effects).',
+    description: 'On win, +5 coin for each face-down card remaining.',
     onMoveComplete: (state) => {
-       // Check Win Condition: All foundations full (13 cards each * 4 = 52, or just checking ranks?)
-       // Standard win: 4 foundations with Kings on top.
        const foundations = Object.values(state.piles).filter(p => p.type === 'foundation');
-       // Simple check: Are there 52 cards in foundations? 
-       // Or just check if all 4 main foundations are full
        const mainFoundations = foundations.filter(p => p.id.match(/^foundation-(hearts|diamonds|clubs|spades)$/));
        const isWin = mainFoundations.every(p => p.cards.length >= 13);
        
        if (isWin && !state.effectState.synchronicityPaid) {
-          // Count face down cards
           let faceDownCount = 0;
           Object.values(state.piles).forEach(p => {
              faceDownCount += p.cards.filter(c => !c.faceUp).length;
@@ -1776,7 +1741,6 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     type: 'legendary',
     description: 'New Game+ (Reset Board, Keep Stats, x3 Multipliers).',
     onActivate: (state) => {
-       // Reset board but keep current score/coins and boost multipliers
        const newState = generateNewBoard(state.score, state.coins, 3, 3);
        return newState;
     }
@@ -1789,7 +1753,6 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     onActivate: (state) => {
        if (state.coins < 500) return {};
        
-       // Find incomplete foundation
        const foundations = Object.keys(state.piles).filter(k => k.startsWith('foundation'));
        const targetId = foundations.find(fid => state.piles[fid].cards.length < 13);
        
@@ -1798,10 +1761,8 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
           const missing = 13 - currentLen;
           
           return {
-             coins: state.coins - 500 + (missing * 10), // Pay cost, get standard move reward
+             coins: state.coins - 500 + (missing * 10),
              score: state.score + (missing * 10),
-             // We effectively "filled" it virtually. Let's lock it or fill with dummy kings.
-             // Simplified: Just give rewards.
              effectState: { ...state.effectState, trustFundUsed: true } 
           };
        }
@@ -1814,7 +1775,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     type: 'rare',
     description: 'When four 8s face up, gain +1 Coin per move permanently.',
     onMoveComplete: (state) => {
-       if (state.effectState.noblePathActive) return {}; // Already active
+       if (state.effectState.noblePathActive) return {}; 
        
        let visible8s = 0;
        Object.values(state.piles).forEach(pile => {
@@ -1863,45 +1824,41 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'reverse_psychology',
     name: 'Reverse Psychology',
     type: 'epic',
-    description: 'Swap the Rank/Suit of top Hand card and top Deck card.',
+    description: 'Swap the Rank/Suit of top Waste card and top Deck card.',
     onActivate: (state) => {
        const deck = state.piles['deck'];
-       const hand = state.piles['hand'];
+       const waste = state.piles['waste'];
        
-       if (deck.cards.length > 0 && hand.cards.length > 0) {
+       if (deck.cards.length > 0 && waste.cards.length > 0) {
           const deckCard = deck.cards[deck.cards.length - 1];
-          const handCard = hand.cards[hand.cards.length - 1];
+          const wasteCard = waste.cards[waste.cards.length - 1];
           
-          const newDeckCard = { ...deckCard, rank: handCard.rank, suit: handCard.suit };
-          const newHandCard = { ...handCard, rank: deckCard.rank, suit: deckCard.suit };
+          const newDeckCard = { ...deckCard, rank: wasteCard.rank, suit: wasteCard.suit };
+          const newWasteCard = { ...wasteCard, rank: deckCard.rank, suit: deckCard.suit };
           
-          // Rebuild piles
           const newDeckCards = [...deck.cards];
           newDeckCards[newDeckCards.length - 1] = newDeckCard;
           
-          const newHandCards = [...hand.cards];
-          newHandCards[newHandCards.length - 1] = newHandCard;
+          const newWasteCards = [...waste.cards];
+          newWasteCards[newWasteCards.length - 1] = newWasteCard;
           
           return {
              piles: {
                 ...state.piles,
                 deck: { ...deck, cards: newDeckCards },
-                hand: { ...hand, cards: newHandCards }
+                waste: { ...waste, cards: newWasteCards }
              }
           };
        }
        return {};
     }
   },
-
-  // --- NEW BATCH 21 ---
-
   {
     id: 'lobbyist',
     name: 'Lobbyist',
     type: 'blessing',
     description: 'Pay 100 coins to remove a random active curse.',
-    onActivate: (state, activeEffects) => {
+    onActivate: (state) => {
        if (state.coins < 100) return {};
        return { 
           coins: state.coins - 100,
@@ -1917,11 +1874,8 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     onActivate: (state) => {
        if (state.coins < 20) return {};
        
-       // Find largest tableau
        const tableaus = Object.values(state.piles).filter(p => p.type === 'tableau');
        const largest = tableaus.reduce((prev, current) => (prev.cards.length > current.cards.length) ? prev : current);
-       
-       // Find empty tableau
        const empty = tableaus.find(p => p.cards.length === 0);
        
        if (largest && empty && largest.cards.length > 1) {
@@ -1933,7 +1887,6 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
           newPiles[largest.id] = { ...largest, cards: toKeep };
           newPiles[empty.id] = { ...empty, cards: toMove };
           
-          // Ensure tops are face up
           if (newPiles[largest.id].cards.length > 0) {
              newPiles[largest.id].cards[newPiles[largest.id].cards.length - 1].faceUp = true;
           }
@@ -1950,17 +1903,17 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'offshore_account',
     name: 'Offshore Account',
     type: 'exploit',
-    description: 'Pay 50 coins to move bottom Hand card to top.',
+    description: 'Pay 50 coins to move bottom Waste card to top.',
     onActivate: (state) => {
        if (state.coins < 50) return {};
-       const hand = state.piles['hand'];
-       if (hand.cards.length > 1) {
-          const bottom = hand.cards[0];
-          const remaining = hand.cards.slice(1);
+       const waste = state.piles['waste'];
+       if (waste.cards.length > 1) {
+          const bottom = waste.cards[0];
+          const remaining = waste.cards.slice(1);
           const newCards = [...remaining, bottom];
           return {
              coins: state.coins - 50,
-             piles: { ...state.piles, hand: { ...hand, cards: newCards } }
+             piles: { ...state.piles, waste: { ...waste, cards: newCards } }
           };
        }
        return {};

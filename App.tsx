@@ -142,8 +142,10 @@ export default function SolitaireEngine({
   const [showUpdates, setShowUpdates] = useState(false);
   const [showHowTo, setShowHowTo] = useState(false);
   const [howToPage, setHowToPage] = useState(0);
-  const [selectedMode, setSelectedMode] = useState('standard');
+  const [selectedMode, setSelectedMode] = useState('coronata');
   const [glossaryTab, setGlossaryTab] = useState<'dangers'|'fears'|'blessings'|'exploits'|'curses'>('dangers');
+  const [expandedAchievement, setExpandedAchievement] = useState<number | null>(null);
+  const [expandedSettingsSection, setExpandedSettingsSection] = useState<string | null>(null);
   const [testAmount, setTestAmount] = useState(100);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackType, setFeedbackType] = useState('bug');
@@ -769,12 +771,10 @@ export default function SolitaireEngine({
   if (currentView === 'home') {
      // Game modes data
      const gameModes = [
-        { id: 'standard', name: 'Standard Run', desc: '15 encounters, build your deck, defeat the final boss', icon: '🎴', unlocked: true },
-        { id: 'daily', name: 'Daily Challenge', desc: 'Same seed for everyone. Compete on the leaderboard!', icon: '📅', unlocked: true },
-        { id: 'endless', name: 'Endless Mode', desc: 'How far can you go? Escalating difficulty, no end.', icon: '♾️', unlocked: false },
-        { id: 'speedrun', name: 'Speed Run', desc: 'Beat the game as fast as possible. Timer starts now!', icon: '⏱️', unlocked: false },
-        { id: 'hardcore', name: 'Hardcore', desc: 'One life. No saves. Maximum bragging rights.', icon: '💀', unlocked: false },
-        { id: 'custom', name: 'Custom Run', desc: 'Pick your own modifiers, effects, and challenges.', icon: '🔧', unlocked: false },
+        { id: 'coronata', name: 'Coronata', desc: 'The original rogue-like experience. 15 encounters with effects, shops, and wanders.', icon: '👑', unlocked: true },
+        { id: 'klondike', name: 'Klondike', desc: 'Classic solitaire with a rogue-like twist. Draw 1 or 3 cards.', icon: '🃏', unlocked: true },
+        { id: 'spider', name: 'Spider', desc: 'Build sequences of the same suit. 1, 2, or 4 suit variants.', icon: '🕷️', unlocked: true },
+        { id: 'freecell', name: 'FreeCell', desc: 'Strategic solitaire with free cells for temporary storage.', icon: '🗃️', unlocked: true },
      ];
 
      // How to play pages
@@ -800,8 +800,8 @@ export default function SolitaireEngine({
      return (
         <div className="h-screen w-full bg-slate-900 text-white flex flex-col items-center justify-center p-4 gap-8">
            <div className="text-center space-y-2">
-              <h1 className="text-5xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-purple-400 to-blue-600">SOLITAIRE<br/>ROGUE</h1>
-              <p className="text-slate-400">Build your deck. Break the rules.</p>
+              <h1 className="text-5xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-purple-400 to-blue-600">CORONATA</h1>
+              <p className="text-slate-400">Rogue-like Solitaire</p>
            </div>
            <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
               <button onClick={startRun} className="col-span-2 bg-emerald-600 hover:bg-emerald-500 text-white py-4 rounded-xl font-bold text-xl shadow-lg shadow-emerald-900/50 flex items-center justify-center gap-2"><Play fill="currentColor" /> Play</button>
@@ -846,6 +846,14 @@ export default function SolitaireEngine({
                           </div>
                        </button>
                     ))}
+                    {/* Coming Soon */}
+                    <div className="mt-4 p-4 rounded-xl border border-dashed border-slate-600 bg-slate-800/30">
+                       <div className="text-center">
+                          <div className="text-2xl mb-2">🚀</div>
+                          <div className="font-bold text-slate-400">More Modes Coming Soon</div>
+                          <div className="text-xs text-slate-500 mt-1">Daily challenges, endless mode, custom runs & more!</div>
+                       </div>
+                    </div>
                  </div>
                  <div className="pt-4 border-t border-slate-700 mt-4">
                     <button 
