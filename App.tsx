@@ -168,7 +168,7 @@ export default function SolitaireEngine({
   const [selectedPileId, setSelectedPileId] = useState<string | null>(null);
   const [hintTargets, setHintTargets] = useState<string[]>([]);
   
-  const [activeDrawer, setActiveDrawer] = useState<'pause' | 'exploit' | 'curse' | 'blessing' | 'shop' | 'feedback' | 'test' | 'settings' | 'resign' | 'blessing_select' | 'threat' | null>(null);
+  const [activeDrawer, setActiveDrawer] = useState<'pause' | 'exploit' | 'curse' | 'blessing' | 'shop' | 'feedback' | 'test' | 'settings' | 'resign' | 'blessing_select' | null>(null);
   const [shopInventory, setShopInventory] = useState<GameEffect[]>([]);
   const [blessingChoices, setBlessingChoices] = useState<GameEffect[]>([]);
   const [showLevelComplete, setShowLevelComplete] = useState(false);
@@ -1666,7 +1666,7 @@ export default function SolitaireEngine({
                 <div className="relative col-span-2 h-16 flex items-center justify-center">
                    {/* Threat button - current danger/fear */}
                    {(currentThreat || currentEncounter) && (
-                      <button type="button" aria-label={`Threat: ${currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}`} className="w-full h-full bg-red-900/50 border-2 border-red-500/50 rounded flex flex-col items-center justify-center text-center p-0.5 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.4)]" onClick={() => setActiveDrawer(activeDrawer === 'threat' ? null : 'threat')}>
+                      <button type="button" aria-label={`Threat: ${currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}`} className="w-full h-full bg-red-900/50 border-2 border-red-500/50 rounded flex flex-col items-center justify-center text-center p-0.5 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.4)]" onClick={() => alert(`${currentThreat?.type?.toUpperCase() || currentEncounter?.type?.toUpperCase() || 'CHALLENGE'}: ${currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}\n${currentThreat?.description || 'Score goal: ' + (currentEncounter?.goal || gameState.currentScoreGoal)}`)}>
                          <Skull size={12} className="text-red-400 mb-0.5" />
                          <div className="text-[6px] font-bold leading-tight text-red-200 line-clamp-2">{currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}</div>
                          <div className="text-[5px] text-red-300 leading-tight line-clamp-3 opacity-75">{currentThreat?.description || 'Goal: ' + (currentEncounter?.goal || gameState.currentScoreGoal)}</div>
@@ -1777,7 +1777,7 @@ export default function SolitaireEngine({
 
          {/* Drawer Content */}
          {activeDrawer && (
-            <div className={`absolute bottom-0 left-0 w-full bg-slate-800 border-t border-slate-700 p-4 pb-16 overflow-y-auto z-40 animate-in slide-in-from-bottom-10 pointer-events-auto ${activeDrawer === 'threat' ? 'h-auto' : 'h-64'}`}>
+            <div className="absolute bottom-0 left-0 w-full bg-slate-800 border-t border-slate-700 p-4 pb-16 overflow-y-auto z-40 animate-in slide-in-from-bottom-10 pointer-events-auto h-64">
                <div className="max-w-md mx-auto">
                   <div className="flex justify-between items-center mb-2">
                      <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">
@@ -1787,40 +1787,11 @@ export default function SolitaireEngine({
                          : activeDrawer === 'test' ? 'Test UI' 
                          : activeDrawer === 'settings' ? 'Settings' 
                          : activeDrawer === 'blessing_select' ? 'Select a Blessing' 
-                         : activeDrawer === 'threat' ? (currentThreat?.type === 'fear' ? 'Current Fear' : 'Current Danger')
                          : `${activeDrawer} Registry`}
                      </h3>
                      <button onClick={() => setActiveDrawer(null)}><ChevronDown className="text-slate-500" /></button>
                   </div>
-                  {/* Threat drawer - shows current danger/fear info */}
-                  {activeDrawer === 'threat' && currentThreat ? (
-                     <div className="grid grid-cols-1 gap-2">
-                        {(() => {
-                           const rarityColors = getRarityColor(currentThreat.rarity);
-                           const effectType = currentThreat.type === 'fear' ? 'fear' : 'danger';
-                           return (
-                              <div className={`p-2 rounded border ${rarityColors.bg} ${rarityColors.border} flex items-center gap-3`}>
-                                 <img src={getEffectIcon(currentThreat.name, effectType)} alt="" className="w-8 h-8 rounded shrink-0" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons[effectType]; }} />
-                                 <div className="flex-1 min-w-0">
-                                    <div className="font-bold text-white flex gap-1 items-center flex-wrap">
-                                       <span className="truncate text-xs">{currentThreat.name}</span>
-                                       <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{currentThreat.rarity || 'Common'}</span>
-                                       <span className={`text-[8px] px-1 py-0.5 rounded shrink-0 ${effectType === 'fear' ? 'bg-purple-900/50 text-purple-300' : 'bg-red-900/50 text-red-300'}`}>
-                                          {effectType === 'fear' ? 'Fear' : 'Danger'}
-                                       </span>
-                                       <span className="text-[8px] px-1 py-0.5 rounded bg-slate-700 text-slate-300 shrink-0">
-                                          {gameState.runIndex + 1}/{runPlan.length}
-                                       </span>
-                                    </div>
-                                    <div className="text-slate-400 text-[10px]">{currentThreat.description}</div>
-                                 </div>
-                              </div>
-                           );
-                        })()}
-                     </div>
-                  ) : activeDrawer === 'threat' && !currentThreat ? (
-                     <div className="text-center text-slate-500 py-4">No active threat</div>
-                  ) : activeDrawer === 'pause' ? (
+                  {activeDrawer === 'pause' ? (
                      <div className="grid grid-cols-4 gap-2">
                         <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><SkipBack size={16} /><span className="text-[8px]">Prev</span></button>
                         <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><Play size={16} /><span className="text-[8px]">Play/Pause</span></button>
