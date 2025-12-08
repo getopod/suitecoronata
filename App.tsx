@@ -1,9 +1,21 @@
 import React, { useState, useCallback } from 'react';
 import { LayoutGrid, Sparkles, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, HelpCircle, RefreshCw, X, Gift, Trophy, ArrowLeftRight, SkipBack, SkipForward, MessageSquare, FlaskConical, Save, Flag, Settings, ChevronDown, Pause, ShoppingCart, User, Unlock, Map as MapIcon } from 'lucide-react';
 import { Card, GameState, Pile, Rank, Suit, MoveContext, Encounter, GameEffect, Wander, WanderChoice, MinigameResult } from './types';
-import { EFFECTS_REGISTRY, getCardColor, generateNewBoard } from './data/effects';
-import { WANDER_REGISTRY } from './data/wanders';
+import { getCardColor, generateNewBoard } from './data/effects';
 import { Minigames } from './utils/minigames';
+
+// ==========================================
+// INJECTABLE REGISTRIES (defaults to empty for decoupled UI)
+// ==========================================
+// To use with effects/items, import and pass them:
+//   import { EFFECTS_REGISTRY } from './data/effects';
+//   import { WANDER_REGISTRY } from './data/wanders';
+//   <SolitaireEngine effectsRegistry={EFFECTS_REGISTRY} wanderRegistry={WANDER_REGISTRY} />
+
+interface SolitaireEngineProps {
+  effectsRegistry?: GameEffect[];
+  wanderRegistry?: Wander[];
+}
 
 // ==========================================
 // CONSTANTS & UTILS
@@ -28,10 +40,26 @@ const shuffleArray = <T,>(arr: T[], rng?: () => number): T[] => {
    return out;
 };
 
-const generateRunPlan = (rng?: () => number): Encounter[] => {
+const generateRunPlan = (effectsRegistry: GameEffect[], rng?: () => number): Encounter[] => {
    const encounters: Encounter[] = [];
-   const fears = EFFECTS_REGISTRY.filter(e => e.type === 'fear');
-   const dangers = EFFECTS_REGISTRY.filter(e => e.type === 'danger');
+   const fears = effectsRegistry.filter(e => e.type === 'fear');
+   const dangers = effectsRegistry.filter(e => e.type === 'danger');
+
+   // If no effects, generate simple encounters with no effect
+   if (fears.length === 0 && dangers.length === 0) {
+      for (let i = 0; i < 15; i++) {
+         const isDanger = (i + 1) % 3 === 0;
+         const goal = Math.floor(150 + (i / 14) * (4200 - 150));
+         encounters.push({
+            index: i,
+            type: isDanger ? 'danger' : 'fear',
+            effectId: '', // No effect
+            goal: goal,
+            completed: false
+         });
+      }
+      return encounters;
+   }
 
    const shuffledFears = shuffleArray([...fears], rng);
    const shuffledDangers = shuffleArray([...dangers], rng);
@@ -39,12 +67,14 @@ const generateRunPlan = (rng?: () => number): Encounter[] => {
    for (let i = 0; i < 15; i++) {
       const isDanger = (i + 1) % 3 === 0;
       const goal = Math.floor(150 + (i / 14) * (4200 - 150));
-      const effect = isDanger ? (shuffledDangers[i % shuffledDangers.length] || dangers[0]) : (shuffledFears[i % shuffledFears.length] || fears[0]);
+      const effect = isDanger 
+         ? (shuffledDangers[i % shuffledDangers.length] || shuffledFears[0]) 
+         : (shuffledFears[i % shuffledFears.length] || shuffledDangers[0]);
 
       encounters.push({
          index: i,
          type: isDanger ? 'danger' : 'fear',
-         effectId: effect.id,
+         effectId: effect?.id || '',
          goal: goal,
          completed: false
       });
@@ -88,7 +118,10 @@ const getRankDisplay = (r: Rank) => {
 // 5. COMPONENT: APP
 // ==========================================
 
-export default function SolitaireEngine() {
+export default function SolitaireEngine({ 
+  effectsRegistry = [], 
+  wanderRegistry = [] 
+}: SolitaireEngineProps = {}) {
   const [currentView, setCurrentView] = useState<'home' | 'game'>('home');
   const [runPlan, setRunPlan] = useState<Encounter[]>([]);
   const [gameState, setGameState] = useState<GameState>(initialGameState());
@@ -101,7 +134,15 @@ export default function SolitaireEngine() {
   const [blessingChoices, setBlessingChoices] = useState<GameEffect[]>([]);
   const [showLevelComplete, setShowLevelComplete] = useState(false);
   
+  // Home menu overlay states
   const [showGlossary, setShowGlossary] = useState(false);
+  const [showModes, setShowModes] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showUpdates, setShowUpdates] = useState(false);
+  const [showHowTo, setShowHowTo] = useState(false);
+  const [howToPage, setHowToPage] = useState(0);
+  const [selectedMode, setSelectedMode] = useState('standard');
   const [glossaryTab, setGlossaryTab] = useState<'dangers'|'fears'|'blessings'|'exploits'|'curses'>('dangers');
   const [testAmount, setTestAmount] = useState(100);
   const [feedbackText, setFeedbackText] = useState("");
@@ -128,7 +169,7 @@ export default function SolitaireEngine() {
         if (eff.type === 'modify_next_score_goal_pct') updates.currentScoreGoal = Math.floor((gameState.currentScoreGoal) * (1 + eff.params[0]));
         
         if (eff.type === 'add_random_curse') { 
-            const curse = EFFECTS_REGISTRY.filter(e => e.type === 'curse')[Math.floor(Math.random() * 5)]; 
+            const curse = effectsRegistry.filter(e => e.type === 'curse')[Math.floor(Math.random() * 5)]; 
             if (curse && !newOwned.includes(curse.id)) { newOwned.push(curse.id); newActive.push(curse.id); } 
         }
         if (eff.type === 'add_specific_curse') {
@@ -136,7 +177,7 @@ export default function SolitaireEngine() {
             if (!newOwned.includes(cid)) { newOwned.push(cid); newActive.push(cid); }
         }
         if (eff.type === 'add_random_blessing') { 
-            const b = EFFECTS_REGISTRY.filter(e => e.type === 'blessing')[Math.floor(Math.random() * 5)]; 
+            const b = effectsRegistry.filter(e => e.type === 'blessing')[Math.floor(Math.random() * 5)]; 
             if (b && !newOwned.includes(b.id)) { newOwned.push(b.id); } // Blessings don't activate immediately
         }
         if (eff.type === 'add_blessing_by_id') {
@@ -144,11 +185,11 @@ export default function SolitaireEngine() {
             if (!newOwned.includes(bid)) { newOwned.push(bid); }
         }
         if (eff.type === 'add_random_exploit') { 
-            const x = EFFECTS_REGISTRY.filter(e => e.type === 'exploit')[Math.floor(Math.random() * 5)]; 
+            const x = effectsRegistry.filter(e => e.type === 'exploit')[Math.floor(Math.random() * 5)]; 
             if (x && !newOwned.includes(x.id)) { newOwned.push(x.id); newActive.push(x.id); } 
         }
         if (eff.type === 'remove_curse') { 
-            const curses = newActive.filter(id => EFFECTS_REGISTRY.find(e => e.id === id)?.type === 'curse'); 
+            const curses = newActive.filter(id => effectsRegistry.find(e => e.id === id)?.type === 'curse'); 
             if (curses.length > 0) {
                 const toRemove = curses[Math.floor(Math.random() * curses.length)];
                 newActive = newActive.filter(id => id !== toRemove); 
@@ -164,6 +205,40 @@ export default function SolitaireEngine() {
     setActiveEffects(newActive);
   };
 
+  // Placeholder wanders for when no wander registry is provided
+  const PLACEHOLDER_WANDERS: Wander[] = [
+    {
+      id: 'placeholder_wander_1',
+      label: 'The Crossroads',
+      description: 'Two paths diverge before you. Each seems to promise something different.',
+      type: 'wander',
+      choices: [
+        { label: 'Take the left path', result: 'You find a small cache of coins.', effects: [{ type: 'modify_coin', params: [15] }] },
+        { label: 'Take the right path', result: 'A shortcut! You feel invigorated.', effects: [{ type: 'modify_score', params: [25] }] },
+      ],
+    },
+    {
+      id: 'placeholder_wander_2',
+      label: 'The Merchant',
+      description: 'A traveling merchant offers you a deal.',
+      type: 'wander',
+      choices: [
+        { label: 'Trade coins for points (-20 coins)', result: 'A fair exchange.', effects: [{ type: 'modify_coin', params: [-20] }, { type: 'modify_score', params: [50] }] },
+        { label: 'Decline politely', result: 'The merchant nods and moves on.', effects: [] },
+      ],
+    },
+    {
+      id: 'placeholder_wander_3',
+      label: 'The Gamble',
+      description: 'A mysterious figure offers you a wager.',
+      type: 'wander',
+      choices: [
+        { label: 'Accept the bet', result: 'Fortune favors the bold!', effects: [{ type: 'modify_coin', params: [30] }] },
+        { label: 'Walk away', result: 'Sometimes caution is wise.', effects: [{ type: 'modify_score', params: [10] }] },
+      ],
+    },
+  ];
+
   const startWanderPhase = () => {
      setActiveDrawer(null);
      setGameState(prev => ({ ...prev, wanderRound: 1 }));
@@ -171,11 +246,16 @@ export default function SolitaireEngine() {
   };
 
   const triggerWanderSelection = () => {
-     const validWanders = WANDER_REGISTRY.filter(w => {
+     let validWanders = wanderRegistry.filter(w => {
          if (w.isHidden) return false; 
          if (w.conditions?.minEncounter && gameState.runIndex < w.conditions.minEncounter) return false;
          return true;
      });
+     
+     // Use placeholder wanders if none available
+     if (validWanders.length === 0) {
+       validWanders = PLACEHOLDER_WANDERS;
+     }
      
      const opts = validWanders.sort(() => 0.5 - Math.random()).slice(0, 3);
      setGameState(prev => ({ ...prev, wanderState: 'selection', wanderOptions: opts, activeWander: null, wanderResultText: null }));
@@ -194,14 +274,14 @@ export default function SolitaireEngine() {
 
   const startNextEncounter = () => {
      const newCharges = { ...gameState.charges };
-     EFFECTS_REGISTRY.forEach(e => { if (e.chargeReset === 'encounter' && e.maxCharges) newCharges[e.id] = e.maxCharges; });
+     effectsRegistry.forEach(e => { if (e.chargeReset === 'encounter' && e.maxCharges) newCharges[e.id] = e.maxCharges; });
      const nextIdx = gameState.runIndex + 1;
      if (nextIdx < runPlan.length) {
         const nextEncounter = runPlan[nextIdx];
         
         // Retain only Exploits/Curses/Dangers (Blessings must be played)
         const keptEffects = activeEffects.filter(id => { 
-            const e = EFFECTS_REGISTRY.find(x => x.id === id); 
+            const e = effectsRegistry.find(x => x.id === id); 
             return e?.type === 'exploit' || e?.type === 'curse' || e?.type === 'epic' || e?.type === 'legendary'; 
         });
         
@@ -210,12 +290,12 @@ export default function SolitaireEngine() {
         
         // Inject Owned Blessings into Deck
         const ownedBlessings = gameState.ownedEffects.filter(id => {
-            const e = EFFECTS_REGISTRY.find(x => x.id === id);
+            const e = effectsRegistry.find(x => x.id === id);
             return e?.type === 'blessing';
         });
         
         const blessingCards: Card[] = ownedBlessings.map(bid => {
-            const def = EFFECTS_REGISTRY.find(e => e.id === bid);
+            const def = effectsRegistry.find(e => e.id === bid);
             return {
                 id: `blessing-${bid}-${Math.random()}`,
                 suit: 'special',
@@ -249,14 +329,14 @@ export default function SolitaireEngine() {
       const seedNum = rawSeed ? Number(rawSeed) : null;
       const rng = seedNum ? createSeededRng(seedNum) : undefined;
 
-      const plan = generateRunPlan(rng);
+      const plan = generateRunPlan(effectsRegistry, rng);
       const firstEncounter = plan[0];
       let freshState = initialGameState();
       if (firstEncounter) freshState.currentScoreGoal = firstEncounter.goal;
 
       // Apply first encounter onActivate if present (mirror geminicoronata behavior)
-      let initialActive: string[] = firstEncounter ? [firstEncounter.effectId] : [];
-      const firstEff = firstEncounter ? EFFECTS_REGISTRY.find(e => e.id === firstEncounter.effectId) : undefined;
+      let initialActive: string[] = firstEncounter?.effectId ? [firstEncounter.effectId] : [];
+      const firstEff = firstEncounter?.effectId ? effectsRegistry.find(e => e.id === firstEncounter.effectId) : undefined;
       if (firstEff?.onActivate) {
          const changes = firstEff.onActivate(freshState, initialActive);
          if (changes) {
@@ -281,13 +361,18 @@ export default function SolitaireEngine() {
       setActiveEffects(initialActive);
       setCurrentView('game');
 
-      // Trigger initial blessing selection (unchanged)
-      const blessings = EFFECTS_REGISTRY.filter(e => e.type === 'blessing').sort(() => 0.5 - Math.random());
-      setBlessingChoices(blessings);
+      // Always show blessing selection (use placeholder if no blessings available)
+      const blessings = effectsRegistry.filter(e => e.type === 'blessing').sort(() => 0.5 - Math.random());
+      const blessingOptions = blessings.length > 0 ? blessings : [
+        { id: 'placeholder_blessing_1', name: 'Swift Hands', type: 'blessing', description: 'Draw an extra card each turn.', rarity: 'common', cost: 0 },
+        { id: 'placeholder_blessing_2', name: 'Lucky Draw', type: 'blessing', description: 'Increased chance of finding rare cards.', rarity: 'uncommon', cost: 0 },
+        { id: 'placeholder_blessing_3', name: 'Golden Touch', type: 'blessing', description: 'Earn bonus coins on foundation plays.', rarity: 'rare', cost: 0 },
+      ] as GameEffect[];
+      setBlessingChoices(blessingOptions);
       setActiveDrawer('blessing_select');
   };
 
-  const getEffects = useCallback(() => { return EFFECTS_REGISTRY.filter(e => activeEffects.includes(e.id)); }, [activeEffects]);
+  const getEffects = useCallback(() => { return effectsRegistry.filter(e => activeEffects.includes(e.id)); }, [activeEffects, effectsRegistry]);
 
   const runMinigame = () => {
      if (!gameState.activeMinigame) return;
@@ -508,8 +593,14 @@ export default function SolitaireEngine() {
      setShowLevelComplete(false);
      const currentEncounter = runPlan[gameState.runIndex];
      if (currentEncounter.type === 'danger') {
-        const blessings = EFFECTS_REGISTRY.filter(e => e.type === 'blessing').sort(() => 0.5 - Math.random());
-        setBlessingChoices(blessings); 
+        // Always show blessing selection after danger (use placeholder if empty)
+        const blessings = effectsRegistry.filter(e => e.type === 'blessing').sort(() => 0.5 - Math.random());
+        const blessingOptions = blessings.length > 0 ? blessings : [
+          { id: 'placeholder_blessing_1', name: 'Swift Hands', type: 'blessing', description: 'Draw an extra card each turn.', rarity: 'common', cost: 0 },
+          { id: 'placeholder_blessing_2', name: 'Lucky Draw', type: 'blessing', description: 'Increased chance of finding rare cards.', rarity: 'uncommon', cost: 0 },
+          { id: 'placeholder_blessing_3', name: 'Golden Touch', type: 'blessing', description: 'Earn bonus coins on foundation plays.', rarity: 'rare', cost: 0 },
+        ] as GameEffect[];
+        setBlessingChoices(blessingOptions); 
         setActiveDrawer('blessing_select');
      } else {
         openShop();
@@ -517,9 +608,20 @@ export default function SolitaireEngine() {
   };
   
   const openShop = () => {
-     const exploits = EFFECTS_REGISTRY.filter(e => e.type === 'exploit').sort(() => 0.5 - Math.random()).slice(0, 4);
-     const curses = EFFECTS_REGISTRY.filter(e => e.type === 'curse').sort(() => 0.5 - Math.random()).slice(0, 4);
-     setShopInventory([...exploits, ...curses]);
+     const exploits = effectsRegistry.filter(e => e.type === 'exploit').sort(() => 0.5 - Math.random()).slice(0, 4);
+     const curses = effectsRegistry.filter(e => e.type === 'curse').sort(() => 0.5 - Math.random()).slice(0, 4);
+     
+     // Always show shop (use placeholder items if empty)
+     let shopItems = [...exploits, ...curses];
+     if (shopItems.length === 0) {
+       shopItems = [
+         { id: 'placeholder_exploit_1', name: 'Card Counter', type: 'exploit', description: 'See the next card in the deck.', rarity: 'common', cost: 50 },
+         { id: 'placeholder_exploit_2', name: 'Deep Pockets', type: 'exploit', description: 'Start with extra coins each encounter.', rarity: 'uncommon', cost: 75 },
+         { id: 'placeholder_curse_1', name: 'Heavy Hands', type: 'curse', description: 'Cards cost more to play.', rarity: 'common', cost: 0 },
+         { id: 'placeholder_curse_2', name: 'Bad Luck', type: 'curse', description: 'Reduced score from low cards.', rarity: 'uncommon', cost: 0 },
+       ] as GameEffect[];
+     }
+     setShopInventory(shopItems);
      setActiveDrawer('shop');
   };
 
@@ -529,7 +631,7 @@ export default function SolitaireEngine() {
          if (forceState === true && isActive) return prev;
          if (forceState === false && !isActive) return prev;
          if (isActive) return prev.filter(e => e !== id);
-         const effect = EFFECTS_REGISTRY.find(e => e.id === id);
+         const effect = effectsRegistry.find(e => e.id === id);
          if (effect?.onActivate) {
             const changes = effect.onActivate(gameState, prev);
             const anyChanges = changes as any;
@@ -652,9 +754,39 @@ export default function SolitaireEngine() {
    const foundationPiles = (Object.values(gameState.piles) as Pile[]).filter(p => p.type === 'foundation').sort((a, b) => a.id.localeCompare(b.id));
    const tableauPiles = (Object.values(gameState.piles) as Pile[]).filter(p => p.type === 'tableau').sort((a, b) => Number.parseInt(a.id.split('-')[1] as string, 10) - Number.parseInt(b.id.split('-')[1] as string, 10));
   const currentEncounter = runPlan[gameState.runIndex];
-  const currentThreat = EFFECTS_REGISTRY.find(e => e.id === currentEncounter?.effectId);
+  const currentThreat = effectsRegistry.find(e => e.id === currentEncounter?.effectId);
 
   if (currentView === 'home') {
+     // Game modes data
+     const gameModes = [
+        { id: 'standard', name: 'Standard Run', desc: '15 encounters, build your deck, defeat the final boss', icon: '🎴', unlocked: true },
+        { id: 'daily', name: 'Daily Challenge', desc: 'Same seed for everyone. Compete on the leaderboard!', icon: '📅', unlocked: true },
+        { id: 'endless', name: 'Endless Mode', desc: 'How far can you go? Escalating difficulty, no end.', icon: '♾️', unlocked: false },
+        { id: 'speedrun', name: 'Speed Run', desc: 'Beat the game as fast as possible. Timer starts now!', icon: '⏱️', unlocked: false },
+        { id: 'hardcore', name: 'Hardcore', desc: 'One life. No saves. Maximum bragging rights.', icon: '💀', unlocked: false },
+        { id: 'custom', name: 'Custom Run', desc: 'Pick your own modifiers, effects, and challenges.', icon: '🔧', unlocked: false },
+     ];
+
+     // How to play pages
+     const howToPages = [
+        { title: 'Goal', content: 'Score points by moving cards to the Foundation piles. Build up from Ace to King, same suit. Reach the target score to clear each encounter!' },
+        { title: 'Moving Cards', content: 'Tap a card to select it, then tap a valid destination. In tableau, stack cards in descending order, alternating colors (red on black, black on red).' },
+        { title: 'The Deck', content: 'Tap the deck to draw cards. You can move the top card of the draw pile to tableau or foundation piles.' },
+        { title: 'Encounters', content: 'Each run has 15 encounters. Every 3rd encounter is a Danger (harder). Fears give you access to the shop. Dangers let you pick a blessing.' },
+        { title: 'Effects', content: 'Exploits help you. Curses hurt you. Blessings are powerful cards added to your deck. Collect them from the shop and wanders!' },
+        { title: 'The Shop', content: 'After Fear encounters, visit the Trade. Spend coins on Exploits or take Curses for bonus coins. Choose wisely!' },
+        { title: 'Wanders', content: 'Between encounters, you\'ll face random events. Make choices that can reward you with coins, effects, or... consequences.' },
+        { title: 'Winning', content: 'Beat all 15 encounters to complete a run. Your final score depends on coins, effects collected, and time taken. Good luck!' },
+     ];
+
+     // Updates/changelog data
+     const updates = [
+        { version: 'v0.4.0', date: 'Dec 7, 2024', changes: ['Added Modes menu', 'Added Profile screen', 'Full Settings UI', 'How To Play tutorial', 'Updates changelog'] },
+        { version: 'v0.3.0', date: 'Dec 5, 2024', changes: ['Decoupled UI from backend', 'Placeholder content for all phases', 'UI works without effects'] },
+        { version: 'v0.2.0', date: 'Dec 1, 2024', changes: ['Wander events system', 'Shop & trading', 'Blessing cards', 'Run planning'] },
+        { version: 'v0.1.0', date: 'Nov 15, 2024', changes: ['Initial prototype', 'Basic solitaire gameplay', 'Score system', 'Card rendering'] },
+     ];
+
      return (
         <div className="h-screen w-full bg-slate-900 text-white flex flex-col items-center justify-center p-4 gap-8">
            <div className="text-center space-y-2">
@@ -663,13 +795,310 @@ export default function SolitaireEngine() {
            </div>
            <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
               <button onClick={startRun} className="col-span-2 bg-emerald-600 hover:bg-emerald-500 text-white py-4 rounded-xl font-bold text-xl shadow-lg shadow-emerald-900/50 flex items-center justify-center gap-2"><Play fill="currentColor" /> Play</button>
-              <button className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><Gamepad2 size={18}/> Modes</button>
-              <button className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><BookOpen size={18}/> How To</button>
+              <button onClick={() => setShowModes(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><Gamepad2 size={18}/> Modes</button>
+              <button onClick={() => setShowHowTo(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><BookOpen size={18}/> How To</button>
               <button className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2" onClick={() => setShowGlossary(true)}><HelpCircle size={18}/> Glossary</button>
-              <button className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><RefreshCw size={18}/> Updates</button>
-              <button className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><User size={18}/> Profile</button>
-              <button onClick={() => setActiveDrawer('settings')} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><Settings size={18}/> Settings</button>
+              <button onClick={() => setShowUpdates(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><RefreshCw size={18}/> Updates</button>
+              <button onClick={() => setShowProfile(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><User size={18}/> Profile</button>
+              <button onClick={() => setShowSettings(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><Settings size={18}/> Settings</button>
            </div>
+
+           {/* MODES PANEL */}
+           {showModes && (
+              <div className="fixed inset-0 bg-slate-900 z-50 p-4 flex flex-col animate-in slide-in-from-bottom-10">
+                 <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
+                    <h2 className="text-2xl font-bold">Game Modes</h2>
+                    <button onClick={() => setShowModes(false)}><X /></button>
+                 </div>
+                 <div className="flex-1 overflow-y-auto space-y-3">
+                    {gameModes.map(mode => (
+                       <button 
+                          key={mode.id}
+                          onClick={() => mode.unlocked && setSelectedMode(mode.id)}
+                          disabled={!mode.unlocked}
+                          className={`w-full p-4 rounded-xl border text-left transition-all ${
+                             selectedMode === mode.id 
+                                ? 'bg-purple-900/50 border-purple-500 ring-2 ring-purple-400' 
+                                : mode.unlocked 
+                                   ? 'bg-slate-800 border-slate-700 hover:border-slate-500' 
+                                   : 'bg-slate-800/50 border-slate-700/50 opacity-50 cursor-not-allowed'
+                          }`}>
+                          <div className="flex items-center gap-3">
+                             <span className="text-2xl">{mode.icon}</span>
+                             <div className="flex-1">
+                                <div className="font-bold text-white flex items-center gap-2">
+                                   {mode.name}
+                                   {!mode.unlocked && <Lock size={14} className="text-slate-500" />}
+                                   {selectedMode === mode.id && <span className="text-xs bg-purple-600 px-2 py-0.5 rounded">Selected</span>}
+                                </div>
+                                <div className="text-sm text-slate-400">{mode.desc}</div>
+                             </div>
+                          </div>
+                       </button>
+                    ))}
+                 </div>
+                 <div className="pt-4 border-t border-slate-700 mt-4">
+                    <button 
+                       onClick={() => { setShowModes(false); startRun(); }} 
+                       className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-lg flex items-center justify-center gap-2">
+                       <Play fill="currentColor" /> Start {gameModes.find(m => m.id === selectedMode)?.name}
+                    </button>
+                 </div>
+              </div>
+           )}
+
+           {/* PROFILE PANEL */}
+           {showProfile && (
+              <div className="fixed inset-0 bg-slate-900 z-50 p-4 flex flex-col animate-in slide-in-from-bottom-10">
+                 <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
+                    <h2 className="text-2xl font-bold">Profile</h2>
+                    <button onClick={() => setShowProfile(false)}><X /></button>
+                 </div>
+                 <div className="flex-1 overflow-y-auto">
+                    {/* Avatar & Name */}
+                    <div className="flex items-center gap-4 mb-6 p-4 bg-slate-800 rounded-xl">
+                       <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-600 rounded-full flex items-center justify-center text-2xl">🃏</div>
+                       <div>
+                          <div className="font-bold text-xl">Player One</div>
+                          <div className="text-slate-400 text-sm">Joined Nov 2024</div>
+                       </div>
+                    </div>
+
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-2 gap-3 mb-6">
+                       <div className="bg-slate-800 p-4 rounded-xl text-center">
+                          <div className="text-3xl font-bold text-emerald-400">12</div>
+                          <div className="text-xs text-slate-400 uppercase">Runs Won</div>
+                       </div>
+                       <div className="bg-slate-800 p-4 rounded-xl text-center">
+                          <div className="text-3xl font-bold text-red-400">8</div>
+                          <div className="text-xs text-slate-400 uppercase">Runs Lost</div>
+                       </div>
+                       <div className="bg-slate-800 p-4 rounded-xl text-center">
+                          <div className="text-3xl font-bold text-yellow-400">4,521</div>
+                          <div className="text-xs text-slate-400 uppercase">High Score</div>
+                       </div>
+                       <div className="bg-slate-800 p-4 rounded-xl text-center">
+                          <div className="text-3xl font-bold text-purple-400">23</div>
+                          <div className="text-xs text-slate-400 uppercase">Effects Found</div>
+                       </div>
+                    </div>
+
+                    {/* Recent Runs */}
+                    <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-2">Recent Runs</h3>
+                    <div className="space-y-2 mb-6">
+                       {[
+                          { result: 'won', score: 4521, encounters: 15, date: '2 hours ago' },
+                          { result: 'lost', score: 2100, encounters: 9, date: 'Yesterday' },
+                          { result: 'won', score: 3890, encounters: 15, date: '3 days ago' },
+                       ].map((run, i) => (
+                          <div key={i} className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                             <div className="flex items-center gap-2">
+                                {run.result === 'won' ? <Trophy size={16} className="text-yellow-400" /> : <Skull size={16} className="text-red-400" />}
+                                <span className="font-bold">{run.score}</span>
+                                <span className="text-slate-500 text-xs">({run.encounters}/15)</span>
+                             </div>
+                             <span className="text-slate-500 text-xs">{run.date}</span>
+                          </div>
+                       ))}
+                    </div>
+
+                    {/* Achievements Preview */}
+                    <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-2">Achievements</h3>
+                    <div className="grid grid-cols-4 gap-2">
+                       {['🏆', '⭐', '🎯', '💎', '🔥', '❄️', '⚡', '🌟'].map((emoji, i) => (
+                          <div key={i} className={`aspect-square flex items-center justify-center text-2xl rounded-lg ${i < 5 ? 'bg-slate-800' : 'bg-slate-800/30 grayscale opacity-40'}`}>
+                             {emoji}
+                          </div>
+                       ))}
+                    </div>
+                 </div>
+              </div>
+           )}
+
+           {/* SETTINGS PANEL */}
+           {showSettings && (
+              <div className="fixed inset-0 bg-slate-900 z-50 p-4 flex flex-col animate-in slide-in-from-bottom-10">
+                 <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
+                    <h2 className="text-2xl font-bold">Settings</h2>
+                    <button onClick={() => setShowSettings(false)}><X /></button>
+                 </div>
+                 <div className="flex-1 overflow-y-auto space-y-6">
+                    {/* Gameplay */}
+                    <div>
+                       <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-3">Gameplay</h3>
+                       <div className="space-y-3">
+                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                             <div><div className="font-medium">Auto-flip Cards</div><div className="text-xs text-slate-400">Automatically flip face-down cards</div></div>
+                             <div className="w-12 h-6 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                             <div><div className="font-medium">Confirm Moves</div><div className="text-xs text-slate-400">Ask before making moves</div></div>
+                             <div className="w-12 h-6 bg-slate-600 rounded-full relative cursor-pointer"><div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                             <div><div className="font-medium">Show Hints</div><div className="text-xs text-slate-400">Highlight valid moves</div></div>
+                             <div className="w-12 h-6 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                          </div>
+                       </div>
+                    </div>
+
+                    {/* Audio */}
+                    <div>
+                       <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-3">Audio</h3>
+                       <div className="space-y-3">
+                          <div className="p-3 bg-slate-800 rounded-lg">
+                             <div className="flex justify-between mb-2"><span>Master Volume</span><span className="text-slate-400">80%</span></div>
+                             <div className="h-2 bg-slate-700 rounded-full"><div className="h-2 bg-emerald-500 rounded-full" style={{width: '80%'}}></div></div>
+                          </div>
+                          <div className="p-3 bg-slate-800 rounded-lg">
+                             <div className="flex justify-between mb-2"><span>Music</span><span className="text-slate-400">60%</span></div>
+                             <div className="h-2 bg-slate-700 rounded-full"><div className="h-2 bg-emerald-500 rounded-full" style={{width: '60%'}}></div></div>
+                          </div>
+                          <div className="p-3 bg-slate-800 rounded-lg">
+                             <div className="flex justify-between mb-2"><span>Sound Effects</span><span className="text-slate-400">100%</span></div>
+                             <div className="h-2 bg-slate-700 rounded-full"><div className="h-2 bg-emerald-500 rounded-full" style={{width: '100%'}}></div></div>
+                          </div>
+                       </div>
+                    </div>
+
+                    {/* Display */}
+                    <div>
+                       <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-3">Display</h3>
+                       <div className="space-y-3">
+                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                             <div><div className="font-medium">Card Style</div><div className="text-xs text-slate-400">Visual appearance of cards</div></div>
+                             <select className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm">
+                                <option>Classic</option>
+                                <option>Modern</option>
+                                <option>Minimal</option>
+                             </select>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                             <div><div className="font-medium">Animations</div><div className="text-xs text-slate-400">Enable card animations</div></div>
+                             <div className="w-12 h-6 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                             <div><div className="font-medium">Reduced Motion</div><div className="text-xs text-slate-400">Minimize animations</div></div>
+                             <div className="w-12 h-6 bg-slate-600 rounded-full relative cursor-pointer"><div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                          </div>
+                       </div>
+                    </div>
+
+                    {/* Data */}
+                    <div>
+                       <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-3">Data</h3>
+                       <div className="space-y-2">
+                          <button className="w-full p-3 bg-slate-800 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
+                             <span>Export Save Data</span>
+                             <span className="text-slate-500">→</span>
+                          </button>
+                          <button className="w-full p-3 bg-slate-800 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
+                             <span>Import Save Data</span>
+                             <span className="text-slate-500">→</span>
+                          </button>
+                          <button className="w-full p-3 bg-red-900/30 border border-red-800 rounded-lg text-left hover:bg-red-900/50 text-red-300">
+                             Reset All Progress
+                          </button>
+                       </div>
+                    </div>
+                 </div>
+              </div>
+           )}
+
+           {/* UPDATES PANEL */}
+           {showUpdates && (
+              <div className="fixed inset-0 bg-slate-900 z-50 p-4 flex flex-col animate-in slide-in-from-bottom-10">
+                 <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
+                    <h2 className="text-2xl font-bold">Updates</h2>
+                    <button onClick={() => setShowUpdates(false)}><X /></button>
+                 </div>
+                 <div className="flex-1 overflow-y-auto space-y-4">
+                    {updates.map((update, i) => (
+                       <div key={i} className={`p-4 rounded-xl border ${i === 0 ? 'bg-purple-900/20 border-purple-700' : 'bg-slate-800 border-slate-700'}`}>
+                          <div className="flex justify-between items-center mb-2">
+                             <span className="font-bold text-lg">{update.version}</span>
+                             <span className="text-xs text-slate-400">{update.date}</span>
+                          </div>
+                          {i === 0 && <div className="text-xs bg-purple-600 text-white px-2 py-0.5 rounded inline-block mb-2">Latest</div>}
+                          <ul className="space-y-1">
+                             {update.changes.map((change, j) => (
+                                <li key={j} className="text-sm text-slate-300 flex items-start gap-2">
+                                   <span className="text-emerald-400 mt-1">•</span>
+                                   {change}
+                                </li>
+                             ))}
+                          </ul>
+                       </div>
+                    ))}
+                 </div>
+              </div>
+           )}
+
+           {/* HOW TO PLAY PANEL */}
+           {showHowTo && (
+              <div className="fixed inset-0 bg-slate-900 z-50 p-4 flex flex-col animate-in slide-in-from-bottom-10">
+                 <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
+                    <h2 className="text-2xl font-bold">How To Play</h2>
+                    <button onClick={() => { setShowHowTo(false); setHowToPage(0); }}><X /></button>
+                 </div>
+                 <div className="flex-1 flex flex-col">
+                    {/* Page indicator */}
+                    <div className="flex justify-center gap-1.5 mb-6">
+                       {howToPages.map((_, i) => (
+                          <button 
+                             key={i} 
+                             onClick={() => setHowToPage(i)}
+                             className={`w-2 h-2 rounded-full transition-all ${i === howToPage ? 'bg-purple-500 w-6' : 'bg-slate-600'}`}
+                          />
+                       ))}
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 flex items-center justify-center">
+                       <div className="text-center max-w-sm">
+                          <div className="text-6xl mb-6">
+                             {howToPage === 0 && '🎯'}
+                             {howToPage === 1 && '👆'}
+                             {howToPage === 2 && '🃏'}
+                             {howToPage === 3 && '⚔️'}
+                             {howToPage === 4 && '✨'}
+                             {howToPage === 5 && '🛒'}
+                             {howToPage === 6 && '🗺️'}
+                             {howToPage === 7 && '🏆'}
+                          </div>
+                          <h3 className="text-2xl font-bold mb-4">{howToPages[howToPage].title}</h3>
+                          <p className="text-slate-300 leading-relaxed">{howToPages[howToPage].content}</p>
+                       </div>
+                    </div>
+
+                    {/* Navigation */}
+                    <div className="flex gap-3 pt-4 border-t border-slate-700">
+                       <button 
+                          onClick={() => setHowToPage(p => Math.max(0, p - 1))}
+                          disabled={howToPage === 0}
+                          className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg font-bold">
+                          Previous
+                       </button>
+                       {howToPage < howToPages.length - 1 ? (
+                          <button 
+                             onClick={() => setHowToPage(p => p + 1)}
+                             className="flex-1 py-3 bg-purple-600 hover:bg-purple-500 rounded-lg font-bold">
+                             Next
+                          </button>
+                       ) : (
+                          <button 
+                             onClick={() => { setShowHowTo(false); setHowToPage(0); }}
+                             className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-lg font-bold">
+                             Got It!
+                          </button>
+                       )}
+                    </div>
+                 </div>
+              </div>
+           )}
+
+           {/* GLOSSARY PANEL (existing) */}
            {showGlossary && (
               <div className="fixed inset-0 bg-slate-900 z-50 p-4 flex flex-col animate-in slide-in-from-bottom-10">
                  <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
@@ -682,7 +1111,9 @@ export default function SolitaireEngine() {
                     ))}
                  </div>
                  <div className="flex-1 overflow-y-auto space-y-2">
-                    {EFFECTS_REGISTRY.filter(e => {
+                    {effectsRegistry.length === 0 ? (
+                       <div className="text-center text-slate-500 py-8">No effects loaded</div>
+                    ) : effectsRegistry.filter(e => {
                        if (glossaryTab === 'dangers') return e.type === 'danger';
                        if (glossaryTab === 'fears') return e.type === 'fear';
                        if (glossaryTab === 'blessings') return e.type === 'blessing';
@@ -696,7 +1127,7 @@ export default function SolitaireEngine() {
                             <div className="text-[10px] uppercase text-slate-500 border border-slate-600 px-1 rounded">{e.rarity || 'Common'}</div>
                           </div>
                           <div className="text-slate-400 text-sm mt-1">{e.description}</div>
-                          {e.cost && <div className="text-xs text-yellow-500 mt-1 flex items-center gap-1"><Coins size={10}/> {e.cost}</div>}
+                          {Boolean(e.cost) && <div className="text-xs text-yellow-500 mt-1 flex items-center gap-1"><Coins size={10}/> {e.cost}</div>}
                        </div>
                     ))}
                  </div>
@@ -762,11 +1193,12 @@ export default function SolitaireEngine() {
                    </button>
                 </div>
            <div className="col-span-2 flex items-center justify-center">
-              {currentThreat && (
-                 <button type="button" aria-label={`Threat: ${currentThreat.name}`} className="w-11 h-16 bg-red-900/50 border-2 border-red-500/50 rounded flex flex-col items-center justify-center text-center p-0.5 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.4)]" onClick={() => alert(`${currentThreat.name}: ${currentThreat.description}`)}>
+              {/* Always show threat card - use encounter info as fallback */}
+              {(currentThreat || currentEncounter) && (
+                 <button type="button" aria-label={`Threat: ${currentThreat?.name || `Level ${(currentEncounter?.index || 0) + 1}`}`} className="w-11 h-16 bg-red-900/50 border-2 border-red-500/50 rounded flex flex-col items-center justify-center text-center p-0.5 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.4)]" onClick={() => alert(`${currentThreat?.name || currentEncounter?.type?.toUpperCase() || 'CHALLENGE'}: ${currentThreat?.description || `Reach ${currentEncounter?.goal || gameState.currentScoreGoal} points`}`)}>
                     <Skull size={12} className="text-red-400 mb-0.5" />
-                    <div className="text-[6px] font-bold leading-tight text-red-200 line-clamp-2">{currentThreat.name}</div>
-                    <div className="text-[5px] text-red-300 leading-tight line-clamp-3 opacity-75">{currentThreat.description}</div>
+                    <div className="text-[6px] font-bold leading-tight text-red-200 line-clamp-2">{currentThreat?.name || `Level ${(currentEncounter?.index || 0) + 1}`}</div>
+                    <div className="text-[5px] text-red-300 leading-tight line-clamp-3 opacity-75">{currentThreat?.description || `Goal: ${currentEncounter?.goal || gameState.currentScoreGoal}`}</div>
                  </button>
               )}
            </div>
@@ -831,14 +1263,14 @@ export default function SolitaireEngine() {
             )}
             <div className="flex justify-between px-2 mb-2 relative group">
                {runPlan.map((enc, i) => {
-                  const eff = EFFECTS_REGISTRY.find(e => e.id === enc.effectId);
+                  const eff = effectsRegistry.find(e => e.id === enc.effectId);
                   const cls = `w-2 h-2 rounded-full ${i < gameState.runIndex ? 'bg-green-500' : i === gameState.runIndex ? 'bg-white animate-pulse' : enc.type === 'danger' ? 'bg-red-900' : 'bg-slate-700'}`;
                   return (
                      <button
                         key={i}
                         type="button"
                         className={cls}
-                        onClick={() => alert(`${enc.type.toUpperCase()}: ${eff?.name}\n${eff?.description}`)}
+                        onClick={() => alert(`${enc.type.toUpperCase()}: ${eff?.name || 'Level ' + (i+1)}\n${eff?.description || 'Score goal: ' + enc.goal}`)}
                         aria-label={`Encounter ${i + 1} ${enc.type} ${eff?.name ?? ''}`}
                      />
                   );
@@ -858,7 +1290,7 @@ export default function SolitaireEngine() {
             <div className="flex w-full gap-1">
                <button onClick={() => setActiveDrawer(activeDrawer === 'pause' ? null : 'pause')} className={`p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}><Pause size={16} /></button>
                {['exploit', 'curse', 'blessing'].map((type) => {
-                  const hasReady = EFFECTS_REGISTRY.filter(e => e.type === type && isEffectReady(e.id, gameState) && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll)).length > 0;
+                  const hasReady = effectsRegistry.some(e => e.type === type && isEffectReady(e.id, gameState) && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll));
                   return (
                      <button key={type} onClick={() => setActiveDrawer(activeDrawer === type ? null : type as any)} 
                         className={`flex-1 py-2 rounded text-[10px] font-bold border flex items-center justify-center gap-1 
@@ -914,7 +1346,7 @@ export default function SolitaireEngine() {
                         <div className="h-32 overflow-y-auto border border-slate-700 rounded bg-slate-900/50 p-2">
                            <div className="text-[10px] text-slate-500 mb-2 uppercase">Related Effects</div>
                            <div className="grid grid-cols-2 gap-1">
-                              {EFFECTS_REGISTRY.map(e => (
+                              {effectsRegistry.map(e => (
                                  <label key={e.id} className="flex items-center gap-2 text-xs text-slate-300">
                                     <input type="checkbox" checked={!!feedbackChecks[e.id]} onChange={() => setFeedbackChecks(p => ({...p, [e.id]: !p[e.id]}))} className="rounded bg-slate-700 border-slate-500" />
                                     {e.name}
@@ -1000,7 +1432,7 @@ export default function SolitaireEngine() {
                      </div>
                   ) : (
                      <div className="grid grid-cols-1 gap-2">
-                        {EFFECTS_REGISTRY.filter(e => {
+                        {effectsRegistry.filter(e => {
                            const isOwned = gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll;
                            if (!isOwned) return false; 
                            if (activeDrawer === 'exploit') return ['exploit', 'epic', 'legendary', 'rare', 'uncommon'].includes(e.type);
