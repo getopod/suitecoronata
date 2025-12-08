@@ -128,29 +128,22 @@ const getRarityColor = (rarity?: string): { bg: string; text: string; border: st
 
 // Icon helper - converts effect name to icon path with type fallback
 const getEffectIcon = (name: string, type: 'exploit' | 'curse' | 'blessing' | 'danger' | 'fear') => {
-   // Convert name to filename: lowercase, replace spaces/special chars with underscores
-   const filename = name.toLowerCase()
-      .replace(/'/g, '_s_')  // apostrophe s becomes _s_
-      .replace(/&/g, '__')   // ampersand becomes double underscore
-      .replace(/[^a-z0-9]/g, '_')  // replace non-alphanumeric with underscore
-      .replace(/_+/g, '_')  // collapse multiple underscores
-      .replace(/^_|_$/g, ''); // trim leading/trailing underscores
-   
-   return `/icons/${filename}.webp`;
+   // Use the name directly (lowercased) to match the new icon set
+   return `/icons/${name.toLowerCase()}.png`;
 };
 
 // Category icon paths
 const categoryIcons: Record<string, string> = {
-   danger: '/icons/danger.webp',
-   dangers: '/icons/danger.webp',
-   fear: '/icons/fear.webp',
-   fears: '/icons/fear.webp',
-   blessing: '/icons/blessing.webp',
-   blessings: '/icons/blessing.webp',
-   exploit: '/icons/exploit.webp',
-   exploits: '/icons/exploit.webp',
-   curse: '/icons/curse.webp',
-   curses: '/icons/curse.webp',
+   danger: '/icons/danger.png',
+   dangers: '/icons/danger.png',
+   fear: '/icons/fear.png',
+   fears: '/icons/fear.png',
+   blessing: '/icons/blessing.png',
+   blessings: '/icons/blessing.png',
+   exploit: '/icons/exploit.png',
+   exploits: '/icons/exploit.png',
+   curse: '/icons/curse.png',
+   curses: '/icons/curse.png',
 };
 
 // ==========================================
@@ -979,16 +972,15 @@ export default function SolitaireEngine({
                  </div>
                  <div className="flex-1 overflow-y-auto space-y-3">
                     {gameModes.map(mode => (
-                       <button 
+                       <div 
                           key={mode.id}
                           onClick={() => mode.unlocked && setSelectedMode(mode.id)}
-                          disabled={!mode.unlocked}
-                          className={`w-full p-4 rounded-xl border text-left transition-all ${
+                          className={`w-full p-4 rounded-xl border text-left transition-all cursor-pointer ${
                              selectedMode === mode.id 
                                 ? 'bg-purple-900/50 border-purple-500 ring-2 ring-purple-400' 
                                 : mode.unlocked 
                                    ? 'bg-slate-800 border-slate-700 hover:border-slate-500' 
-                                   : 'bg-slate-800/50 border-slate-700/50 opacity-50 cursor-not-allowed'
+                                   : 'bg-slate-800/50 border-slate-700/50 opacity-50 cursor-not-allowed pointer-events-none'
                           }`}>
                           <div className="flex items-center gap-3">
                              <div className="flex-1">
@@ -1006,7 +998,7 @@ export default function SolitaireEngine({
                                 <Trophy size={18} />
                              </button>
                           </div>
-                       </button>
+                       </div>
                     ))}
                     {/* Coming Soon */}
                     <div className="mt-4 p-4 rounded-xl border border-dashed border-slate-600 bg-slate-800/30">
@@ -1056,8 +1048,8 @@ export default function SolitaireEngine({
                                 : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
                           }`}>
                           {tab === 'stats' && <BarChart3 size={16} />}
-                          {tab === 'feats' && <img src="/icons/feats.webp" alt="" className="w-4 h-4" />}
-                          {tab === 'recaps' && <img src="/icons/run_history.webp" alt="" className="w-4 h-4" />}
+                          {tab === 'feats' && <img src="/icons/feats.png" alt="" className="w-4 h-4" />}
+                          {tab === 'recaps' && <img src="/icons/run history.png" alt="" className="w-4 h-4" />}
                           {tab.charAt(0).toUpperCase() + tab.slice(1)}
                        </button>
                     ))}
@@ -1354,8 +1346,8 @@ export default function SolitaireEngine({
                                             const iconMap: Record<string, string> = {
                                                danger: categoryIcons.danger,
                                                fear: categoryIcons.fear,
-                                               wander: '/icons/wander.webp',
-                                               shop: '/icons/coin.webp',
+                                               wander: '/icons/wander.png',
+                                               shop: '/icons/coin.png',
                                                boss: categoryIcons.danger,
                                             };
                                             return (
