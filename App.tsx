@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
-import { LayoutGrid, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, HelpCircle, RefreshCw, X, Gift, Trophy, ArrowLeftRight, SkipBack, SkipForward, MessageSquare, FlaskConical, Save, Flag, Settings, ChevronDown, Pause, ShoppingCart, User, Unlock, Map as MapIcon, BarChart3 } from 'lucide-react';
+import { LayoutGrid, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, HelpCircle, RefreshCw, X, Gift, Trophy, ArrowLeftRight, SkipBack, SkipForward, MessageSquare, FlaskConical, Save, Flag, Settings, ChevronDown, Pause, ShoppingCart, User, Unlock, Map as MapIcon, BarChart3, Link as LinkIcon, Bug } from 'lucide-react';
 import { Card, GameState, Pile, Rank, Suit, MoveContext, Encounter, GameEffect, Wander, WanderChoice, MinigameResult } from './types';
-import { getCardColor, generateNewBoard } from './data/effects';
+import { getCardColor, generateNewBoard, EFFECTS_REGISTRY } from './data/effects';
 import { Minigames } from './utils/minigames';
 
 // ==========================================
@@ -158,7 +158,7 @@ const categoryIcons: Record<string, string> = {
 // ==========================================
 
 export default function SolitaireEngine({ 
-  effectsRegistry = [], 
+  effectsRegistry = EFFECTS_REGISTRY, 
   wanderRegistry = [] 
 }: SolitaireEngineProps = {}) {
   const [currentView, setCurrentView] = useState<'home' | 'game'>('home');
@@ -227,7 +227,6 @@ export default function SolitaireEngine({
 
   const isEffectReady = (id: string, state: GameState) => {
      if (id === 'lobbyist') return state.coins >= 100;
-     if (id === 'street_smarts') return state.coins >= 25;
      return true;
   };
 
@@ -383,18 +382,54 @@ export default function SolitaireEngine({
         
         newBoard.piles.deck.cards = [...newBoard.piles.deck.cards, ...blessingCards].sort(() => 0.5 - Math.random());
 
-        // Update State
-        setActiveEffects([...keptEffects, nextEncounter.effectId]);
-        setGameState(prev => ({ 
-            ...prev, 
+        // Calculate new active effects list
+        let nextActiveEffects = [...keptEffects];
+        if (nextEncounter.effectId) nextActiveEffects.push(nextEncounter.effectId);
+
+        // Prepare state updates
+        let stateUpdates: Partial<GameState> = { 
             piles: newBoard.piles, 
             score: 0, 
-            coins: prev.coins, 
+            coins: gameState.coins, 
             runIndex: nextIdx, 
             currentScoreGoal: nextEncounter.goal, 
             isLevelComplete: false, 
             charges: newCharges, 
             wanderState: 'none' 
+        };
+
+        // Apply onActivate for the new encounter effect
+        const newEffectDef = effectsRegistry.find(e => e.id === nextEncounter.effectId);
+        if (newEffectDef?.onActivate) {
+           const tempState = { ...gameState, ...stateUpdates };
+           const changes = newEffectDef.onActivate(tempState, nextActiveEffects);
+           if (changes) {
+              const anyChanges = changes as any;
+              if (anyChanges.newActiveEffects) {
+                 nextActiveEffects = anyChanges.newActiveEffects;
+                 delete anyChanges.newActiveEffects;
+              }
+              stateUpdates = { ...stateUpdates, ...anyChanges };
+           }
+        }
+
+        // Apply onEncounterStart for ALL active effects
+        nextActiveEffects.forEach(eid => {
+           const def = effectsRegistry.find(e => e.id === eid);
+           if (def?.onEncounterStart) {
+              const tempState = { ...gameState, ...stateUpdates };
+              const changes = def.onEncounterStart(tempState);
+              if (changes) {
+                 stateUpdates = { ...stateUpdates, ...changes, effectState: { ...(stateUpdates.effectState || gameState.effectState), ...changes.effectState } };
+              }
+           }
+        });
+
+        // Update State
+        setActiveEffects(nextActiveEffects);
+        setGameState(prev => ({ 
+            ...prev, 
+            ...stateUpdates
         }));
      } else { alert("Run Complete!"); setCurrentView('home'); }
   };
@@ -481,6 +516,59 @@ export default function SolitaireEngine({
      setGameState(prev => ({ ...prev, activeMinigame: null, minigameResult: null }));
   };
 
+  const handleShadowRealmClick = () => {
+     const shadowPile = gameState.piles['shadow-realm'];
+     if (!shadowPile || shadowPile.cards.length === 0) return;
+     
+     // Cost to summon: 10 coins
+     const cost = 10;
+     if (gameState.coins >= cost) {
+        const card = shadowPile.cards[shadowPile.cards.length - 1];
+        const newShadowCards = shadowPile.cards.slice(0, -1);
+        const hand = gameState.piles['hand'];
+        const newHandCards = [...hand.cards, card];
+        
+        setGameState(prev => ({
+           ...prev,
+           coins: prev.coins - cost,
+           piles: {
+              ...prev.piles,
+              'shadow-realm': { ...shadowPile, cards: newShadowCards },
+              hand: { ...hand, cards: newHandCards }
+           }
+        }));
+     }
+  };
+
+  const spendMomentum = (type: 'wild' | 'unlock' | 'pts') => {
+     const current = gameState.effectState?.momentum || 0;
+     if (type === 'wild' && current >= 3) {
+        const wild: Card = { id: `momentum-wild-${Math.random()}`, rank: 0, suit: 'special', faceUp: true, meta: { isWild: true } };
+        setGameState(prev => ({
+           ...prev,
+           piles: { ...prev.piles, hand: { ...prev.piles.hand, cards: [...prev.piles.hand.cards, wild] } },
+           effectState: { ...prev.effectState, momentum: current - 3 }
+        }));
+     } else if (type === 'unlock' && current >= 5) {
+        // Unlock random tableau
+        const locked = Object.values(gameState.piles).filter(p => p.type === 'tableau' && p.locked);
+        if (locked.length > 0) {
+           const target = locked[Math.floor(Math.random() * locked.length)];
+           setGameState(prev => ({
+              ...prev,
+              piles: { ...prev.piles, [target.id]: { ...target, locked: false } },
+              effectState: { ...prev.effectState, momentum: current - 5 }
+           }));
+        }
+     } else if (type === 'pts' && current >= 1) {
+        setGameState(prev => ({
+           ...prev,
+           score: prev.score + 100,
+           effectState: { ...prev.effectState, momentum: current - 1 }
+        }));
+     }
+  };
+
   const handleCardClick = (pileId: string, cardIndex: number) => {
     const pile = gameState.piles[pileId];
     if (!pile) return;
@@ -510,9 +598,6 @@ export default function SolitaireEngine({
     }
     
     if (pile.locked) {
-        if (activeEffects.includes('street_smarts') && canAfford(25)) {
-             setGameState(prev => ({ ...prev, coins: prev.coins - 25, piles: { ...prev.piles, [pileId]: { ...pile, locked: false } } }));
-        }
         return;
     }
     
@@ -572,7 +657,7 @@ export default function SolitaireEngine({
     const hand = gameState.piles['hand'];
     const oldHand = hand.cards.map(c => ({ ...c, faceUp: false }));
     let newDeckCards = [...deck.cards, ...oldHand]; 
-    const drawCount = activeEffects.includes('five_finger_discount') ? 10 : 5; 
+    const drawCount = 5; 
     const drawn = newDeckCards.splice(0, drawCount).map(c => ({ ...c, faceUp: true }));
     let newState: GameState = { ...gameState, piles: { ...gameState.piles, deck: { ...deck, cards: newDeckCards }, hand: { ...hand, cards: drawn } }, lastActionType: 'shuffle' as const };
     
@@ -805,6 +890,11 @@ export default function SolitaireEngine({
                  <div className="flex flex-col items-center justify-center h-full text-center bg-gradient-to-b from-purple-100 to-purple-200 rounded">
                      <img src={getEffectIcon(visualCard.meta.name || '', 'blessing')} alt="" className="w-6 h-6 mb-0.5" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons.blessing; }} />
                      <div className="text-[5px] font-bold leading-tight text-purple-800 px-0.5">{visualCard.meta.name}</div>
+                 </div>
+             ) : visualCard.meta?.isWild ? (
+                 <div className="flex flex-col items-center justify-center h-full text-center bg-gradient-to-b from-blue-100 to-blue-200 rounded">
+                     <div className="text-xl">🃏</div>
+                     <div className="text-[6px] font-bold text-blue-800">WILD</div>
                  </div>
              ) : (
                  <>
@@ -1663,7 +1753,23 @@ export default function SolitaireEngine({
                         {gameState.piles.deck.cards.length > 0 ? <div className="font-bold text-blue-300 text-xs">{gameState.piles.deck.cards.length}</div> : <RefreshCw className="text-slate-600 w-4 h-4" />}
                    </button>
                 </div>
-                <div className="relative col-span-2 h-16 flex items-center justify-center">
+                
+                {/* Shadow Realm Pile */}
+                {gameState.piles['shadow-realm'] && (
+                   <div 
+                      className="relative w-11 h-16 bg-purple-900/30 border border-purple-500/50 rounded flex items-center justify-center cursor-pointer hover:bg-purple-900/50 transition-colors"
+                      onClick={handleShadowRealmClick}
+                      title="Shadow Realm: Click to summon back (10 coins)">
+                      <div className="absolute -top-2 -left-1 bg-purple-900 text-[8px] px-1 rounded-full border border-purple-500 z-10">Realm</div>
+                      {gameState.piles['shadow-realm'].cards.length === 0 ? (
+                         <div className="text-purple-700 opacity-50"><Skull size={16} /></div>
+                      ) : (
+                         renderCard(gameState.piles['shadow-realm'].cards[gameState.piles['shadow-realm'].cards.length - 1], gameState.piles['shadow-realm'].cards.length - 1, 'shadow-realm')
+                      )}
+                   </div>
+                )}
+
+                <div className={`relative ${gameState.piles['shadow-realm'] ? 'col-span-1' : 'col-span-2'} h-16 flex items-center justify-center`}>
                    {/* Threat button - current danger/fear */}
                    {(currentThreat || currentEncounter) && (
                       <button type="button" aria-label={`Threat: ${currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}`} className="w-full h-full bg-red-900/50 border-2 border-red-500/50 rounded flex flex-col items-center justify-center text-center p-1 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.4)]" onClick={() => alert(`${currentThreat?.type?.toUpperCase() || currentEncounter?.type?.toUpperCase() || 'CHALLENGE'}: ${currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}\n${currentThreat?.description || 'Score goal: ' + (currentEncounter?.goal || gameState.currentScoreGoal)}`)}>
@@ -1685,16 +1791,69 @@ export default function SolitaireEngine({
                    );
                 })}
         </div>
+
+        {/* Active Effect HUDs */}
+        {(activeEffects.includes('ritual_components') || activeEffects.includes('momentum_tokens')) && (
+           <div className="flex justify-center gap-4 mb-2 animate-in fade-in slide-in-from-top-2">
+              {activeEffects.includes('ritual_components') && (
+                 <div className="flex items-center gap-1 bg-slate-800/80 p-1.5 rounded border border-slate-700">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold mr-1">Ritual</span>
+                    {['blood', 'bone', 'ash'].map((step, i) => {
+                       const seq = gameState.effectState?.ritualSequence || [];
+                       const done = seq.length > i; 
+                       return <div key={step} className={`w-3 h-3 rounded-full border border-slate-600 ${done ? 'bg-red-500 shadow-[0_0_5px_rgba(239,68,68,0.8)]' : 'bg-slate-900'}`} title={step} />;
+                    })}
+                 </div>
+              )}
+              {activeEffects.includes('momentum_tokens') && (
+                 <div className="flex items-center gap-2 bg-slate-800/80 p-1.5 rounded border border-slate-700">
+                    <div className="flex items-center gap-1">
+                       <span className="text-[10px] text-slate-400 uppercase font-bold">Momentum</span>
+                       <span className="text-sm font-bold text-blue-400">{gameState.effectState?.momentum || 0}</span>
+                    </div>
+                    <div className="flex gap-1">
+                       <button onClick={() => spendMomentum('wild')} disabled={(gameState.effectState?.momentum || 0) < 3} className="px-1.5 py-0.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-[9px] font-bold">Wild (3)</button>
+                       <button onClick={() => spendMomentum('unlock')} disabled={(gameState.effectState?.momentum || 0) < 5} className="px-1.5 py-0.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-[9px] font-bold">Unlock (5)</button>
+                       <button onClick={() => spendMomentum('pts')} disabled={(gameState.effectState?.momentum || 0) < 1} className="px-1.5 py-0.5 bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-[9px] font-bold">Pts (1)</button>
+                    </div>
+                 </div>
+              )}
+           </div>
+        )}
+
         <div className="grid grid-cols-7 gap-1 h-full">
-               {tableauPiles.map(pile => (
-                  <div key={pile.id} className="relative w-full h-full">
+               {tableauPiles.map(pile => {
+                  const isLinked = activeEffects.includes('linked_fates') && gameState.effectState?.linkedTableaus?.includes(pile.id);
+                  const isLinkedTurn = isLinked && gameState.effectState?.lastLinkedPlayed !== pile.id;
+                  const isParasite = activeEffects.includes('parasite_pile') && gameState.effectState?.parasiteTarget === pile.id;
+
+                  return (
+                  <div key={pile.id} className={`relative w-full h-full ${isLinked ? 'border-t-2 border-purple-500/50 rounded-t-lg pt-1' : ''} ${isParasite ? 'border-t-2 border-green-500/50 rounded-t-lg pt-1' : ''}`}>
+                      {/* Linked Fates Indicator */}
+                      {isLinked && (
+                         <div className={`absolute -top-7 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center ${isLinkedTurn ? 'text-purple-400 animate-pulse' : 'text-slate-600 opacity-50'}`}>
+                            <LinkIcon size={14} />
+                            {!isLinkedTurn && <span className="text-[8px] uppercase font-bold bg-slate-900 px-1 rounded border border-slate-700">Wait</span>}
+                         </div>
+                      )}
+                      
+                      {/* Parasite Indicator */}
+                      {isParasite && (
+                         <div className="absolute -top-7 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center text-green-500">
+                            <Bug size={14} />
+                            <div className="w-8 h-1 bg-slate-700 mt-0.5 rounded-full overflow-hidden border border-slate-600">
+                               <div className="h-full bg-green-500 transition-all duration-300" style={{ width: `${((gameState.moves % 7) / 7) * 100}%` }} />
+                            </div>
+                         </div>
+                      )}
+
                       {pile.locked && <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-20 text-red-500"><Lock size={10} /></div>}
                       {pile.cards.length === 0 && (
                          <button type="button" aria-label={`Empty ${pile.id}`} className="absolute inset-0 w-full h-full bg-transparent" onClick={() => handleCardClick(pile.id, -1)} />
                       )}
                       {pile.cards.map((c, idx) => renderCard(c, idx, pile.id))}
                   </div>
-               ))}
+               )})}
         </div>
       </div>
 

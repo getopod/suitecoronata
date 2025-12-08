@@ -266,20 +266,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     description: 'No tableau play from tableau.',
     canMove: (cards, source, target) => (source.type === 'tableau' && target.type === 'tableau') ? false : undefined
   },
-  {
-    id: 'starving_artist',
-    name: 'Starving Artist',
-    type: 'curse',
-    description: 'All plays -1 coin. Foundation completed +50 coin.',
-    calculateCoinTransaction: (delta, context, state) => {
-      let newDelta = delta - 1;
-      if (context.target.includes('foundation')) {
-        const currentLen = state.piles[context.target].cards.length;
-        if (currentLen + context.cards.length === 13) newDelta += 50;
-      }
-      return newDelta;
-    }
-  },
+
   {
     id: 'schizophrenia',
     name: 'Schizophrenia',
@@ -471,17 +458,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
        return score;
     }
   },
-  {
-    id: 'annuit_coeptis',
-    name: 'Annuit Coeptis',
-    type: 'curse',
-    description: 'Tableau plays -5 coin. Foundation plays +10 coin.',
-    calculateCoinTransaction: (delta, context) => {
-       if (context.target.includes('tableau')) return delta - 5;
-       if (context.target.includes('foundation')) return delta + 10;
-       return delta;
-    }
-  },
+
   {
     id: 'not_gaslighting',
     name: 'Not Gaslighting',
@@ -1181,26 +1158,8 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
        return { piles: newPiles };
     }
   },
-  {
-    id: 'sleight_of_hand',
-    name: 'Sleight of Hand',
-    type: 'exploit',
-    description: 'Gain 3 coin for every 2 lost.',
-    calculateCoinTransaction: (delta) => {
-       if (delta < 0) {
-          const loss = Math.abs(delta);
-          const rebate = Math.floor(loss / 2) * 3;
-          return delta + rebate;
-       }
-       return delta;
-    }
-  },
-  {
-    id: 'street_smarts',
-    name: 'Street Smarts',
-    type: 'exploit',
-    description: 'Pay 25 coins per locked tableau to unlock.',
-  },
+
+
   {
     id: 'rules_of_3',
     name: '3 Rules of 3',
@@ -1247,36 +1206,9 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
        return {};
     }
   },
-  {
-    id: 'five_finger_discount',
-    name: 'Five-Finger Discount',
-    type: 'exploit',
-    description: 'Draw 5 cards at once from deck.',
-  },
-  {
-    id: 'legitimate_business',
-    name: 'Legitimate Business',
-    type: 'exploit',
-    description: 'Convert 50 pts to 150 coin automatically.',
-    onMoveComplete: (state) => {
-       if (state.score >= 50) {
-          return { score: state.score - 50, coins: state.coins + 150 };
-       }
-       return {};
-    }
-  },
-  {
-    id: 'liquid_assets',
-    name: 'Liquid Assets',
-    type: 'exploit',
-    description: 'Convert 50 coin to 25 pts automatically.',
-    onMoveComplete: (state) => {
-       if (state.coins >= 50) {
-          return { score: state.score + 25, coins: state.coins - 50 };
-       }
-       return {};
-    }
-  },
+
+
+
   {
     id: 'fountain_youth',
     name: 'Fountain of Youth',
@@ -1457,12 +1389,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
        return {};
     }
   },
-  {
-    id: 'slush_fund',
-    name: 'Slush Fund',
-    type: 'exploit',
-    description: 'Go into debt up to 200 coins.',
-  },
+
   {
     id: 'thief',
     name: 'Thief',
@@ -1711,40 +1638,8 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
        return {};
     }
   },
-  {
-    id: 'synchronicity',
-    name: 'Synchronicity',
-    type: 'uncommon',
-    description: 'On win, +5 coin for each face-down card remaining.',
-    onMoveComplete: (state) => {
-       const foundations = Object.values(state.piles).filter(p => p.type === 'foundation');
-       const mainFoundations = foundations.filter(p => p.id.match(/^foundation-(hearts|diamonds|clubs|spades)$/));
-       const isWin = mainFoundations.every(p => p.cards.length >= 13);
-       
-       if (isWin && !state.effectState.synchronicityPaid) {
-          let faceDownCount = 0;
-          Object.values(state.piles).forEach(p => {
-             faceDownCount += p.cards.filter(c => !c.faceUp).length;
-          });
-          
-          return {
-             coins: state.coins + (faceDownCount * 5),
-             effectState: { ...state.effectState, synchronicityPaid: true }
-          };
-       }
-       return {};
-    }
-  },
-  {
-    id: 'nice_rock',
-    name: 'Nice Rock',
-    type: 'legendary',
-    description: 'New Game+ (Reset Board, Keep Stats, x3 Multipliers).',
-    onActivate: (state) => {
-       const newState = generateNewBoard(state.score, state.coins, 3, 3);
-       return newState;
-    }
-  },
+
+
   {
     id: 'trust_fund',
     name: 'Trust Fund',
@@ -1919,22 +1814,1451 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
        return {};
     }
   },
-  {
-    id: 'cracked_rock',
-    name: 'Cracked Rock',
-    type: 'legendary',
-    description: 'Hard Mode NG+ (Reset, x5 Multipliers, Empty Tableau).',
-    onActivate: (state) => {
-       return generateNewBoard(state.score, state.coins, 5, 5, true, false);
+
+
+{
+  id: 'uncle_timmy_boo',
+  name: 'Uncle Timmy Boo',
+  type: 'exploit',
+  description: 'When five Queens face up, +300 points & unlock all tableaus.',
+  onMoveComplete: (state) => {
+    if (state.effectState.uncleTimmyBooPaid) return {};
+    
+    let visibleQueens = 0;
+    Object.values(state.piles).forEach(pile => {
+      pile.cards.forEach(c => {
+        if (c.faceUp && c.rank === 12) visibleQueens++;
+      });
+    });
+    
+    if (visibleQueens >= 5) {
+      const newPiles = { ...state.piles };
+      Object.keys(newPiles).forEach(key => {
+        if (key.startsWith('tableau') && newPiles[key].locked) {
+          newPiles[key] = { ...newPiles[key], locked: false };
+        }
+      });
+      
+      return {
+        score: state.score + 300,
+        piles: newPiles,
+        effectState: { ...state.effectState, uncleTimmyBooPaid: true }
+      };
+    }
+    return {};
+  }
+},
+
+{
+  id: 'sacred_geometry',
+  name: 'Sacred Geometry',
+  type: 'exploit',
+  description: 'Prime number ranks (2,3,5,7,11,13) play anywhere.',
+  canMove: (cards, source, target, defaultAllowed) => {
+    const moving = cards[0];
+    const primeRanks = [2, 3, 5, 7, 11, 13];
+    
+    if (primeRanks.includes(moving.rank)) {
+      if (target.type === 'tableau') return true;
+      if (target.type === 'foundation') return true;
+    }
+    return defaultAllowed;
+  },
+  calculateScore: (score, context) => {
+    const rank = context.cards[0].rank;
+    const primeRanks = [2, 3, 5, 7, 11, 13];
+    if (primeRanks.includes(rank)) return score * 2;
+    return score;
+  }
+},
+
+{
+  id: 'royal_flush',
+  name: 'Royal Flush',
+  type: 'exploit',
+  description: 'Complete suit in foundation = +200 pts & +100 coins.',
+  onMoveComplete: (state, context) => {
+    if (context.target.includes('foundation')) {
+      const pile = state.piles[context.target];
+      if (pile.cards.length === 13) { // Full suit
+        const isRoyal = pile.cards.every(c => c.rank >= 10 || c.rank === 1); // A,10,J,Q,K
+        if (isRoyal) {
+          return {
+            score: state.score + 200,
+            coins: state.coins + 100
+          };
+        }
+      }
+    }
+    return {};
+  }
+},
+
+{
+  id: 'straight_sequence',
+  name: 'Straight Sequence',
+  type: 'exploit',
+  description: '5+ consecutive ranks in tableau = +5 pts per card.',
+  onMoveComplete: (state, context) => {
+    if (context.target.includes('tableau')) {
+      const pile = state.piles[context.target];
+      if (pile.cards.length >= 5) {
+        const lastFive = pile.cards.slice(-5);
+        const ranks = lastFive.map(c => c.rank).sort((a, b) => a - b);
+        
+        // Check if consecutive
+        let isConsecutive = true;
+        for (let i = 1; i < ranks.length; i++) {
+          if (ranks[i] !== ranks[i-1] + 1) {
+            isConsecutive = false;
+            break;
+          }
+        }
+        
+        if (isConsecutive) {
+          return { score: state.score + (lastFive.length * 5) };
+        }
+      }
+    }
+    return {};
+  }
+},
+
+{
+  id: 'mirror_match',
+  name: 'Mirror Match',
+  type: 'exploit',
+  description: 'Pair same rank cards = +25 pts & reveal hidden cards.',
+  onMoveComplete: (state, context) => {
+    if (context.target.includes('tableau') && context.cards.length === 1) {
+      const pile = state.piles[context.target];
+      const playedCard = context.cards[0];
+      
+      if (pile.cards.length >= 2) {
+        const previousCard = pile.cards[pile.cards.length - 2];
+        if (previousCard.rank === playedCard.rank) {
+          // Reveal face-down cards in tableau
+          const newPiles = { ...state.piles };
+          Object.keys(newPiles).forEach(key => {
+            if (key.startsWith('tableau')) {
+              const tabPile = newPiles[key];
+              if (tabPile.cards.length > 0) {
+                const topCard = tabPile.cards[tabPile.cards.length - 1];
+                if (!topCard.faceUp) {
+                  const newCards = [...tabPile.cards];
+                  newCards[newCards.length - 1] = { ...topCard, faceUp: true };
+                  newPiles[key] = { ...tabPile, cards: newCards };
+                }
+              }
+            }
+          });
+          
+          return {
+            score: state.score + 25,
+            piles: newPiles
+          };
+        }
+      }
+    }
+    return {};
+  }
+},
+
+{
+  id: 'rainbow_bridge',
+  name: 'Rainbow Bridge',
+  type: 'exploit',
+  description: 'Play all 4 suits in sequence = +100 pts & wild card.',
+  onEncounterStart: (state) => {
+    return { 
+      effectState: { 
+        ...state.effectState, 
+        rainbowSequence: [] 
+      } 
+    };
+  },
+  onMoveComplete: (state, context) => {
+    if (context.cards.length === 1) {
+      const playedCard = context.cards[0];
+      const sequence = state.effectState.rainbowSequence || [];
+      const lastSuit = sequence.length > 0 ? sequence[sequence.length - 1] : null;
+      
+      if (lastSuit !== playedCard.suit) {
+        const newSequence = [...sequence, playedCard.suit];
+        
+        if (newSequence.length >= 4) {
+          // Check if we have all 4 suits
+          const suits = new Set(newSequence.slice(-4));
+          if (suits.size === 4) {
+            // Add wild card to waste
+            const newPiles = { ...state.piles };
+            const wildCard: Card = {
+              id: `rainbow-wild-${Date.now()}`,
+              rank: 0,
+              suit: 'special',
+              faceUp: true,
+              meta: { isWild: true, fromRainbow: true }
+            };
+            newPiles['waste'].cards = [...newPiles['waste'].cards, wildCard];
+            
+            return {
+              score: state.score + 100,
+              piles: newPiles,
+              effectState: { ...state.effectState, rainbowSequence: [] }
+            };
+          }
+        }
+        
+        return { 
+          effectState: { ...state.effectState, rainbowSequence: newSequence } 
+        };
+      } else {
+        // Same suit breaks sequence
+        return { 
+          effectState: { ...state.effectState, rainbowSequence: [playedCard.suit] } 
+        };
+      }
+    }
+    return {};
+  }
+},
+
+{
+  id: 'tower_of_power',
+  name: 'Tower of Power',
+  type: 'exploit',
+  description: '7+ card tableau pile = +10 pts per extra card.',
+  calculateScore: (score, context, state) => {
+    if (context.target.includes('tableau')) {
+      const pile = state.piles[context.target];
+      if (pile.cards.length >= 7) {
+        const extraCards = pile.cards.length - 6; // Beyond first 6
+        return score + (extraCards * 10);
+      }
+    }
+    return score;
+  }
+},
+
+{
+  id: 'checkered_board',
+  name: 'Checkered Board',
+  type: 'exploit',
+  description: 'Alternating colors score 2x, same color scores 0.',
+  calculateScore: (score, context, state) => {
+    if (context.target.includes('tableau') && context.cards.length === 1) {
+      const pile = state.piles[context.target];
+      const playedCard = context.cards[0];
+      
+      if (pile.cards.length >= 2) {
+        const previousCard = pile.cards[pile.cards.length - 2];
+        const sameColor = getCardColor(playedCard.suit) === getCardColor(previousCard.suit);
+        
+        if (sameColor) return 0;
+        return score * 2;
+      }
+    }
+    return score;
+  }
+},
+
+{
+  id: 'full_house',
+  name: 'Full House',
+  type: 'exploit',
+  description: '3 of a rank + 2 of another rank in waste = +150 pts.',
+  onMoveComplete: (state) => {
+    const waste = state.piles['waste'];
+    const rankCounts: Record<number, number> = {};
+    
+    waste.cards.forEach(card => {
+      rankCounts[card.rank] = (rankCounts[card.rank] || 0) + 1;
+    });
+    
+    let hasThree = false;
+    let hasTwo = false;
+    for (const count of Object.values(rankCounts)) {
+      if (count >= 3) hasThree = true;
+      if (count >= 2) hasTwo = true;
+    }
+    
+    if (hasThree && hasTwo && !state.effectState.fullHousePaid) {
+      return {
+        score: state.score + 150,
+        effectState: { ...state.effectState, fullHousePaid: true }
+      };
+    }
+    return {};
+  }
+},
+
+{
+  id: 'the_constellation',
+  name: 'The Constellation',
+  type: 'exploit',
+  description: 'Connect cards like stars = +5 pts per connection.',
+  onEncounterStart: (state) => {
+    return { 
+      effectState: { 
+        ...state.effectState, 
+        constellationNodes: new Set<string>(),
+        constellationConnections: 0
+      } 
+    };
+  },
+  onMoveComplete: (state, context) => {
+    if (context.cards.length === 1) {
+      const playedCard = context.cards[0];
+      const cardId = playedCard.id;
+      const nodes = new Set(state.effectState.constellationNodes || []);
+      let connections = state.effectState.constellationConnections || 0;
+      
+      // Count connections: each new card connects to all existing nodes
+      const newConnections = nodes.size;
+      connections += newConnections;
+      nodes.add(cardId);
+      
+      return {
+        score: state.score + (newConnections * 5),
+        effectState: { 
+          ...state.effectState, 
+          constellationNodes: Array.from(nodes),
+          constellationConnections: connections
+        }
+      };
+    }
+    return {};
+  }
+},
+
+{
+  id: 'perfect_balance',
+  name: 'Perfect Balance',
+  type: 'exploit',
+  description: 'Equal red/black cards in tableau = +50 pts each check.',
+  onMoveComplete: (state) => {
+    let redCount = 0;
+    let blackCount = 0;
+    
+    Object.values(state.piles).forEach(pile => {
+      if (pile.type === 'tableau') {
+        pile.cards.forEach(card => {
+          if (card.faceUp) {
+            if (getCardColor(card.suit) === 'red') redCount++;
+            else blackCount++;
+          }
+        });
+      }
+    });
+    
+    if (redCount === blackCount && redCount > 0) {
+      return { score: state.score + 50 };
+    }
+    return {};
+  }
+},
+
+{
+  id: 'suit_supremacy',
+  name: 'Suit Supremacy',
+  type: 'exploit',
+  description: 'Dominant suit scores 2x, others 0.5x.',
+  onEncounterStart: (state) => {
+    return { 
+      effectState: { 
+        ...state.effectState, 
+        suitPlays: { hearts: 0, diamonds: 0, clubs: 0, spades: 0 } 
+      } 
+    };
+  },
+  onMoveComplete: (state, context) => {
+    if (context.cards.length === 1) {
+      const suit = context.cards[0].suit;
+      const suitPlays = { ...state.effectState.suitPlays };
+      suitPlays[suit] = (suitPlays[suit] || 0) + 1;
+      
+      return { 
+        effectState: { ...state.effectState, suitPlays } 
+      };
+    }
+    return {};
+  },
+  calculateScore: (score, context, state) => {
+    const suitPlays = state.effectState.suitPlays || { hearts: 0, diamonds: 0, clubs: 0, spades: 0 };
+    const playedSuit = context.cards[0].suit;
+    
+    // Find dominant suit
+    let maxPlays = 0;
+    let dominantSuit: string | null = null;
+    for (const [suit, plays] of Object.entries(suitPlays)) {
+      if (plays > maxPlays) {
+        maxPlays = plays;
+        dominantSuit = suit;
+      }
+    }
+    
+    if (dominantSuit === playedSuit) return score * 2;
+    return Math.floor(score * 0.5);
+  }
+},
+
+{
+  id: 'high_society',
+  name: 'High Society',
+  type: 'exploit',
+  description: 'Face cards & Aces score 3x, number cards 0.5x.',
+  calculateScore: (score, context) => {
+    const rank = context.cards[0].rank;
+    if (rank === 1 || rank >= 11) return score * 3;
+    return Math.floor(score * 0.5);
+  }
+},
+
+{
+  id: 'lucky_sevens_wall',
+  name: 'Lucky Sevens Wall',
+  type: 'exploit',
+  description: 'Each 7 played creates protective wall (+10 coin per move).',
+  onMoveComplete: (state, context) => {
+    if (context.cards[0].rank === 7) {
+      const walls = (state.effectState.sevenWalls || 0) + 1;
+      return {
+        effectState: { ...state.effectState, sevenWalls: walls }
+      };
+    }
+    return {};
+  },
+  calculateCoinTransaction: (delta, context, state) => {
+    const walls = state.effectState.sevenWalls || 0;
+    return delta + (walls * 10);
+  }
+},
+
+{
+  id: 'foundation_race',
+  name: 'Foundation Race',
+  type: 'exploit',
+  description: 'First foundation to 10 cards = +200 pts, others +100.',
+  onMoveComplete: (state, context) => {
+    if (context.target.includes('foundation')) {
+      const pile = state.piles[context.target];
+      if (pile.cards.length === 10) {
+        if (!state.effectState.foundationRaceWinner) {
+          // First to 10
+          return {
+            score: state.score + 200,
+            effectState: { ...state.effectState, foundationRaceWinner: context.target }
+          };
+        } else if (state.effectState.foundationRaceWinner !== context.target) {
+          // Others to 10
+          return { score: state.score + 100 };
+        }
+      }
+    }
+    return {};
+  }
+},
+
+{
+  id: 'grand_slam',
+  name: 'Grand Slam',
+  type: 'exploit',
+  description: 'Complete all foundations in one suit order = +500 pts.',
+  onMoveComplete: (state) => {
+    const foundations = ['hearts', 'diamonds', 'clubs', 'spades']
+      .map(suit => state.piles[`foundation-${suit}`])
+      .filter(Boolean);
+    
+    const allComplete = foundations.every(f => f.cards.length === 13);
+    if (allComplete && !state.effectState.grandSlamPaid) {
+      return {
+        score: state.score + 500,
+        effectState: { ...state.effectState, grandSlamPaid: true }
+      };
+    }
+    return {};
+  }
+},
+
+{
+  id: 'emergency_reshuffle',
+  name: 'Emergency Reshuffle',
+  type: 'exploit',
+  description: 'When stuck, reshuffle tableau (costs 50 pts).',
+  onActivate: (state) => {
+    if (state.score >= 50) {
+      const newPiles = { ...state.piles };
+      let allTableauCards: Card[] = [];
+      
+      // Collect all tableau cards
+      Object.keys(newPiles).forEach(key => {
+        if (key.startsWith('tableau')) {
+          allTableauCards = [...allTableauCards, ...newPiles[key].cards];
+          newPiles[key].cards = [];
+        }
+      });
+      
+      // Shuffle
+      allTableauCards.sort(() => Math.random() - 0.5);
+      
+      // Redistribute
+      const tableauKeys = Object.keys(newPiles).filter(k => k.startsWith('tableau'));
+      let cardIndex = 0;
+      tableauKeys.forEach(key => {
+        const pileSize = key === 'tableau-0' ? 1 : key === 'tableau-1' ? 2 : key === 'tableau-2' ? 3 : 
+                        key === 'tableau-3' ? 4 : key === 'tableau-4' ? 5 : key === 'tableau-5' ? 6 : 7;
+        const cards = allTableauCards.slice(cardIndex, cardIndex + pileSize);
+        if (cards.length > 0) {
+          cards[cards.length - 1].faceUp = true;
+        }
+        newPiles[key].cards = cards;
+        cardIndex += pileSize;
+      });
+      
+      return {
+        score: state.score - 50,
+        piles: newPiles
+      };
+    }
+    return {};
+  }
+},
+
+{
+  id: 'sacrifice_play',
+  name: 'Sacrifice Play',
+  type: 'exploit',
+  description: 'Discard high-value card to draw 3 new cards.',
+  canMove: (cards, source, target, defaultAllowed) => {
+    if (source.type === 'tableau' && target.type === 'waste' && cards.length === 1) {
+      const card = cards[0];
+      return card.rank >= 10; // Only high-value cards
+    }
+    return defaultAllowed;
+  },
+  onMoveComplete: (state, context) => {
+    if (context.source.includes('tableau') && context.target === 'waste' && context.cards[0].rank >= 10) {
+      const deck = state.piles['deck'];
+      if (deck.cards.length >= 3) {
+        const newPiles = { ...state.piles };
+        const drawn = newPiles['deck'].cards.slice(-3).reverse(); // Draw from end
+        newPiles['deck'].cards = newPiles['deck'].cards.slice(0, -3);
+        newPiles['waste'].cards = [...newPiles['waste'].cards, ...drawn.map(c => ({ ...c, faceUp: true }))];
+        
+        return { piles: newPiles };
+      }
+    }
+    return {};
+  }
+},
+
+{
+  id: 'bifurcation',
+  name: 'Bifurcation',
+  type: 'exploit',
+  description: 'Split tableau piles into two paths (choose direction).',
+  onActivate: (state) => {
+    return {
+      effectState: { 
+        ...state.effectState, 
+        bifurcationActive: true,
+        pendingBifurcation: true // UI should let player choose split
+      }
+    };
+  },
+  canMove: (cards, source, target, defaultAllowed, state) => {
+    if (state.effectState.bifurcationActive && source.type === 'tableau') {
+      // Allow playing to either tableau or a special "split" pile
+      return true;
+    }
+    return defaultAllowed;
+  }
+},
+
+{
+  id: 'tableau_tiers',
+  name: 'Tableau Tiers',
+  type: 'exploit',
+  description: 'Tableaus have tiers: Bronze (1-4), Silver (5-8), Gold (9-K).',
+  onEncounterStart: (state) => {
+    const newPiles = { ...state.piles };
+    // Label tableaus by tier
+    Object.keys(newPiles).forEach(key => {
+      if (key.startsWith('tableau')) {
+        const tier = key === 'tableau-0' || key === 'tableau-1' ? 'bronze' :
+                    key === 'tableau-2' || key === 'tableau-3' ? 'silver' : 'gold';
+        newPiles[key].meta = { ...newPiles[key].meta, tier };
+      }
+    });
+    return { piles: newPiles };
+  },
+  calculateScore: (score, context, state) => {
+    if (context.target.includes('tableau')) {
+      const pile = state.piles[context.target];
+      const tier = pile.meta?.tier;
+      const rank = context.cards[0].rank;
+      
+      let multiplier = 1;
+      if (tier === 'bronze' && rank <= 4) multiplier = 2;
+      if (tier === 'silver' && rank >= 5 && rank <= 8) multiplier = 2;
+      if (tier === 'gold' && rank >= 9) multiplier = 2;
+      
+      return score * multiplier;
+    }
+    return score;
+  }
+},
+
+{
+  id: 'cascading_columns',
+  name: 'Cascading Columns',
+  type: 'exploit',
+  description: 'Clearing a tableau cascades cards to adjacent piles.',
+  onMoveComplete: (state, context) => {
+    if (context.source.includes('tableau')) {
+      const sourcePile = state.piles[context.source];
+      if (sourcePile.cards.length === 0) {
+        // Find adjacent tableau
+        const idx = parseInt(context.source.split('-')[1]);
+        const leftIdx = idx - 1;
+        const rightIdx = idx + 1;
+        
+        const newPiles = { ...state.piles };
+        let cardsToMove: Card[] = [];
+        
+        // Try to take from right neighbor
+        const rightId = `tableau-${rightIdx}`;
+        if (newPiles[rightId] && newPiles[rightId].cards.length > 1) {
+          cardsToMove = newPiles[rightId].cards.slice(-1); // Take top card
+          newPiles[rightId].cards = newPiles[rightId].cards.slice(0, -1);
+        }
+        // Or from left neighbor
+        else if (newPiles[`tableau-${leftIdx}`] && newPiles[`tableau-${leftIdx}`].cards.length > 1) {
+          const leftId = `tableau-${leftIdx}`;
+          cardsToMove = newPiles[leftId].cards.slice(-1);
+          newPiles[leftId].cards = newPiles[leftId].cards.slice(0, -1);
+        }
+        
+        if (cardsToMove.length > 0) {
+          cardsToMove[0].faceUp = true;
+          newPiles[context.source].cards = cardsToMove;
+          return { piles: newPiles };
+        }
+      }
+    }
+    return {};
+  }
+},
+
+{
+  id: 'phantom_tableau',
+  name: 'Phantom Tableau',
+  type: 'exploit',
+  description: 'Create ghost tableau that holds any 3 cards.',
+  onActivate: (state) => {
+    const phantomId = `tableau-phantom-${Date.now()}`;
+    const newPiles = {
+      ...state.piles,
+      [phantomId]: {
+        id: phantomId,
+        type: 'tableau',
+        cards: [],
+        meta: { isPhantom: true, maxCards: 3 }
+      }
+    };
+    return { piles: newPiles };
+  },
+  canMove: (cards, source, target, defaultAllowed, state) => {
+    if (target.meta?.isPhantom) {
+      return target.cards.length < (target.meta.maxCards || 3);
+    }
+    return defaultAllowed;
+  },
+  calculateScore: (score, context, state) => {
+    if (context.target.includes('phantom')) {
+      return score * 2; // Bonus for using phantom tableau
+    }
+    return score;
+  }
+},
+
+{
+  id: 'stacked_deck',
+  name: 'Stacked Deck',
+  type: 'exploit',
+  description: 'Arrange next 5 deck cards in any order.',
+  onActivate: (state) => {
+    const deck = state.piles['deck'];
+    if (deck.cards.length >= 5) {
+      return {
+        effectState: {
+          ...state.effectState,
+          stackedDeckActive: true,
+          pendingDeckArrange: deck.cards.slice(-5) // Last 5 cards
+        }
+      };
+    }
+    return {};
+  }
+},
+
+// ========== MISSING BLESSINGS ==========
+
+{
+  id: 'tortoiseshell',
+  name: 'Tortoiseshell',
+  type: 'blessing',
+  description: 'Each card played to tableau adds +1 to its defense stat.',
+  onEncounterStart: (state) => {
+    const newPiles = { ...state.piles };
+    Object.keys(newPiles).forEach(key => {
+      if (key.startsWith('tableau')) {
+        newPiles[key].meta = { ...newPiles[key].meta, defense: 0 };
+      }
+    });
+    return { piles: newPiles };
+  },
+  onMoveComplete: (state, context) => {
+    if (context.target.includes('tableau')) {
+      const pile = state.piles[context.target];
+      const defense = (pile.meta?.defense || 0) + 1;
+      const newPiles = {
+        ...state.piles,
+        [context.target]: {
+          ...pile,
+          meta: { ...pile.meta, defense }
+        }
+      };
+      
+      // Defense reduces penalty from curses
+      const curseProtection = Math.min(defense * 0.1, 0.5); // Up to 50% protection
+      return {
+        piles: newPiles,
+        effectState: {
+          ...state.effectState,
+          curseProtection
+        }
+      };
+    }
+    return {};
+  }
+},
+
+{
+  id: 'martyr',
+  name: 'Martyr',
+  type: 'blessing',
+  description: 'Sacrifice a tableau pile to heal 100 points.',
+  canMove: (cards, source, target, defaultAllowed) => {
+    if (source.type === 'tableau' && target.type === 'waste' && cards.length > 1) {
+      return true; // Allow sacrificing entire stack
+    }
+    return defaultAllowed;
+  },
+  onMoveComplete: (state, context) => {
+    if (context.source.includes('tableau') && context.target === 'waste' && context.cards.length > 1) {
+      return { score: state.score + 100 };
+    }
+    return {};
+  }
+},
+
+{
+  id: 'klabautermann',
+  name: 'Klabautermann',
+  type: 'blessing',
+  description: 'Ghost ship: Move cards between tableau without penalty.',
+  canMove: (cards, source, target, defaultAllowed) => {
+    if (source.type === 'tableau' && target.type === 'tableau') {
+      return true; // Always allow tableau-to-tableau
+    }
+    return defaultAllowed;
+  },
+  calculateScore: (score, context) => {
+    if (context.source.includes('tableau') && context.target.includes('tableau')) {
+      return score + 5; // Bonus for ghost ship moves
+    }
+    return score;
+  }
+},
+
+{
+  id: 'reality_shift',
+  name: 'Reality Shift',
+  type: 'blessing',
+  description: 'Swap tableau and foundation rules temporarily.',
+  onActivate: (state) => {
+    return {
+      effectState: {
+        ...state.effectState,
+        realityShiftActive: true,
+        realityShiftEnds: state.moves + 10 // Lasts 10 moves
+      }
+    };
+  },
+  canMove: (cards, source, target, defaultAllowed, state) => {
+    if (!state.effectState.realityShiftActive) return defaultAllowed;
+    
+    const moving = cards[0];
+    
+    if (target.type === 'tableau') {
+      // Use foundation rules: same suit, ascending
+      const targetCard = target.cards[target.cards.length - 1];
+      if (!targetCard) return moving.rank === 1; // Ace to empty
+      return targetCard.suit === moving.suit && targetCard.rank === moving.rank - 1;
+    }
+    
+    if (target.type === 'foundation') {
+      // Use tableau rules: alternate colors, descending
+      const targetCard = target.cards[target.cards.length - 1];
+      if (!targetCard) return moving.rank === 13; // King to empty
+      return getCardColor(moving.suit) !== getCardColor(targetCard.suit) && 
+             targetCard.rank === moving.rank + 1;
+    }
+    
+    return defaultAllowed;
+  }
+},
+
+{
+  id: 'time_rewind',
+  name: 'Time Rewind',
+  type: 'blessing',
+  description: 'Undo last move (3 uses per encounter).',
+  onActivate: (state) => {
+    const uses = (state.effectState.timeRewindUses || 0) + 1;
+    if (uses <= 3) {
+      return {
+        effectState: {
+          ...state.effectState,
+          timeRewindUses: uses,
+          pendingRewind: true // UI should handle undo
+        }
+      };
+    }
+    return {};
+  }
+},
+
+{
+  id: 'wild_card_generator',
+  name: 'Wild Card Generator',
+  type: 'blessing',
+  description: 'Every 10 moves, create a wild card in waste.',
+  onMoveComplete: (state) => {
+    const moves = (state.effectState.wildCardMoves || 0) + 1;
+    if (moves >= 10) {
+      const newPiles = { ...state.piles };
+      const wildCard: Card = {
+        id: `wild-${Date.now()}`,
+        rank: 0,
+        suit: 'special',
+        faceUp: true,
+        meta: { isWild: true, generated: true }
+      };
+      newPiles['waste'].cards = [...newPiles['waste'].cards, wildCard];
+      
+      return {
+        piles: newPiles,
+        effectState: { ...state.effectState, wildCardMoves: 0 }
+      };
+    }
+    
+    return { effectState: { ...state.effectState, wildCardMoves: moves } };
+  }
+},
+
+{
+  id: 'tableau_swap',
+  name: 'Tableau Swap',
+  type: 'blessing',
+  description: 'Swap positions of two tableau piles.',
+  onActivate: (state) => {
+    return {
+      effectState: {
+        ...state.effectState,
+        pendingTableauSwap: true // UI should let player choose two tableaus
+      }
+    };
+  }
+},
+
+{
+  id: 'mulligan_blessing',
+  name: 'Mulligan (Blessing)',
+  type: 'blessing',
+  description: 'Redraw opening tableau (once per encounter).',
+  onActivate: (state) => {
+    if (state.effectState.mulliganUsed) return {};
+    
+    const newPiles = { ...state.piles };
+    let allTableauCards: Card[] = [];
+    
+    // Collect all tableau cards
+    Object.keys(newPiles).forEach(key => {
+      if (key.startsWith('tableau')) {
+        allTableauCards = [...allTableauCards, ...newPiles[key].cards];
+        newPiles[key].cards = [];
+      }
+    });
+    
+    // Shuffle and redeal
+    allTableauCards.sort(() => Math.random() - 0.5);
+    
+    const tableauKeys = Object.keys(newPiles).filter(k => k.startsWith('tableau')).sort();
+    let cardIndex = 0;
+    tableauKeys.forEach((key, i) => {
+      const pileSize = i + 1; // Standard solitaire distribution
+      const cards = allTableauCards.slice(cardIndex, cardIndex + pileSize);
+      if (cards.length > 0) {
+        cards[cards.length - 1].faceUp = true;
+      }
+      newPiles[key].cards = cards;
+      cardIndex += pileSize;
+    });
+    
+    return {
+      piles: newPiles,
+      effectState: { ...state.effectState, mulliganUsed: true }
+    };
+  }
+},
+
+{
+  id: 'foundation_peek',
+  name: 'Foundation Peek',
+  type: 'blessing',
+  description: 'See next card that would go on each foundation.',
+  onActivate: (state) => {
+    const nextCards: Record<string, Card> = {};
+    
+    ['hearts', 'diamonds', 'clubs', 'spades'].forEach(suit => {
+      const foundation = state.piles[`foundation-${suit}`];
+      if (foundation) {
+        const currentRank = foundation.cards.length;
+        const nextRank = currentRank + 1;
+        if (nextRank <= 13) {
+          // In real game, you'd need to find this card in the deck/tableau
+          // For now, we'll just mark that we can see it
+          nextCards[suit] = { rank: nextRank as Rank, suit } as Card;
+        }
+      }
+    });
+    
+    return {
+      effectState: {
+        ...state.effectState,
+        foundationPeek: nextCards,
+        peekActive: true
+      }
+    };
+  },
+  transformCardVisual: (card, pile, state) => {
+    if (state.effectState.peekActive && pile.type === 'foundation') {
+      const suit = pile.id.split('-')[1];
+      const nextCard = state.effectState.foundationPeek?.[suit];
+      if (nextCard && card.rank === nextCard.rank && card.suit === nextCard.suit) {
+        return { meta: { ...card.meta, isNextFoundationCard: true } };
+      }
+    }
+    return {};
+  }
+},
+
+// ========== MISSING CURSES ==========
+
+{
+  id: 'temporal_anomaly',
+  name: 'Temporal Anomaly',
+  type: 'curse',
+  description: 'Cards randomly age/de-age (rank changes ±3).',
+  onMoveComplete: (state) => {
+    if (Math.random() < 0.2) { // 20% chance per move
+      const newPiles = { ...state.piles };
+      Object.keys(newPiles).forEach(key => {
+        const pile = newPiles[key];
+        if (pile.cards.length > 0 && Math.random() < 0.3) {
+          const randomIndex = Math.floor(Math.random() * pile.cards.length);
+          const card = pile.cards[randomIndex];
+          const change = Math.random() > 0.5 ? 3 : -3;
+          let newRank = card.rank + change;
+          newRank = Math.max(1, Math.min(13, newRank));
+          
+          const newCards = [...pile.cards];
+          newCards[randomIndex] = { ...card, rank: newRank as Rank };
+          newPiles[key] = { ...pile, cards: newCards };
+        }
+      });
+      return { piles: newPiles };
+    }
+    return {};
+  }
+},
+
+{
+  id: 'earthquake',
+  name: 'Earthquake',
+  type: 'curse',
+  description: 'Randomly collapse tableau stacks.',
+  onMoveComplete: (state) => {
+    if (Math.random() < 0.15) { // 15% chance per move
+      const newPiles = { ...state.piles };
+      const tableaus = Object.keys(newPiles).filter(k => k.startsWith('tableau'));
+      
+      tableaus.forEach(tableauId => {
+        const pile = newPiles[tableauId];
+        if (pile.cards.length > 1 && Math.random() < 0.5) {
+          // Collapse: move bottom 1-3 cards to waste
+          const collapseCount = Math.floor(Math.random() * 3) + 1;
+          const toCollapse = Math.min(collapseCount, pile.cards.length);
+          const collapsed = pile.cards.slice(0, toCollapse);
+          const remaining = pile.cards.slice(toCollapse);
+          
+          newPiles[tableauId] = { ...pile, cards: remaining };
+          newPiles['waste'].cards = [...newPiles['waste'].cards, ...collapsed.map(c => ({ ...c, faceUp: true }))];
+        }
+      });
+      
+      return { piles: newPiles };
+    }
+    return {};
+  }
+},
+
+{
+  id: 'tectonic_shift',
+  name: 'Tectonic Shift',
+  type: 'curse',
+  description: 'Tableau piles slowly drift left/right each move.',
+  onMoveComplete: (state) => {
+    const newPiles = { ...state.piles };
+    const tableaus = Object.keys(newPiles)
+      .filter(k => k.startsWith('tableau'))
+      .sort((a, b) => parseInt(a.split('-')[1]) - parseInt(b.split('-')[1]));
+    
+    if (tableaus.length > 1) {
+      // Shift all piles one position
+      const firstPile = newPiles[tableaus[0]];
+      for (let i = 0; i < tableaus.length - 1; i++) {
+        newPiles[tableaus[i]] = newPiles[tableaus[i + 1]];
+      }
+      newPiles[tableaus[tableaus.length - 1]] = firstPile;
+      
+      return { piles: newPiles };
+    }
+    return {};
+  }
+},
+
+{
+  id: 'entropy',
+  name: 'Entropy',
+  type: 'curse',
+  description: 'Game state slowly decays: -1% score per card in waste.',
+  calculateScore: (score, context, state) => {
+    const waste = state.piles['waste'];
+    const decay = waste.cards.length * 0.01;
+    return Math.floor(score * (1 - decay));
+  }
+},
+
+{
+  id: 'solar_flare',
+  name: 'Solar Flare',
+  type: 'curse',
+  description: 'Random cards become face-down every 8 moves.',
+  onMoveComplete: (state) => {
+    const moves = (state.effectState.solarFlareMoves || 0) + 1;
+    if (moves >= 8) {
+      const newPiles = { ...state.piles };
+      let flipped = 0;
+      
+      Object.keys(newPiles).forEach(key => {
+        const pile = newPiles[key];
+        if (pile.cards.length > 0 && Math.random() < 0.4) {
+          const randomIndex = Math.floor(Math.random() * pile.cards.length);
+          const card = pile.cards[randomIndex];
+          if (card.faceUp) {
+            const newCards = [...pile.cards];
+            newCards[randomIndex] = { ...card, faceUp: false };
+            newPiles[key] = { ...pile, cards: newCards };
+            flipped++;
+          }
+        }
+      });
+      
+      return {
+        piles: newPiles,
+        effectState: { ...state.effectState, solarFlareMoves: 0 }
+      };
+    }
+    
+    return { effectState: { ...state.effectState, solarFlareMoves: moves } };
+  }
+},
+
+{
+  id: 'gravity_well',
+  name: 'Gravity Well',
+  type: 'curse',
+  description: 'Cards slide to bottom of tableau (reverse build order).',
+  canMove: (cards, source, target, defaultAllowed) => {
+    if (target.type === 'tableau' && target.cards.length > 0) {
+      const moving = cards[0];
+      const targetCard = target.cards[0]; // Bottom card instead of top
+      if (targetCard.faceUp) {
+        // Must be opposite color and one rank higher than bottom card
+        return getCardColor(moving.suit) !== getCardColor(targetCard.suit) &&
+               moving.rank === targetCard.rank - 1;
+      }
+    }
+    return defaultAllowed;
+  }
+},
+
+{
+  id: 'poltergeist',
+  name: 'Poltergeist',
+  type: 'curse',
+  description: 'Cards randomly move between tableau piles.',
+  onMoveComplete: (state) => {
+    if (Math.random() < 0.25) {
+      const newPiles = { ...state.piles };
+      const tableaus = Object.keys(newPiles)
+        .filter(k => k.startsWith('tableau') && newPiles[k].cards.length > 0);
+      
+      if (tableaus.length >= 2) {
+        const fromIdx = Math.floor(Math.random() * tableaus.length);
+        const toIdx = Math.floor(Math.random() * tableaus.length);
+        
+        if (fromIdx !== toIdx) {
+          const fromPile = newPiles[tableaus[fromIdx]];
+          const toPile = newPiles[tableaus[toIdx]];
+          
+          if (fromPile.cards.length > 0) {
+            const movingCard = fromPile.cards[fromPile.cards.length - 1];
+            const newFromCards = fromPile.cards.slice(0, -1);
+            const newToCards = [...toPile.cards, { ...movingCard, faceUp: true }];
+            
+            newPiles[tableaus[fromIdx]] = { ...fromPile, cards: newFromCards };
+            newPiles[tableaus[toIdx]] = { ...toPile, cards: newToCards };
+            
+            return { piles: newPiles };
+          }
+        }
+      }
+    }
+    return {};
+  }
+},
+
+{
+  id: 'shapeshifter',
+  name: 'Shapeshifter',
+  type: 'curse',
+  description: 'Cards change suit when you look away (on tableau reveal).',
+  onCardRevealed: (state, card) => {
+    if (Math.random() < 0.5) {
+      const newPiles = { ...state.piles };
+      const suits: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
+      const newSuit = suits.filter(s => s !== card.suit)[Math.floor(Math.random() * 3)];
+      
+      Object.keys(newPiles).forEach(pileId => {
+        const pile = newPiles[pileId];
+        const cardIndex = pile.cards.findIndex(c => c.id === card.id);
+        if (cardIndex >= 0) {
+          const newCards = [...pile.cards];
+          newCards[cardIndex] = { ...card, suit: newSuit };
+          newPiles[pileId] = { ...pile, cards: newCards };
+        }
+      });
+      
+      return { piles: newPiles };
+    }
+    return {};
+  }
+},
+
+{
+  id: 'wild_magic_surge',
+  name: 'Wild Magic Surge',
+  type: 'curse',
+  description: '10% chance any play triggers random effect.',
+  onMoveComplete: (state, context) => {
+    if (Math.random() < 0.1) {
+      const effects = [
+        { score: state.score + 50, coins: state.coins + 25 },
+        { score: Math.floor(state.score * 0.8) },
+        { coins: state.coins - 20 },
+        { effectState: { ...state.effectState, wildMagic: 'extraMove' } },
+        { effectState: { ...state.effectState, wildMagic: 'shuffleTableaus' } }
+      ];
+      
+      const randomEffect = effects[Math.floor(Math.random() * effects.length)];
+      return randomEffect;
+    }
+    return {};
+  }
+},
+
+{
+  id: 'butterfly_effect',
+  name: 'Butterfly Effect',
+  type: 'curse',
+  description: 'Small changes cascade: moving a 2 affects all 2s, etc.',
+  onMoveComplete: (state, context) => {
+    if (context.cards.length === 1) {
+      const movedRank = context.cards[0].rank;
+      const newPiles = { ...state.piles };
+      let cascadeCount = 0;
+      
+      Object.keys(newPiles).forEach(pileId => {
+        const pile = newPiles[pileId];
+        const newCards = pile.cards.map(card => {
+          if (card.rank === movedRank && card.id !== context.cards[0].id) {
+            cascadeCount++;
+            // Flip the card or change its face-up status
+            return { ...card, faceUp: !card.faceUp };
+          }
+          return card;
+        });
+        
+        newPiles[pileId] = { ...pile, cards: newCards };
+      });
+      
+      if (cascadeCount > 0) {
+        return {
+          piles: newPiles,
+          score: state.score - (cascadeCount * 5) // Penalty for cascade
+        };
+      }
+    }
+    return {};
+  }
+},
+
+{
+  id: 'mulligan_curse',
+  name: 'Mulligan (Curse)',
+  type: 'curse',
+  description: 'Every 7 moves, forced tableau reshuffle.',
+  onMoveComplete: (state) => {
+    const moves = (state.effectState.curseMulliganMoves || 0) + 1;
+    if (moves >= 7) {
+      const newPiles = { ...state.piles };
+      let allTableauCards: Card[] = [];
+      
+      // Collect and shuffle all tableau cards
+      Object.keys(newPiles).forEach(key => {
+        if (key.startsWith('tableau')) {
+          allTableauCards = [...allTableauCards, ...newPiles[key].cards];
+          newPiles[key].cards = [];
+        }
+      });
+      
+      allTableauCards.sort(() => Math.random() - 0.5);
+      
+      // Redistribute randomly (not in standard solitaire pattern)
+      const tableauKeys = Object.keys(newPiles).filter(k => k.startsWith('tableau'));
+      tableauKeys.forEach(key => {
+        const randomCount = Math.floor(Math.random() * 5) + 1;
+        const cards = allTableauCards.splice(0, randomCount);
+        if (cards.length > 0) {
+          cards[cards.length - 1].faceUp = true;
+        }
+        newPiles[key].cards = cards;
+      });
+      
+      // Put remaining cards back in deck
+      newPiles['deck'].cards = [...allTableauCards, ...newPiles['deck'].cards];
+      
+      return {
+        piles: newPiles,
+        effectState: { ...state.effectState, curseMulliganMoves: 0 }
+      };
+    }
+    
+    return { effectState: { ...state.effectState, curseMulliganMoves: moves } };
+  }
+},
+
+{
+  id: 'revolving_door',
+  name: 'Revolving Door',
+  type: 'curse',
+  description: 'Foundation cards can be taken back, but at -20 pts cost.',
+  canMove: (cards, source, target, defaultAllowed) => {
+    if (source.type === 'foundation' && target.type === 'tableau') {
+      const moving = cards[0];
+      const targetCard = target.cards[target.cards.length - 1];
+      if (!targetCard) return moving.rank === 13;
+      return getCardColor(moving.suit) !== getCardColor(targetCard.suit) &&
+             targetCard.rank === moving.rank + 1;
+    }
+    return defaultAllowed;
+  },
+  calculateScore: (score, context) => {
+    if (context.source.includes('foundation') && context.target.includes('tableau')) {
+      return score - 20;
+    }
+    return score;
+  }
+},
+
+// ========== MISSING FEARS ==========
+
+{
+  id: 'crown_of_martyr',
+  name: 'Crown of Martyr',
+  type: 'fear',
+  description: 'Taking damage gives +1 to all future plays (stacks).',
+  onEncounterStart: (state) => {
+    return { 
+      effectState: { 
+        ...state.effectState, 
+        martyrCrownStacks: 0 
+      } 
+    };
+  },
+  calculateScore: (score, context, state) => {
+    const stacks = state.effectState.martyrCrownStacks || 0;
+    if (score < 0) { // Taking damage
+      return {
+        score,
+        effectState: { 
+          ...state.effectState, 
+          martyrCrownStacks: stacks + 1 
+        }
+      };
+    }
+    return score + stacks; // Bonus based on stacks
+  }
+},
+
+{
+  id: 'dementia',
+  name: 'Dementia',
+  type: 'fear',
+  description: 'Forget card positions after 3 seconds of viewing.',
+  onCardRevealed: (state, card) => {
+    // Start a timer for this card
+    const timers = state.effectState.dementiaTimers || {};
+    timers[card.id] = Date.now() + 3000; // 3 seconds from now
+    
+    return { 
+      effectState: { 
+        ...state.effectState, 
+        dementiaTimers: timers 
+      } 
+    };
+  },
+  transformCardVisual: (card, pile, state) => {
+    const timers = state.effectState.dementiaTimers || {};
+    const expireTime = timers[card.id];
+    
+    if (expireTime && Date.now() > expireTime) {
+      // Card should be "forgotten" - hide it
+      return { faceUp: false };
+    }
+    return {};
+  }
+},
+{
+    id: 'shadow_realm',
+    name: 'Shadow Realm',
+    type: 'epic',
+    description: 'Discards enter Shadow Realm. Pay coins to summon back.',
+    onMoveComplete: (state, context) => {
+       if (context.target === 'waste') {
+          const newPiles = { ...state.piles };
+          if (!newPiles['shadow-realm']) newPiles['shadow-realm'] = { id: 'shadow-realm', type: 'waste', cards: [] };
+          
+          const moved = newPiles['waste'].cards.pop()!;
+          newPiles['shadow-realm'].cards.push(moved);
+          return { piles: newPiles };
+       }
+       return {};
     }
   },
   {
-    id: 'strange_rock',
-    name: 'Strange Rock',
-    type: 'legendary',
-    description: 'Chaos Mode NG+ (Reset, x4 Multipliers, Random Cards).',
-    onActivate: (state) => {
-       return generateNewBoard(state.score, state.coins, 4, 4, false, true);
+    id: 'card_graveyard',
+    name: 'Card Graveyard',
+    type: 'epic',
+    description: 'Foundation cards stack. 35+ total cards -> +500 pts.',
+    onMoveComplete: (state) => {
+       const total = Object.keys(state.piles)
+          .filter(k => k.startsWith('foundation'))
+          .reduce((sum, k) => sum + state.piles[k].cards.length, 0);
+       
+       if (total >= 35 && !state.effectState.graveyardBonus) {
+          return { score: state.score + 500, effectState: { ...state.effectState, graveyardBonus: true } };
+       }
+       return {};
     }
+  },
+  {
+    id: 'linked_fates',
+    name: 'Linked Fates',
+    type: 'epic',
+    description: 'Two tableaus linked. Must play alternatingly.',
+    onActivate: (state) => ({ effectState: { ...state.effectState, linkedTableaus: ['tableau-2', 'tableau-4'] } }),
+    canMove: (cards, source, target, defaultAllowed, state) => {
+       const links = state.effectState.linkedTableaus;
+       if (links && links.includes(source.id)) {
+          if (state.effectState.lastLinkedPlayed === source.id) return false;
+       }
+       return defaultAllowed;
+    },
+    onMoveComplete: (state, context) => {
+       const links = state.effectState.linkedTableaus;
+       if (links && links.includes(context.source)) {
+          return { effectState: { ...state.effectState, lastLinkedPlayed: context.source } };
+       }
+       return {};
+    }
+  },
+  {
+    id: 'parasite_pile',
+    name: 'Parasite Pile',
+    type: 'epic',
+    description: 'Tableau steals cards every 7 moves. Stolen cards score 3x.',
+    onActivate: (state) => ({ effectState: { ...state.effectState, parasiteTarget: 'tableau-6' } }),
+    onMoveComplete: (state) => {
+       if (state.moves % 7 === 0) {
+          // Logic handled in App.tsx or here? Ideally here but we need pile access.
+          // For now just flag it.
+          return { effectState: { ...state.effectState, parasiteActive: true } };
+       }
+       return {};
+    },
+    calculateScore: (score, context) => context.cards[0].meta?.stolen ? score * 3 : score
+  },
+  {
+    id: 'ritual_components',
+    name: 'Ritual Components',
+    type: 'epic',
+    description: 'Collect Blood (Hearts), Bone (Diamonds), Ash (Clubs/Spades) in sequence.',
+    onMoveComplete: (state, context) => {
+       const suit = context.cards[0].suit;
+       const seq = state.effectState.ritualSequence || [];
+       let next = '';
+       if (seq.length === 0 && suit === 'hearts') next = 'blood';
+       if (seq.length === 1 && suit === 'diamonds') next = 'bone';
+       if (seq.length === 2 && (suit === 'clubs' || suit === 'spades')) next = 'ash';
+       
+       if (next) {
+          const newSeq = [...seq, next];
+          if (newSeq.length === 3) return { score: state.score + 666, effectState: { ...state.effectState, ritualSequence: [] } };
+          return { effectState: { ...state.effectState, ritualSequence: newSeq } };
+       }
+       return {};
+    }
+  },
+  {
+    id: 'momentum_tokens',
+    name: 'Momentum Tokens',
+    type: 'epic',
+    description: 'Build tokens on pile. Spend for wild/unlock/pts.',
+    onMoveComplete: (state) => ({ effectState: { ...state.effectState, momentum: (state.effectState.momentum || 0) + 1 } })
   }
 ];

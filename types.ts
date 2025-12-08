@@ -126,6 +126,10 @@ export interface GameEffect {
     context: MoveContext
   ) => Partial<GameState> & { triggerMinigame?: string };
 
+  onEncounterStart?: (
+    gameState: GameState
+  ) => Partial<GameState>;
+
   calculateScore?: (
     currentScore: number, 
     context: MoveContext,
