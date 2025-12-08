@@ -3,6 +3,7 @@ import { LayoutGrid, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, H
 import { Card, GameState, Pile, Rank, Suit, MoveContext, Encounter, GameEffect, Wander, WanderChoice, MinigameResult } from './types';
 import { getCardColor, generateNewBoard, EFFECTS_REGISTRY } from './data/effects';
 import { Minigames } from './utils/minigames';
+import ResponsiveIcon from './components/ResponsiveIcon';
 
 // ==========================================
 // INJECTABLE REGISTRIES (defaults to empty for decoupled UI)
@@ -126,10 +127,107 @@ const getRarityColor = (rarity?: string): { bg: string; text: string; border: st
    }
 };
 
+// Small synonyms map for common registry keys vs actual filenames
+const ICON_SYNONYMS: Record<string, string> = {
+  coins: 'coin',
+  coin: 'coin',
+  fortunes: 'fortune',
+  fortune: 'fortune',
+  blessings: 'blessing',
+  blessing: 'blessing',
+  curses: 'curse',
+  curse: 'curse',
+  hand: 'hand size',
+  'hand size': 'hand size',
+  shuffle: 'shuffle',
+  shuffles: 'shuffle',
+  discard: 'discard',
+  discards: 'discard',
+  exploit: 'exploit',
+  exploits: 'exploit',
+  danger: 'danger',
+  dangers: 'danger',
+  fear: 'fear',
+  fears: 'fear',
+  barricade: 'barricade',
+  resign: 'resign',
+  orangehelp: 'orangehelp',
+  purplehelp: 'purplehelp',
+  whitehelp: 'whitehelp',
+  notdanger: 'notdanger',
+  history: 'run history',
+  'run history': 'run history',
+  ghost: 'sign in',
+  'sign in': 'sign in',
+  signin: 'sign in',
+  feats: 'feats',
+  ascension: 'ascension',
+  settings: 'settings',
+  setting: 'settings',
+  // UI/Menu icons
+  back: 'back',
+  save: 'save',
+  pause: 'pause',
+  play: 'play',
+  volume: 'volume',
+  mute: 'volume',
+  sound: 'volume',
+  close: 'close',
+  exit: 'close',
+  feedback: 'feedback',
+  glossary: 'glossary',
+  login: 'login',
+  signup: 'sign up',
+
+  // Registry ID to Filename Mappings
+  bait_switch: 'baitandswitch',
+  stolen_valor: 'stolenvalor',
+  creative_accounting: 'creativeaccounting',
+  martial_law: 'martiallaw',
+  path_least_resistance: 'pathofleastresistance',
+  gift_gab: 'giftofgab',
+  beginners_luck: 'beginnersluck',
+  diplomatic_immunity: 'diplomaticimmunity',
+  angel_investor: 'angelinvestor',
+  bag_of_holding: 'bagofholding',
+  street_smarts: 'streetsmarts',
+  legitimate_business: 'legitimatebusiness',
+  liquid_assets: 'liquidassets',
+  fountain_youth: 'fountainofyouth',
+  insider_trading: 'insidertrading',
+  daruma_karma: 'duarmakarma',
+  golden_parachute: 'goldenparachute',
+  
+  // Native Effects Mappings
+  alchemist: 'alchemy',
+  'fog-of-war': 'fogofwar',
+  'moon-toad-cheeks': 'moontoadcheeks',
+};
+
 // Icon helper - converts effect name to icon path with type fallback
-const getEffectIcon = (name: string, type: 'exploit' | 'curse' | 'blessing' | 'danger' | 'fear') => {
-   // Use the name directly (lowercased) to match the new icon set
-   return `/icons/${name.toLowerCase()}.png`;
+const getEffectIcon = (nameOrId: string, type: 'exploit' | 'curse' | 'blessing' | 'danger' | 'fear') => {
+   const lower = (nameOrId || '').toLowerCase();
+   
+   // 1. Check synonyms (using ID-like keys)
+   if (ICON_SYNONYMS[lower]) {
+      return `/icons/${encodeURIComponent(ICON_SYNONYMS[lower])}.png`;
+   }
+
+   // 2. Try replacing underscores with spaces (e.g. "above_the_law" -> "above the law.png")
+   if (lower.includes('_')) {
+      return `/icons/${encodeURIComponent(lower.replace(/_/g, ' '))}.png`;
+   }
+
+   // 3. Try replacing spaces with underscores (e.g. "Bait & Switch" -> "bait_switch" -> "baitandswitch")
+   // This handles cases where we passed the Name but the file/synonym is keyed by ID
+   // First, try to map Name to ID-like string
+   const asId = lower.replace(/\s+/g, '_').replace(/&/g, 'and').replace(/[^a-z0-9_]/g, '');
+   if (ICON_SYNONYMS[asId]) {
+       return `/icons/${encodeURIComponent(ICON_SYNONYMS[asId])}.png`;
+   }
+
+   // 4. Default: use name directly
+   return `/icons/${encodeURIComponent(lower)}.png`;
 };
 
 // Category icon paths
@@ -224,11 +322,16 @@ export default function SolitaireEngine({
   };
 
   const resolveWanderEffect = (effects: any[]) => {
+    console.log('resolveWanderEffect called with:', effects);
     let updates: Partial<GameState> = {};
     let newOwned = [...gameState.ownedEffects];
     let newActive = [...activeEffects];
     
     const apply = (effs: any[]) => {
+      if (!effs || !Array.isArray(effs)) {
+        console.error('apply called with invalid effects:', effs);
+        return;
+      }
       for (const eff of effs) {
         if (eff.type === 'modify_coin') updates.coins = (updates.coins ?? gameState.coins) + eff.params[0];
         if (eff.type === 'modify_score') updates.score = (updates.score ?? gameState.score) + eff.params[0];
@@ -578,14 +681,14 @@ export default function SolitaireEngine({
         newCards.splice(cardIndex, 1);
         setGameState(prev => ({ ...prev, piles: { ...prev.piles, hand: { ...pile, cards: newCards } } }));
         return;
-    }
+    }rn;
+       }
 
     if (clickedCard && clickedCard.meta?.locked) {
        const hasPanopticon = activeEffects.includes('panopticon');
        if (hasPanopticon) {
           setGameState(prev => ({ ...prev, activeMinigame: { type: 'darts', title: 'Break the Lock', context: { pileId, cardIndex } } }));
-          return;
-       }
+          retu
        if (canAfford(10)) { const newCards = [...pile.cards]; newCards[cardIndex] = { ...clickedCard, meta: { ...clickedCard.meta, locked: false } }; setGameState(prev => ({ ...prev, coins: prev.coins - 10, piles: { ...prev.piles, [pileId]: { ...pile, cards: newCards } } })); } 
        return; 
     }
@@ -881,7 +984,7 @@ export default function SolitaireEngine({
              {/* Special Blessing Card Rendering */}
              {visualCard.meta?.isBlessing ? (
                  <div className="flex flex-col items-center justify-center h-full text-center bg-gradient-to-b from-purple-100 to-purple-200 rounded">
-                     <img src={getEffectIcon(visualCard.meta.name || '', 'blessing')} alt="" className="w-6 h-6 mb-0.5" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons.blessing; }} />
+                     <ResponsiveIcon name={visualCard.meta.effectId || visualCard.meta.name || ''} fallbackType="blessing" size={24} className="mb-0.5" />
                      <div className="text-[5px] font-bold leading-tight text-purple-800 px-0.5">{visualCard.meta.name}</div>
                  </div>
              ) : visualCard.meta?.isWild ? (
@@ -1305,7 +1408,7 @@ export default function SolitaireEngine({
                                          </div>
                                          <div className="flex flex-wrap gap-1">
                                             {run.exploits.map((ex, i) => (
-                                               <img key={i} src={getEffectIcon(ex, 'exploit')} alt={ex} title={ex} className="w-5 h-5 rounded" onError={(e) => { (e.target as HTMLImageElement).src = categoryIcons.exploit; }} />
+                                               <ResponsiveIcon key={i} name={ex.id || ex.name} fallbackType="exploit" size={20} className="rounded" />
                                             ))}
                                          </div>
                                       </div>
@@ -1317,7 +1420,7 @@ export default function SolitaireEngine({
                                          </div>
                                          <div className="flex flex-wrap gap-1">
                                             {run.curses.map((c, i) => (
-                                               <img key={i} src={getEffectIcon(c, 'curse')} alt={c} title={c} className="w-5 h-5 rounded" onError={(e) => { (e.target as HTMLImageElement).src = categoryIcons.curse; }} />
+                                               <ResponsiveIcon key={i} name={c.id || c.name} fallbackType="curse" size={20} className="rounded" />
                                             ))}
                                          </div>
                                       </div>
@@ -1329,7 +1432,7 @@ export default function SolitaireEngine({
                                          </div>
                                          <div className="flex flex-wrap gap-1">
                                             {run.blessings.map((b, i) => (
-                                               <img key={i} src={getEffectIcon(b, 'blessing')} alt={b} title={b} className="w-5 h-5 rounded" onError={(e) => { (e.target as HTMLImageElement).src = categoryIcons.blessing; }} />
+                                               <img key={i} src={getEffectIcon(b.id || b.name, 'blessing')} alt={b.name} title={b.name} className="w-5 h-5 rounded" onError={(e) => { (e.target as HTMLImageElement).src = categoryIcons.blessing; }} />
                                             ))}
                                          </div>
                                       </div>
@@ -1672,7 +1775,7 @@ export default function SolitaireEngine({
                        const effectType = e.type === 'danger' ? 'danger' : e.type === 'fear' ? 'fear' : e.type === 'blessing' ? 'blessing' : e.type === 'curse' ? 'curse' : 'exploit';
                        return (
                        <div key={e.id} className={`p-3 rounded border ${rarityColors.bg} ${rarityColors.border} flex gap-3`}>
-                          <img src={getEffectIcon(e.name, effectType)} alt="" className="w-10 h-10 rounded shrink-0" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons[effectType]; }} />
+                          <img src={getEffectIcon(e.id || e.name, effectType)} alt="" className="w-10 h-10 rounded shrink-0" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons[effectType]; }} />
                           <div className="flex-1 min-w-0">
                              <div className="flex justify-between items-start gap-2">
                                <div className="font-bold text-white truncate">{e.name}</div>
@@ -2048,7 +2151,7 @@ export default function SolitaireEngine({
                                           openShop();
                                       }
                                    }}>
-                                 <img src={getEffectIcon(item.name, 'blessing')} alt="" className="w-8 h-8 rounded shrink-0" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons.blessing; }} />
+                                 <img src={getEffectIcon(item.id || item.name, 'blessing')} alt="" className="w-8 h-8 rounded shrink-0" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons.blessing; }} />
                                  <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
                                        <span className="font-bold text-white text-xs truncate">{item.name}</span>
@@ -2069,7 +2172,7 @@ export default function SolitaireEngine({
                               const itemType = item.type === 'curse' ? 'curse' : item.type === 'blessing' ? 'blessing' : 'exploit';
                               return (
                               <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3`}>
-                                 <img src={getEffectIcon(item.name, itemType)} alt="" className="w-8 h-8 rounded shrink-0" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons[itemType]; }} />
+                                 <img src={getEffectIcon(item.id || item.name, itemType)} alt="" className="w-8 h-8 rounded shrink-0" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons[itemType]; }} />
                                  <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
                                        <span className="font-bold text-white text-xs truncate">{item.name}</span>
@@ -2115,7 +2218,7 @@ export default function SolitaireEngine({
                                  onClick={() => { if ((effect as any).type !== 'blessing') toggleEffect(effect.id); }}
                                  aria-label={`Toggle effect ${effect.name}`}
                                  className={`p-2 rounded border cursor-pointer text-xs flex items-center gap-3 transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : `${rarityColors.bg} ${rarityColors.border}`} ${isReady ? 'ring-1 ring-yellow-400' : ''}`}>
-                                 <img src={getEffectIcon(effect.name, effectType)} alt="" className="w-8 h-8 rounded shrink-0" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons[effectType]; }} />
+                                 <img src={getEffectIcon(effect.id || effect.name, effectType)} alt="" className="w-8 h-8 rounded shrink-0" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons[effectType]; }} />
                                  <div className="flex-1 min-w-0 text-left">
                                      <div className="font-bold text-white flex gap-1 items-center flex-wrap">
                                          <span className="truncate">{effect.name}</span>

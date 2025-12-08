@@ -25,7 +25,8 @@ export interface Pile {
 export interface WanderChoice {
   label: string;
   result: string;
-  effects: { type: string; params: any[] }[];
+  effects?: { type: string; params: any[]; scaling?: string }[];
+  onChoose?: (ctx: { gameState: GameState, rng?: () => number }) => GameState;
 }
 
 export interface Wander {
@@ -36,6 +37,9 @@ export interface Wander {
   choices: WanderChoice[];
   conditions?: any;
   isHidden?: boolean;
+  category?: string;
+  baseWeight?: number;
+  weightModifiers?: Record<string, any>;
 }
 
 export interface GameState {
