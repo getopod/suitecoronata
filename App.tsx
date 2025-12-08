@@ -149,6 +149,14 @@ export default function SolitaireEngine({
   const [feedbackType, setFeedbackType] = useState('bug');
   const [feedbackChecks, setFeedbackChecks] = useState<Record<string, boolean>>({});
 
+  // Auto-advance when score goal is reached
+  React.useEffect(() => {
+    if (currentView === 'game' && gameState.score >= gameState.currentScoreGoal && !gameState.isLevelComplete && !showLevelComplete) {
+      setGameState(p => ({ ...p, isLevelComplete: true }));
+      setShowLevelComplete(true);
+    }
+  }, [gameState.score, gameState.currentScoreGoal, gameState.isLevelComplete, currentView, showLevelComplete]);
+
   const isEffectReady = (id: string, state: GameState) => {
      if (id === 'lobbyist') return state.coins >= 100;
      if (id === 'street_smarts') return state.coins >= 25;
@@ -650,16 +658,18 @@ export default function SolitaireEngine({
   const canAfford = (cost: number) => gameState.coins >= cost;
 
   const buyEffect = (effect: GameEffect) => {
-     if ((effect as any).type === 'exploit' || (effect as any).type === 'blessing') {
-        if (gameState.coins >= (effect.cost || 50)) {
-           setGameState(p => ({ ...p, coins: p.coins - (effect.cost || 50), ownedEffects: [...p.ownedEffects, effect.id] }));
-           if ((effect as any).type !== 'blessing') {
-               toggleEffect(effect.id, true);
-           }
-        }
-     } else if ((effect as any).type === 'curse') {
-        setGameState(p => ({ ...p, coins: p.coins + 50, ownedEffects: [...p.ownedEffects, effect.id] }));
-        toggleEffect(effect.id, true); 
+     const cost = effect.cost || 50;
+     if (gameState.coins < cost) return; // Can't afford
+     
+     setGameState(p => ({ 
+       ...p, 
+       coins: p.coins - cost, 
+       ownedEffects: [...p.ownedEffects, effect.id] 
+     }));
+     
+     // Auto-activate exploits and curses (but not blessings - those go to deck)
+     if ((effect as any).type !== 'blessing') {
+       toggleEffect(effect.id, true);
      }
   };
 
@@ -1424,7 +1434,12 @@ export default function SolitaireEngine({
                            {shopInventory.map(item => (
                               <div key={item.id} className="p-2 rounded border border-slate-600 bg-slate-700/50 flex justify-between items-center">
                                  <div><div className="font-bold text-slate-200 text-xs">{item.name}</div><div className="text-slate-400 text-[10px]">{item.description}</div></div>
-                                 <button className="bg-yellow-600 text-white px-2 py-1 rounded text-xs font-bold" onClick={() => buyEffect(item)}>{(item as any).type === 'exploit' ? `Buy ${item.cost || 50}` : 'Take (+50)'}</button>
+                                 <button 
+                                   className={`text-white px-2 py-1 rounded text-xs font-bold ${gameState.coins >= (item.cost || 50) ? 'bg-yellow-600 hover:bg-yellow-500' : 'bg-slate-600 cursor-not-allowed'}`}
+                                   onClick={() => buyEffect(item)}
+                                   disabled={gameState.coins < (item.cost || 50)}>
+                                   Buy {item.cost || 50}
+                                 </button>
                               </div>
                            ))}
                         </div>
