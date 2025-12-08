@@ -114,6 +114,18 @@ const getRankDisplay = (r: Rank) => {
    return r;
 };
 
+// Rarity color helper - returns Tailwind classes for rarity
+const getRarityColor = (rarity?: string): { bg: string; text: string; border: string } => {
+   const r = (rarity || 'common').toLowerCase();
+   switch (r) {
+      case 'uncommon': return { bg: 'bg-green-900/30', text: 'text-green-300', border: 'border-green-600' };
+      case 'rare': return { bg: 'bg-blue-900/30', text: 'text-blue-400', border: 'border-blue-500' };
+      case 'epic': return { bg: 'bg-purple-900/30', text: 'text-purple-400', border: 'border-purple-500' };
+      case 'legendary': return { bg: 'bg-yellow-900/30', text: 'text-yellow-400', border: 'border-yellow-500' };
+      default: return { bg: 'bg-slate-700/30', text: 'text-slate-400', border: 'border-slate-600' };
+   }
+};
+
 // ==========================================
 // 5. COMPONENT: APP
 // ==========================================
@@ -146,6 +158,32 @@ export default function SolitaireEngine({
   const [glossaryTab, setGlossaryTab] = useState<'dangers'|'fears'|'blessings'|'exploits'|'curses'>('dangers');
   const [expandedAchievement, setExpandedAchievement] = useState<number | null>(null);
   const [expandedSettingsSection, setExpandedSettingsSection] = useState<string | null>(null);
+  
+  // Settings state
+  const [settings, setSettings] = useState({
+    autoFlip: true,
+    confirmMoves: false,
+    confirmResign: true,
+    showHints: true,
+    masterVolume: 80,
+    musicVolume: 60,
+    sfxVolume: 100,
+    menuMusic: true,
+    gameplayMusic: true,
+    shopMusic: true,
+    wanderMusic: true,
+    cardFlip: true,
+    cardPlace: true,
+    invalidMove: true,
+    scorePoints: true,
+    levelComplete: true,
+    uiClicks: true,
+    reduceMotion: false,
+    highContrast: false,
+    colorBlindMode: 'off',
+    cardStyle: 'classic',
+    cardAnimations: true,
+  });
   const [testAmount, setTestAmount] = useState(100);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackType, setFeedbackType] = useState('bug');
@@ -771,10 +809,10 @@ export default function SolitaireEngine({
   if (currentView === 'home') {
      // Game modes data
      const gameModes = [
-        { id: 'coronata', name: 'Coronata', desc: 'The original rogue-like experience. 15 encounters with effects, shops, and wanders.', icon: '👑', unlocked: true },
-        { id: 'klondike', name: 'Klondike', desc: 'Classic solitaire with a rogue-like twist. Draw 1 or 3 cards.', icon: '🃏', unlocked: true },
-        { id: 'spider', name: 'Spider', desc: 'Build sequences of the same suit. 1, 2, or 4 suit variants.', icon: '🕷️', unlocked: true },
-        { id: 'freecell', name: 'FreeCell', desc: 'Strategic solitaire with free cells for temporary storage.', icon: '🗃️', unlocked: true },
+        { id: 'coronata', name: 'Coronata', desc: 'The original rogue-like experience. 15 encounters with effects, shops, and wanders.', unlocked: true, hasStars: true },
+        { id: 'klondike', name: 'Klondike', desc: 'Classic solitaire with a rogue-like twist. Draw 1 or 3 cards.', unlocked: true, hasStars: false },
+        { id: 'spider', name: 'Spider', desc: 'Build sequences of the same suit. 1, 2, or 4 suit variants.', unlocked: true, hasStars: false },
+        { id: 'freecell', name: 'FreeCell', desc: 'Strategic solitaire with free cells for temporary storage.', unlocked: true, hasStars: false },
      ];
 
      // How to play pages
@@ -834,7 +872,6 @@ export default function SolitaireEngine({
                                    : 'bg-slate-800/50 border-slate-700/50 opacity-50 cursor-not-allowed'
                           }`}>
                           <div className="flex items-center gap-3">
-                             <span className="text-2xl">{mode.icon}</span>
                              <div className="flex-1">
                                 <div className="font-bold text-white flex items-center gap-2">
                                    {mode.name}
@@ -843,13 +880,19 @@ export default function SolitaireEngine({
                                 </div>
                                 <div className="text-sm text-slate-400">{mode.desc}</div>
                              </div>
+                             <button 
+                                className={`p-2 rounded-lg ${mode.hasStars ? 'bg-yellow-600/20 text-yellow-400 hover:bg-yellow-600/30' : 'bg-slate-700/30 text-slate-600 cursor-not-allowed'}`}
+                                disabled={!mode.hasStars}
+                                onClick={(e) => { e.stopPropagation(); if (mode.hasStars) alert('High Scores coming soon!'); }}>
+                                <Trophy size={18} />
+                             </button>
                           </div>
                        </button>
                     ))}
                     {/* Coming Soon */}
                     <div className="mt-4 p-4 rounded-xl border border-dashed border-slate-600 bg-slate-800/30">
                        <div className="text-center">
-                          <div className="text-2xl mb-2">🚀</div>
+                          <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-slate-700 flex items-center justify-center"><RefreshCw size={18} className="text-slate-500" /></div>
                           <div className="font-bold text-slate-400">More Modes Coming Soon</div>
                           <div className="text-xs text-slate-500 mt-1">Daily challenges, endless mode, custom runs & more!</div>
                        </div>
@@ -1035,19 +1078,19 @@ export default function SolitaireEngine({
                           <div className="space-y-2 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
                              <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
                                 <div><div className="font-medium text-sm">Auto-flip Cards</div><div className="text-xs text-slate-400">Automatically flip face-down cards</div></div>
-                                <div className="w-12 h-6 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                                <button onClick={() => setSettings(s => ({...s, autoFlip: !s.autoFlip}))} className={`w-12 h-6 ${settings.autoFlip ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.autoFlip ? 'right-0.5' : 'left-0.5'}`}></div></button>
                              </div>
                              <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
                                 <div><div className="font-medium text-sm">Confirm Moves</div><div className="text-xs text-slate-400">Ask before making moves</div></div>
-                                <div className="w-12 h-6 bg-slate-600 rounded-full relative cursor-pointer"><div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                                <button onClick={() => setSettings(s => ({...s, confirmMoves: !s.confirmMoves}))} className={`w-12 h-6 ${settings.confirmMoves ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.confirmMoves ? 'right-0.5' : 'left-0.5'}`}></div></button>
                              </div>
                              <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
                                 <div><div className="font-medium text-sm">Confirm Resign</div><div className="text-xs text-slate-400">Ask before giving up a run</div></div>
-                                <div className="w-12 h-6 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                                <button onClick={() => setSettings(s => ({...s, confirmResign: !s.confirmResign}))} className={`w-12 h-6 ${settings.confirmResign ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.confirmResign ? 'right-0.5' : 'left-0.5'}`}></div></button>
                              </div>
                              <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
                                 <div><div className="font-medium text-sm">Show Hints</div><div className="text-xs text-slate-400">Highlight valid moves</div></div>
-                                <div className="w-12 h-6 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                                <button onClick={() => setSettings(s => ({...s, showHints: !s.showHints}))} className={`w-12 h-6 ${settings.showHints ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.showHints ? 'right-0.5' : 'left-0.5'}`}></div></button>
                              </div>
                           </div>
                        )}
@@ -1065,21 +1108,21 @@ export default function SolitaireEngine({
                           <div className="space-y-3 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
                              {/* Master */}
                              <div className="p-3 bg-slate-700/50 rounded-lg">
-                                <div className="flex justify-between mb-2"><span className="text-sm">Master Volume</span><span className="text-slate-400 text-sm">80%</span></div>
-                                <div className="h-2 bg-slate-600 rounded-full"><div className="h-2 bg-emerald-500 rounded-full" style={{width: '80%'}}></div></div>
+                                <div className="flex justify-between mb-2"><span className="text-sm">Master Volume</span><span className="text-slate-400 text-sm">{settings.masterVolume}%</span></div>
+                                <input type="range" min="0" max="100" value={settings.masterVolume} onChange={(e) => setSettings(s => ({...s, masterVolume: Number(e.target.value)}))} className="w-full h-2 bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-emerald-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
                              </div>
                              {/* Music Section */}
                              <div className="border-t border-slate-600 pt-3">
                                 <div className="text-xs text-slate-400 uppercase mb-2">Music</div>
                                 <div className="p-3 bg-slate-700/50 rounded-lg mb-2">
-                                   <div className="flex justify-between mb-2"><span className="text-sm">Music Volume</span><span className="text-slate-400 text-sm">60%</span></div>
-                                   <div className="h-2 bg-slate-600 rounded-full"><div className="h-2 bg-emerald-500 rounded-full" style={{width: '60%'}}></div></div>
+                                   <div className="flex justify-between mb-2"><span className="text-sm">Music Volume</span><span className="text-slate-400 text-sm">{settings.musicVolume}%</span></div>
+                                   <input type="range" min="0" max="100" value={settings.musicVolume} onChange={(e) => setSettings(s => ({...s, musicVolume: Number(e.target.value)}))} className="w-full h-2 bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-emerald-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
                                 </div>
                                 <div className="space-y-1">
-                                   {['Menu Music', 'Gameplay Music', 'Shop Music', 'Wander Music'].map(item => (
-                                      <div key={item} className="flex items-center justify-between p-2 bg-slate-700/30 rounded">
-                                         <span className="text-xs">{item}</span>
-                                         <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
+                                   {[{key: 'menuMusic', label: 'Menu Music'}, {key: 'gameplayMusic', label: 'Gameplay Music'}, {key: 'shopMusic', label: 'Shop Music'}, {key: 'wanderMusic', label: 'Wander Music'}].map(item => (
+                                      <div key={item.key} className="flex items-center justify-between p-2 bg-slate-700/30 rounded">
+                                         <span className="text-xs">{item.label}</span>
+                                         <button onClick={() => setSettings(s => ({...s, [item.key]: !s[item.key as keyof typeof s]}))} className={`w-10 h-5 ${settings[item.key as keyof typeof settings] ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings[item.key as keyof typeof settings] ? 'right-0.5' : 'left-0.5'}`}></div></button>
                                       </div>
                                    ))}
                                 </div>
@@ -1088,14 +1131,14 @@ export default function SolitaireEngine({
                              <div className="border-t border-slate-600 pt-3">
                                 <div className="text-xs text-slate-400 uppercase mb-2">Sound Effects</div>
                                 <div className="p-3 bg-slate-700/50 rounded-lg mb-2">
-                                   <div className="flex justify-between mb-2"><span className="text-sm">SFX Volume</span><span className="text-slate-400 text-sm">100%</span></div>
-                                   <div className="h-2 bg-slate-600 rounded-full"><div className="h-2 bg-emerald-500 rounded-full" style={{width: '100%'}}></div></div>
+                                   <div className="flex justify-between mb-2"><span className="text-sm">SFX Volume</span><span className="text-slate-400 text-sm">{settings.sfxVolume}%</span></div>
+                                   <input type="range" min="0" max="100" value={settings.sfxVolume} onChange={(e) => setSettings(s => ({...s, sfxVolume: Number(e.target.value)}))} className="w-full h-2 bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-emerald-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
                                 </div>
                                 <div className="space-y-1">
-                                   {['Card Flip', 'Card Place', 'Invalid Move', 'Score Points', 'Level Complete', 'UI Clicks'].map(item => (
-                                      <div key={item} className="flex items-center justify-between p-2 bg-slate-700/30 rounded">
-                                         <span className="text-xs">{item}</span>
-                                         <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
+                                   {[{key: 'cardFlip', label: 'Card Flip'}, {key: 'cardPlace', label: 'Card Place'}, {key: 'invalidMove', label: 'Invalid Move'}, {key: 'scorePoints', label: 'Score Points'}, {key: 'levelComplete', label: 'Level Complete'}, {key: 'uiClicks', label: 'UI Clicks'}].map(item => (
+                                      <div key={item.key} className="flex items-center justify-between p-2 bg-slate-700/30 rounded">
+                                         <span className="text-xs">{item.label}</span>
+                                         <button onClick={() => setSettings(s => ({...s, [item.key]: !s[item.key as keyof typeof s]}))} className={`w-10 h-5 ${settings[item.key as keyof typeof settings] ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings[item.key as keyof typeof settings] ? 'right-0.5' : 'left-0.5'}`}></div></button>
                                       </div>
                                    ))}
                                 </div>
@@ -1116,20 +1159,20 @@ export default function SolitaireEngine({
                           <div className="space-y-2 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
                              <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
                                 <div><div className="font-medium text-sm">Reduce Motion</div><div className="text-xs text-slate-400">Minimize animations throughout the app</div></div>
-                                <div className="w-12 h-6 bg-slate-600 rounded-full relative cursor-pointer"><div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                                <button onClick={() => setSettings(s => ({...s, reduceMotion: !s.reduceMotion}))} className={`w-12 h-6 ${settings.reduceMotion ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.reduceMotion ? 'right-0.5' : 'left-0.5'}`}></div></button>
                              </div>
                              <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
                                 <div><div className="font-medium text-sm">High Contrast</div><div className="text-xs text-slate-400">Increase contrast for better visibility</div></div>
-                                <div className="w-12 h-6 bg-slate-600 rounded-full relative cursor-pointer"><div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                                <button onClick={() => setSettings(s => ({...s, highContrast: !s.highContrast}))} className={`w-12 h-6 ${settings.highContrast ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.highContrast ? 'right-0.5' : 'left-0.5'}`}></div></button>
                              </div>
                              <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
                                 <div><div className="font-medium text-sm">Color Blind Mode</div><div className="text-xs text-slate-400">Adjust colors for color vision deficiency</div></div>
-                                <select className="bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm">
-                                   <option>Off</option>
-                                   <option>Deuteranopia (Green-weak)</option>
-                                   <option>Protanopia (Red-weak)</option>
-                                   <option>Tritanopia (Blue-weak)</option>
-                                   <option>Achromatopsia (Monochrome)</option>
+                                <select value={settings.colorBlindMode} onChange={(e) => setSettings(s => ({...s, colorBlindMode: e.target.value}))} className="bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm">
+                                   <option value="off">Off</option>
+                                   <option value="deuteranopia">Deuteranopia (Green-weak)</option>
+                                   <option value="protanopia">Protanopia (Red-weak)</option>
+                                   <option value="tritanopia">Tritanopia (Blue-weak)</option>
+                                   <option value="achromatopsia">Achromatopsia (Monochrome)</option>
                                 </select>
                              </div>
                           </div>
@@ -1148,16 +1191,16 @@ export default function SolitaireEngine({
                           <div className="space-y-2 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
                              <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
                                 <div><div className="font-medium text-sm">Card Style</div><div className="text-xs text-slate-400">Visual appearance of cards</div></div>
-                                <select className="bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm">
-                                   <option>Classic</option>
-                                   <option>Modern</option>
-                                   <option>Minimal</option>
-                                   <option>High Contrast</option>
+                                <select value={settings.cardStyle} onChange={(e) => setSettings(s => ({...s, cardStyle: e.target.value}))} className="bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm">
+                                   <option value="classic">Classic</option>
+                                   <option value="modern">Modern</option>
+                                   <option value="minimal">Minimal</option>
+                                   <option value="highcontrast">High Contrast</option>
                                 </select>
                              </div>
                              <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
                                 <div><div className="font-medium text-sm">Card Animations</div><div className="text-xs text-slate-400">Enable smooth card animations</div></div>
-                                <div className="w-12 h-6 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                                <button onClick={() => setSettings(s => ({...s, cardAnimations: !s.cardAnimations}))} className={`w-12 h-6 ${settings.cardAnimations ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.cardAnimations ? 'right-0.5' : 'left-0.5'}`}></div></button>
                              </div>
                           </div>
                        )}
@@ -1242,15 +1285,8 @@ export default function SolitaireEngine({
                     {/* Content */}
                     <div className="flex-1 flex items-center justify-center">
                        <div className="text-center max-w-sm">
-                          <div className="text-6xl mb-6">
-                             {howToPage === 0 && '🎯'}
-                             {howToPage === 1 && '👆'}
-                             {howToPage === 2 && '🃏'}
-                             {howToPage === 3 && '⚔️'}
-                             {howToPage === 4 && '✨'}
-                             {howToPage === 5 && '🛒'}
-                             {howToPage === 6 && '🗺️'}
-                             {howToPage === 7 && '🏆'}
+                          <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-slate-800 border-2 border-slate-600 flex items-center justify-center">
+                             <span className="text-2xl font-bold text-slate-400">{howToPage + 1}</span>
                           </div>
                           <h3 className="text-2xl font-bold mb-4">{howToPages[howToPage].title}</h3>
                           <p className="text-slate-300 leading-relaxed">{howToPages[howToPage].content}</p>
@@ -1305,16 +1341,18 @@ export default function SolitaireEngine({
                        if (glossaryTab === 'exploits') return ['exploit', 'epic', 'legendary', 'rare', 'uncommon'].includes(e.type);
                        if (glossaryTab === 'curses') return e.type === 'curse';
                        return false;
-                    }).map(e => (
-                       <div key={e.id} className="p-3 bg-slate-800 rounded border border-slate-700">
+                    }).map(e => {
+                       const rarityColors = getRarityColor(e.rarity);
+                       return (
+                       <div key={e.id} className={`p-3 rounded border ${rarityColors.bg} ${rarityColors.border}`}>
                           <div className="flex justify-between items-start">
-                            <div className="font-bold text-blue-300">{e.name}</div>
-                            <div className="text-[10px] uppercase text-slate-500 border border-slate-600 px-1 rounded">{e.rarity || 'Common'}</div>
+                            <div className="font-bold text-white">{e.name}</div>
+                            <div className={`text-[10px] uppercase px-1.5 py-0.5 rounded font-bold ${rarityColors.text} ${rarityColors.bg} border ${rarityColors.border}`}>{e.rarity || 'Common'}</div>
                           </div>
-                          <div className="text-slate-400 text-sm mt-1">{e.description}</div>
+                          <div className="text-slate-300 text-sm mt-1">{e.description}</div>
                           {Boolean(e.cost) && <div className="text-xs text-yellow-500 mt-1 flex items-center gap-1"><Coins size={10}/> {e.cost}</div>}
                        </div>
-                    ))}
+                    );})}
                  </div>
               </div>
            )}
@@ -1570,8 +1608,10 @@ export default function SolitaireEngine({
                       <div className="flex flex-col gap-2">
                         <div className="text-center text-sm text-slate-300 mb-2">Choose a Blessing to add to your deck</div>
                         <div className="grid grid-cols-1 gap-2">
-                           {blessingChoices.slice(0,4).map(item => (
-                              <div key={item.id} className="p-2 rounded border border-slate-600 bg-slate-700/50 flex justify-between items-center hover:bg-slate-700 cursor-pointer"
+                           {blessingChoices.slice(0,4).map(item => {
+                              const rarityColors = getRarityColor(item.rarity);
+                              return (
+                              <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex justify-between items-center hover:brightness-110 cursor-pointer`}
                                    onClick={() => {
                                       setGameState(p => ({ ...p, ownedEffects: [...p.ownedEffects, item.id] }));
                                       // Don't activate, just own. It will be added to deck next encounter.
@@ -1597,18 +1637,32 @@ export default function SolitaireEngine({
                                           openShop();
                                       }
                                    }}>
-                                 <div><div className="font-bold text-slate-200 text-xs">{item.name}</div><div className="text-slate-400 text-[10px]">{item.description}</div></div>
+                                 <div>
+                                    <div className="flex items-center gap-2">
+                                       <span className="font-bold text-white text-xs">{item.name}</span>
+                                       <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
+                                    </div>
+                                    <div className="text-slate-400 text-[10px]">{item.description}</div>
+                                 </div>
                                  <Gift size={16} className="text-blue-400" />
                               </div>
-                           ))}
+                           );})}
                         </div>
                      </div>
                   ) : activeDrawer === 'shop' ? (
                      <div className="flex flex-col gap-2">
                         <div className="grid grid-cols-1 gap-2">
-                           {shopInventory.map(item => (
-                              <div key={item.id} className="p-2 rounded border border-slate-600 bg-slate-700/50 flex justify-between items-center">
-                                 <div><div className="font-bold text-slate-200 text-xs">{item.name}</div><div className="text-slate-400 text-[10px]">{item.description}</div></div>
+                           {shopInventory.map(item => {
+                              const rarityColors = getRarityColor(item.rarity);
+                              return (
+                              <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex justify-between items-center`}>
+                                 <div>
+                                    <div className="flex items-center gap-2">
+                                       <span className="font-bold text-white text-xs">{item.name}</span>
+                                       <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
+                                    </div>
+                                    <div className="text-slate-400 text-[10px]">{item.description}</div>
+                                 </div>
                                  <button 
                                    className={`text-white px-2 py-1 rounded text-xs font-bold ${gameState.coins >= (item.cost || 50) ? 'bg-yellow-600 hover:bg-yellow-500' : 'bg-slate-600 cursor-not-allowed'}`}
                                    onClick={() => buyEffect(item)}
@@ -1616,7 +1670,7 @@ export default function SolitaireEngine({
                                    Buy {item.cost || 50}
                                  </button>
                               </div>
-                           ))}
+                           );})}
                         </div>
                         <button onClick={startWanderPhase} className="w-full py-3 mt-4 rounded bg-emerald-600 text-white font-bold flex items-center justify-center gap-2">Depart <ArrowLeftRight size={16}/></button>
                      </div>
@@ -1637,6 +1691,7 @@ export default function SolitaireEngine({
                            const isActive = activeEffects.includes(effect.id);
                            const isReady = isEffectReady(effect.id, gameState);
                            const charges = gameState.charges[effect.id] ?? effect.maxCharges;
+                           const rarityColors = getRarityColor(effect.rarity);
                            
                            return (
                               <button
@@ -1644,10 +1699,11 @@ export default function SolitaireEngine({
                                  type="button"
                                  onClick={() => { if ((effect as any).type !== 'blessing') toggleEffect(effect.id); }}
                                  aria-label={`Toggle effect ${effect.name}`}
-                                 className={`p-2 rounded border cursor-pointer text-xs flex justify-between items-center transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : 'bg-slate-700/30 border-slate-600'} ${isReady ? 'ring-1 ring-yellow-400 bg-yellow-900/20' : ''}`}>
+                                 className={`p-2 rounded border cursor-pointer text-xs flex justify-between items-center transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : `${rarityColors.bg} ${rarityColors.border}`} ${isReady ? 'ring-1 ring-yellow-400' : ''}`}>
                                  <div>
-                                     <div className="font-bold text-slate-200 flex gap-1 items-center">
+                                     <div className="font-bold text-white flex gap-1 items-center">
                                          {effect.name} 
+                                         <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold ${rarityColors.text} border ${rarityColors.border}`}>{effect.rarity || 'Common'}</span>
                                          {effect.maxCharges && <span className="text-[9px] bg-slate-600 px-1 rounded text-white">{charges}/{effect.maxCharges}</span>}
                                      </div>
                                      <div className="text-slate-400 text-[10px]">{effect.description}</div>
