@@ -893,8 +893,8 @@ export default function SolitaireEngine({
                           <div className="text-xs text-slate-400 uppercase">Runs Lost</div>
                        </div>
                        <div className="bg-slate-800 p-4 rounded-xl text-center">
-                          <div className="text-3xl font-bold text-yellow-400">4,521</div>
-                          <div className="text-xs text-slate-400 uppercase">High Score</div>
+                          <div className="text-3xl font-bold text-yellow-400">60%</div>
+                          <div className="text-xs text-slate-400 uppercase">Win Rate</div>
                        </div>
                        <div className="bg-slate-800 p-4 rounded-xl text-center">
                           <div className="text-3xl font-bold text-purple-400">23</div>
@@ -921,13 +921,39 @@ export default function SolitaireEngine({
                        ))}
                     </div>
 
-                    {/* Achievements Preview */}
+                    {/* Achievements - Clickable with requirements */}
                     <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-2">Achievements</h3>
-                    <div className="grid grid-cols-4 gap-2">
-                       {['🏆', '⭐', '🎯', '💎', '🔥', '❄️', '⚡', '🌟'].map((emoji, i) => (
-                          <div key={i} className={`aspect-square flex items-center justify-center text-2xl rounded-lg ${i < 5 ? 'bg-slate-800' : 'bg-slate-800/30 grayscale opacity-40'}`}>
-                             {emoji}
-                          </div>
+                    <div className="space-y-2">
+                       {[
+                          { emoji: '🏆', name: 'First Victory', req: 'Win your first run', unlocked: true },
+                          { emoji: '⭐', name: 'Rising Star', req: 'Win 5 runs', unlocked: true },
+                          { emoji: '🎯', name: 'Sharpshooter', req: 'Complete a run without using hints', unlocked: true },
+                          { emoji: '💎', name: 'Collector', req: 'Find 20 unique effects', unlocked: true },
+                          { emoji: '🔥', name: 'On Fire', req: 'Win 3 runs in a row', unlocked: true },
+                          { emoji: '❄️', name: 'Cool Customer', req: 'Win without taking any curses', unlocked: false },
+                          { emoji: '⚡', name: 'Speed Demon', req: 'Complete a run in under 10 minutes', unlocked: false },
+                          { emoji: '🌟', name: 'Perfectionist', req: 'Win with all 4 foundations complete', unlocked: false },
+                       ].map((ach, i) => (
+                          <button
+                             key={i}
+                             onClick={() => setExpandedAchievement(expandedAchievement === i ? null : i)}
+                             className={`w-full p-3 rounded-lg text-left transition-all ${
+                                ach.unlocked ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-800/30 opacity-50'
+                             }`}>
+                             <div className="flex items-center gap-3">
+                                <span className={`text-2xl ${!ach.unlocked && 'grayscale'}`}>{ach.emoji}</span>
+                                <div className="flex-1">
+                                   <div className="font-bold text-sm flex items-center gap-2">
+                                      {ach.name}
+                                      {ach.unlocked && <span className="text-[10px] bg-emerald-600 px-1.5 py-0.5 rounded">Unlocked</span>}
+                                   </div>
+                                   {expandedAchievement === i && (
+                                      <div className="text-xs text-slate-400 mt-1 animate-in fade-in">{ach.req}</div>
+                                   )}
+                                </div>
+                                <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedAchievement === i ? 'rotate-180' : ''}`} />
+                             </div>
+                          </button>
                        ))}
                     </div>
                  </div>
@@ -955,27 +981,117 @@ export default function SolitaireEngine({
                              <div className="w-12 h-6 bg-slate-600 rounded-full relative cursor-pointer"><div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
                           </div>
                           <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                             <div><div className="font-medium">Confirm Resign</div><div className="text-xs text-slate-400">Ask before giving up a run</div></div>
+                             <div className="w-12 h-6 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
                              <div><div className="font-medium">Show Hints</div><div className="text-xs text-slate-400">Highlight valid moves</div></div>
                              <div className="w-12 h-6 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
                           </div>
                        </div>
                     </div>
 
-                    {/* Audio */}
+                    {/* Music - Expandable */}
                     <div>
-                       <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-3">Audio</h3>
+                       <button 
+                          onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'music' ? null : 'music')}
+                          className="w-full flex items-center justify-between mb-3">
+                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Music</h3>
+                          <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'music' ? 'rotate-180' : ''}`} />
+                       </button>
                        <div className="space-y-3">
                           <div className="p-3 bg-slate-800 rounded-lg">
-                             <div className="flex justify-between mb-2"><span>Master Volume</span><span className="text-slate-400">80%</span></div>
-                             <div className="h-2 bg-slate-700 rounded-full"><div className="h-2 bg-emerald-500 rounded-full" style={{width: '80%'}}></div></div>
-                          </div>
-                          <div className="p-3 bg-slate-800 rounded-lg">
-                             <div className="flex justify-between mb-2"><span>Music</span><span className="text-slate-400">60%</span></div>
+                             <div className="flex justify-between mb-2"><span>Music Volume</span><span className="text-slate-400">60%</span></div>
                              <div className="h-2 bg-slate-700 rounded-full"><div className="h-2 bg-emerald-500 rounded-full" style={{width: '60%'}}></div></div>
                           </div>
+                          {expandedSettingsSection === 'music' && (
+                             <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                   <span className="text-sm">Menu Music</span>
+                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
+                                </div>
+                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                   <span className="text-sm">Gameplay Music</span>
+                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
+                                </div>
+                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                   <span className="text-sm">Shop Music</span>
+                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
+                                </div>
+                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                   <span className="text-sm">Wander Music</span>
+                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
+                                </div>
+                             </div>
+                          )}
+                       </div>
+                    </div>
+
+                    {/* Sound Effects - Expandable */}
+                    <div>
+                       <button 
+                          onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'sfx' ? null : 'sfx')}
+                          className="w-full flex items-center justify-between mb-3">
+                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Sound Effects</h3>
+                          <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'sfx' ? 'rotate-180' : ''}`} />
+                       </button>
+                       <div className="space-y-3">
                           <div className="p-3 bg-slate-800 rounded-lg">
-                             <div className="flex justify-between mb-2"><span>Sound Effects</span><span className="text-slate-400">100%</span></div>
+                             <div className="flex justify-between mb-2"><span>SFX Volume</span><span className="text-slate-400">100%</span></div>
                              <div className="h-2 bg-slate-700 rounded-full"><div className="h-2 bg-emerald-500 rounded-full" style={{width: '100%'}}></div></div>
+                          </div>
+                          {expandedSettingsSection === 'sfx' && (
+                             <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                   <span className="text-sm">Card Flip</span>
+                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
+                                </div>
+                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                   <span className="text-sm">Card Place</span>
+                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
+                                </div>
+                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                   <span className="text-sm">Invalid Move</span>
+                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
+                                </div>
+                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                   <span className="text-sm">Score Points</span>
+                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
+                                </div>
+                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                   <span className="text-sm">Level Complete</span>
+                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
+                                </div>
+                                <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                   <span className="text-sm">UI Clicks</span>
+                                   <div className="w-10 h-5 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow"></div></div>
+                                </div>
+                             </div>
+                          )}
+                       </div>
+                    </div>
+
+                    {/* Accessibility */}
+                    <div>
+                       <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-3">Accessibility</h3>
+                       <div className="space-y-3">
+                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                             <div><div className="font-medium">Reduce Motion</div><div className="text-xs text-slate-400">Minimize animations throughout the app</div></div>
+                             <div className="w-12 h-6 bg-slate-600 rounded-full relative cursor-pointer"><div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                             <div><div className="font-medium">High Contrast</div><div className="text-xs text-slate-400">Increase contrast for better visibility</div></div>
+                             <div className="w-12 h-6 bg-slate-600 rounded-full relative cursor-pointer"><div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                             <div><div className="font-medium">Color Blind Mode</div><div className="text-xs text-slate-400">Adjust colors for color vision deficiency</div></div>
+                             <select className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm">
+                                <option>Off</option>
+                                <option>Deuteranopia (Green-weak)</option>
+                                <option>Protanopia (Red-weak)</option>
+                                <option>Tritanopia (Blue-weak)</option>
+                                <option>Achromatopsia (Monochrome)</option>
+                             </select>
                           </div>
                        </div>
                     </div>
@@ -990,15 +1106,12 @@ export default function SolitaireEngine({
                                 <option>Classic</option>
                                 <option>Modern</option>
                                 <option>Minimal</option>
+                                <option>High Contrast</option>
                              </select>
                           </div>
                           <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                             <div><div className="font-medium">Animations</div><div className="text-xs text-slate-400">Enable card animations</div></div>
+                             <div><div className="font-medium">Card Animations</div><div className="text-xs text-slate-400">Enable smooth card animations</div></div>
                              <div className="w-12 h-6 bg-emerald-600 rounded-full relative cursor-pointer"><div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
-                          </div>
-                          <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                             <div><div className="font-medium">Reduced Motion</div><div className="text-xs text-slate-400">Minimize animations</div></div>
-                             <div className="w-12 h-6 bg-slate-600 rounded-full relative cursor-pointer"><div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"></div></div>
                           </div>
                        </div>
                     </div>
