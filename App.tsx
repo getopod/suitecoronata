@@ -96,9 +96,9 @@ const isStandardMoveValid = (movingCards: Card[], targetPile: Pile): boolean => 
   }
   if (targetPile.type === 'foundation') {
     if (movingCards.length > 1) return false;
-    if (!targetTop) return leader.rank === 1;
-    if (targetPile.id.includes(leader.suit)) return leader.rank === targetTop.rank + 1;
-    return false;
+    if (!targetTop) return leader.rank === 1; // Any ace can start any foundation
+    // Must match suit of foundation's first card and be next rank
+    return leader.suit === targetTop.suit && leader.rank === targetTop.rank + 1;
   }
   return false;
 };
@@ -1666,21 +1666,24 @@ export default function SolitaireEngine({
                 <div className="relative col-span-2 h-16 flex items-center justify-center">
                    {/* Threat button - current danger/fear */}
                    {(currentThreat || currentEncounter) && (
-                      <button type="button" aria-label={`Threat: ${currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}`} className="w-full h-full bg-red-900/50 border-2 border-red-500/50 rounded flex flex-col items-center justify-center text-center p-0.5 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.4)]" onClick={() => alert(`${currentThreat?.type?.toUpperCase() || currentEncounter?.type?.toUpperCase() || 'CHALLENGE'}: ${currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}\n${currentThreat?.description || 'Score goal: ' + (currentEncounter?.goal || gameState.currentScoreGoal)}`)}>
-                         <Skull size={12} className="text-red-400 mb-0.5" />
-                         <div className="text-[6px] font-bold leading-tight text-red-200 line-clamp-2">{currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}</div>
-                         <div className="text-[5px] text-red-300 leading-tight line-clamp-3 opacity-75">{currentThreat?.description || 'Goal: ' + (currentEncounter?.goal || gameState.currentScoreGoal)}</div>
+                      <button type="button" aria-label={`Threat: ${currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}`} className="w-full h-full bg-red-900/50 border-2 border-red-500/50 rounded flex flex-col items-center justify-center text-center p-1 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.4)]" onClick={() => alert(`${currentThreat?.type?.toUpperCase() || currentEncounter?.type?.toUpperCase() || 'CHALLENGE'}: ${currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}\n${currentThreat?.description || 'Score goal: ' + (currentEncounter?.goal || gameState.currentScoreGoal)}`)}>
+                         <Skull size={20} className="text-red-400 mb-1" />
+                         <div className="text-[8px] font-bold leading-tight text-red-200 line-clamp-2">{currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}</div>
                       </button>
                    )}
                 </div>
-                {foundationPiles.map(pile => (
+                {foundationPiles.map(pile => {
+                   const suitSymbol = pile.id.includes('hearts') ? '♥' : pile.id.includes('diamonds') ? '♦' : pile.id.includes('clubs') ? '♣' : '♠';
+                   const suitColor = pile.id.includes('hearts') || pile.id.includes('diamonds') ? 'text-red-600' : 'text-white';
+                   return (
                    <div key={pile.id} className="relative w-11 h-16 bg-slate-800/50 rounded border border-slate-700 flex items-center justify-center">
                       {pile.cards.length === 0 ? (
-                         <button type="button" aria-label={`Empty foundation ${pile.id}`} className="text-xl opacity-20 text-white bg-transparent border-0" onClick={() => handleCardClick(pile.id, -1)}>♠</button>
+                         <button type="button" aria-label={`Empty foundation ${pile.id}`} className={`text-xl opacity-20 ${suitColor} bg-transparent border-0`} onClick={() => handleCardClick(pile.id, -1)}>{suitSymbol}</button>
                       ) : null}
                       {pile.cards.map((c, i) => renderCard(c, i, pile.id))}
                    </div>
-                ))}
+                   );
+                })}
         </div>
         <div className="grid grid-cols-7 gap-1 h-full">
                {tableauPiles.map(pile => (
