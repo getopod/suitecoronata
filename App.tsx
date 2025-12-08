@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { LayoutGrid, Sparkles, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, HelpCircle, RefreshCw, X, Gift, Trophy, ArrowLeftRight, SkipBack, SkipForward, MessageSquare, FlaskConical, Save, Flag, Settings, ChevronDown, Pause, ShoppingCart, User, Unlock, Map as MapIcon, BarChart3 } from 'lucide-react';
+import { LayoutGrid, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, HelpCircle, RefreshCw, X, Gift, Trophy, ArrowLeftRight, SkipBack, SkipForward, MessageSquare, FlaskConical, Save, Flag, Settings, ChevronDown, Pause, ShoppingCart, User, Unlock, Map as MapIcon, BarChart3 } from 'lucide-react';
 import { Card, GameState, Pile, Rank, Suit, MoveContext, Encounter, GameEffect, Wander, WanderChoice, MinigameResult } from './types';
 import { getCardColor, generateNewBoard } from './data/effects';
 import { Minigames } from './utils/minigames';
@@ -802,9 +802,9 @@ export default function SolitaireEngine({
              
              {/* Special Blessing Card Rendering */}
              {visualCard.meta?.isBlessing ? (
-                 <div className="flex flex-col items-center justify-center h-full text-center">
-                     <Sparkles size={16} className="text-purple-500 mb-1" />
-                     <div className="text-[6px] font-bold leading-tight text-purple-800">{visualCard.meta.name}</div>
+                 <div className="flex flex-col items-center justify-center h-full text-center bg-gradient-to-b from-purple-100 to-purple-200 rounded">
+                     <img src={getEffectIcon(visualCard.meta.name || '', 'blessing')} alt="" className="w-6 h-6 mb-0.5" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons.blessing; }} />
+                     <div className="text-[5px] font-bold leading-tight text-purple-800 px-0.5">{visualCard.meta.name}</div>
                  </div>
              ) : (
                  <>
@@ -1587,14 +1587,18 @@ export default function SolitaireEngine({
                        return false;
                     }).map(e => {
                        const rarityColors = getRarityColor(e.rarity);
+                       const effectType = e.type === 'danger' ? 'danger' : e.type === 'fear' ? 'fear' : e.type === 'blessing' ? 'blessing' : e.type === 'curse' ? 'curse' : 'exploit';
                        return (
-                       <div key={e.id} className={`p-3 rounded border ${rarityColors.bg} ${rarityColors.border}`}>
-                          <div className="flex justify-between items-start">
-                            <div className="font-bold text-white">{e.name}</div>
-                            <div className={`text-[10px] uppercase px-1.5 py-0.5 rounded font-bold ${rarityColors.text} ${rarityColors.bg} border ${rarityColors.border}`}>{e.rarity || 'Common'}</div>
+                       <div key={e.id} className={`p-3 rounded border ${rarityColors.bg} ${rarityColors.border} flex gap-3`}>
+                          <img src={getEffectIcon(e.name, effectType)} alt="" className="w-10 h-10 rounded shrink-0" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons[effectType]; }} />
+                          <div className="flex-1 min-w-0">
+                             <div className="flex justify-between items-start gap-2">
+                               <div className="font-bold text-white truncate">{e.name}</div>
+                               <div className={`text-[10px] uppercase px-1.5 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} ${rarityColors.bg} border ${rarityColors.border}`}>{e.rarity || 'Common'}</div>
+                             </div>
+                             <div className="text-slate-300 text-sm mt-1">{e.description}</div>
+                             {Boolean(e.cost) && <div className="text-xs text-yellow-500 mt-1 flex items-center gap-1"><Coins size={10}/> {e.cost}</div>}
                           </div>
-                          <div className="text-slate-300 text-sm mt-1">{e.description}</div>
-                          {Boolean(e.cost) && <div className="text-xs text-yellow-500 mt-1 flex items-center gap-1"><Coins size={10}/> {e.cost}</div>}
                        </div>
                     );})}
                  </div>
@@ -1856,7 +1860,7 @@ export default function SolitaireEngine({
                            {blessingChoices.slice(0,4).map(item => {
                               const rarityColors = getRarityColor(item.rarity);
                               return (
-                              <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex justify-between items-center hover:brightness-110 cursor-pointer`}
+                              <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3 hover:brightness-110 cursor-pointer`}
                                    onClick={() => {
                                       setGameState(p => ({ ...p, ownedEffects: [...p.ownedEffects, item.id] }));
                                       // Don't activate, just own. It will be added to deck next encounter.
@@ -1882,14 +1886,15 @@ export default function SolitaireEngine({
                                           openShop();
                                       }
                                    }}>
-                                 <div>
+                                 <img src={getEffectIcon(item.name, 'blessing')} alt="" className="w-8 h-8 rounded shrink-0" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons.blessing; }} />
+                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
-                                       <span className="font-bold text-white text-xs">{item.name}</span>
-                                       <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
+                                       <span className="font-bold text-white text-xs truncate">{item.name}</span>
+                                       <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
                                     </div>
                                     <div className="text-slate-400 text-[10px]">{item.description}</div>
                                  </div>
-                                 <Gift size={16} className="text-blue-400" />
+                                 <Gift size={16} className="text-purple-400 shrink-0" />
                               </div>
                            );})}
                         </div>
@@ -1899,17 +1904,19 @@ export default function SolitaireEngine({
                         <div className="grid grid-cols-1 gap-2">
                            {shopInventory.map(item => {
                               const rarityColors = getRarityColor(item.rarity);
+                              const itemType = item.type === 'curse' ? 'curse' : item.type === 'blessing' ? 'blessing' : 'exploit';
                               return (
-                              <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex justify-between items-center`}>
-                                 <div>
+                              <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3`}>
+                                 <img src={getEffectIcon(item.name, itemType)} alt="" className="w-8 h-8 rounded shrink-0" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons[itemType]; }} />
+                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
-                                       <span className="font-bold text-white text-xs">{item.name}</span>
-                                       <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
+                                       <span className="font-bold text-white text-xs truncate">{item.name}</span>
+                                       <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
                                     </div>
                                     <div className="text-slate-400 text-[10px]">{item.description}</div>
                                  </div>
                                  <button 
-                                   className={`text-white px-2 py-1 rounded text-xs font-bold ${gameState.coins >= (item.cost || 50) ? 'bg-yellow-600 hover:bg-yellow-500' : 'bg-slate-600 cursor-not-allowed'}`}
+                                   className={`text-white px-2 py-1 rounded text-xs font-bold shrink-0 ${gameState.coins >= (item.cost || 50) ? 'bg-yellow-600 hover:bg-yellow-500' : 'bg-slate-600 cursor-not-allowed'}`}
                                    onClick={() => buyEffect(item)}
                                    disabled={gameState.coins < (item.cost || 50)}>
                                    Buy {item.cost || 50}
@@ -1938,22 +1945,24 @@ export default function SolitaireEngine({
                            const charges = gameState.charges[effect.id] ?? effect.maxCharges;
                            const rarityColors = getRarityColor(effect.rarity);
                            
+                           const effectType = effect.type === 'curse' ? 'curse' : effect.type === 'fear' ? 'fear' : effect.type === 'danger' ? 'danger' : effect.type === 'blessing' ? 'blessing' : 'exploit';
                            return (
                               <button
                                  key={effect.id}
                                  type="button"
                                  onClick={() => { if ((effect as any).type !== 'blessing') toggleEffect(effect.id); }}
                                  aria-label={`Toggle effect ${effect.name}`}
-                                 className={`p-2 rounded border cursor-pointer text-xs flex justify-between items-center transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : `${rarityColors.bg} ${rarityColors.border}`} ${isReady ? 'ring-1 ring-yellow-400' : ''}`}>
-                                 <div>
-                                     <div className="font-bold text-white flex gap-1 items-center">
-                                         {effect.name} 
-                                         <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold ${rarityColors.text} border ${rarityColors.border}`}>{effect.rarity || 'Common'}</span>
-                                         {effect.maxCharges && <span className="text-[9px] bg-slate-600 px-1 rounded text-white">{charges}/{effect.maxCharges}</span>}
+                                 className={`p-2 rounded border cursor-pointer text-xs flex items-center gap-3 transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : `${rarityColors.bg} ${rarityColors.border}`} ${isReady ? 'ring-1 ring-yellow-400' : ''}`}>
+                                 <img src={getEffectIcon(effect.name, effectType)} alt="" className="w-8 h-8 rounded shrink-0" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons[effectType]; }} />
+                                 <div className="flex-1 min-w-0 text-left">
+                                     <div className="font-bold text-white flex gap-1 items-center flex-wrap">
+                                         <span className="truncate">{effect.name}</span>
+                                         <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{effect.rarity || 'Common'}</span>
+                                         {effect.maxCharges && <span className="text-[9px] bg-slate-600 px-1 rounded text-white shrink-0">{charges}/{effect.maxCharges}</span>}
                                      </div>
                                      <div className="text-slate-400 text-[10px]">{effect.description}</div>
                                  </div>
-                                 {isActive && <div className="w-2 h-2 bg-green-400 rounded-full"></div>}
+                                 {isActive && <div className="w-2 h-2 bg-green-400 rounded-full shrink-0"></div>}
                               </button>
                            );
                         })}
