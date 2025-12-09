@@ -258,6 +258,7 @@ export default function SolitaireEngine({
   const [activeEffects, setActiveEffects] = useState<string[]>([]);
   const [selectedPileId, setSelectedPileId] = useState<string | null>(null);
   const [hintTargets, setHintTargets] = useState<string[]>([]);
+   const [suggestionColor, setSuggestionColor] = useState<'none'|'green'|'yellow'|'red'>('none');
   
   const [activeDrawer, setActiveDrawer] = useState<'pause' | 'exploit' | 'curse' | 'blessing' | 'shop' | 'feedback' | 'test' | 'settings' | 'resign' | 'blessing_select' | null>(null);
   const [shopInventory, setShopInventory] = useState<GameEffect[]>([]);
@@ -581,6 +582,51 @@ export default function SolitaireEngine({
 
   const getEffects = useCallback(() => { return effectsRegistry.filter(e => activeEffects.includes(e.id)); }, [activeEffects, effectsRegistry]);
 
+   const computeValidTargets = useCallback((movingCardIds: string[], sourcePileId: string) => {
+      const sourcePile = gameState.piles[sourcePileId];
+      if (!sourcePile) return [] as string[];
+      const movingCards = sourcePile.cards.filter(c => movingCardIds.includes(c.id));
+      if (movingCards.length === 0) return [] as string[];
+      const effects = getEffects();
+      const validSet = new Set<string>();
+      const pileKeys = Object.keys(gameState.piles).filter(k => k !== sourcePileId);
+      for (const candidate of pileKeys) {
+         let finalTarget = candidate;
+         for (const eff of effects) {
+            if (eff.interceptMove) {
+               try {
+                  const mod = eff.interceptMove({ source: sourcePileId, target: candidate, cards: movingCards }, gameState as any);
+                  if (mod && (mod as any).target) finalTarget = (mod as any).target;
+               } catch (e) {
+                  // ignore
+               }
+            }
+         }
+         const targetPile = gameState.piles[finalTarget];
+         if (!targetPile) continue;
+         let valid = isStandardMoveValid(movingCards, targetPile);
+         for (const eff of effects) {
+            if (eff.canMove) {
+               try {
+                  const res = eff.canMove(movingCards, sourcePile, targetPile, valid, gameState as any);
+                  if (res !== undefined) valid = res;
+               } catch (e) {
+                  // ignore
+               }
+            }
+         }
+         if (valid) validSet.add(finalTarget);
+      }
+      return Array.from(validSet);
+   }, [gameState, getEffects]);
+
+   const computeSuggestions = useCallback((movingCardIds: string[], sourcePileId: string) => {
+      const valids = computeValidTargets(movingCardIds, sourcePileId);
+      setHintTargets(valids);
+      const color = valids.length === 0 ? 'red' : valids.length === 1 ? 'green' : 'yellow';
+      setSuggestionColor(color as 'red'|'green'|'yellow'|'none');
+   }, [computeValidTargets]);
+
   const runMinigame = () => {
      if (!gameState.activeMinigame) return;
      const type = gameState.activeMinigame.type;
@@ -681,16 +727,20 @@ export default function SolitaireEngine({
         newCards.splice(cardIndex, 1);
         setGameState(prev => ({ ...prev, piles: { ...prev.piles, hand: { ...pile, cards: newCards } } }));
         return;
-    }rn;
-       }
+    }
 
     if (clickedCard && clickedCard.meta?.locked) {
        const hasPanopticon = activeEffects.includes('panopticon');
        if (hasPanopticon) {
           setGameState(prev => ({ ...prev, activeMinigame: { type: 'darts', title: 'Break the Lock', context: { pileId, cardIndex } } }));
-          retu
-       if (canAfford(10)) { const newCards = [...pile.cards]; newCards[cardIndex] = { ...clickedCard, meta: { ...clickedCard.meta, locked: false } }; setGameState(prev => ({ ...prev, coins: prev.coins - 10, piles: { ...prev.piles, [pileId]: { ...pile, cards: newCards } } })); } 
-       return; 
+          return;
+       }
+       if (canAfford(10)) {
+          const newCards = [...pile.cards];
+          newCards[cardIndex] = { ...clickedCard, meta: { ...clickedCard.meta, locked: false } };
+          setGameState(prev => ({ ...prev, coins: prev.coins - 10, piles: { ...prev.piles, [pileId]: { ...pile, cards: newCards } } }));
+       }
+       return;
     }
     
     if (pile.locked) {
@@ -702,14 +752,41 @@ export default function SolitaireEngine({
     if (!gameState.selectedCardIds) {
       if (pile.type === 'deck') { discardAndDrawHand(); return; }
       if (!clickedCard) return;
-      if (pile.type === 'hand') { setGameState(prev => ({ ...prev, selectedCardIds: [clickedCard.id] })); setSelectedPileId(pileId); return; }
-      if (pile.type === 'tableau') { if (clickedCard.faceUp) { const stack = pile.cards.slice(cardIndex).map(c => c.id); setGameState(prev => ({ ...prev, selectedCardIds: stack })); setSelectedPileId(pileId); return; } else if (cardIndex === pile.cards.length - 1) { const newCards = [...pile.cards]; newCards[cardIndex] = { ...clickedCard, faceUp: true }; setGameState(prev => ({ ...prev, piles: { ...prev.piles, [pileId]: { ...pile, cards: newCards } } })); return; } }
-      if (pile.type === 'foundation' && pile.cards.length > 0) { setGameState(prev => ({ ...prev, selectedCardIds: [clickedCard.id] })); setSelectedPileId(pileId); return; }
+         if (pile.type === 'hand') {
+            const ids = [clickedCard.id];
+            setGameState(prev => ({ ...prev, selectedCardIds: ids }));
+            setSelectedPileId(pileId);
+            computeSuggestions(ids, pileId);
+            return;
+         }
+         if (pile.type === 'tableau') {
+            if (clickedCard.faceUp) {
+               const stack = pile.cards.slice(cardIndex).map(c => c.id);
+               setGameState(prev => ({ ...prev, selectedCardIds: stack }));
+               setSelectedPileId(pileId);
+               computeSuggestions(stack, pileId);
+               return;
+            } else if (cardIndex === pile.cards.length - 1) {
+               const newCards = [...pile.cards];
+               newCards[cardIndex] = { ...clickedCard, faceUp: true };
+               setGameState(prev => ({ ...prev, piles: { ...prev.piles, [pileId]: { ...pile, cards: newCards } } }));
+               return;
+            }
+         }
+         if (pile.type === 'foundation' && pile.cards.length > 0) {
+            const ids = [clickedCard.id];
+            setGameState(prev => ({ ...prev, selectedCardIds: ids }));
+            setSelectedPileId(pileId);
+            computeSuggestions(ids, pileId);
+            return;
+         }
       return;
     }
-    attemptMove(gameState.selectedCardIds, selectedPileId!, pileId);
-    setGameState(prev => ({ ...prev, selectedCardIds: null }));
-    setSelectedPileId(null);
+      attemptMove(gameState.selectedCardIds, selectedPileId!, pileId);
+      setGameState(prev => ({ ...prev, selectedCardIds: null }));
+      setSelectedPileId(null);
+      setHintTargets([]);
+      setSuggestionColor('none');
   };
   
   const handleDoubleClick = (pileId: string, cardIndex: number) => {
@@ -727,25 +804,33 @@ export default function SolitaireEngine({
           return;
       }
 
-      // Only single card auto-move logic for now to stay simple
-      if (cardIndex !== pile.cards.length - 1) return;
+         // Only allow double-click auto-move from the exposed/top card
+         if (cardIndex !== pile.cards.length - 1) return;
 
-      // 1. Try Foundations
-      const foundationKeys = Object.keys(gameState.piles).filter(k => k.startsWith('foundation'));
-      for (const fid of foundationKeys) {
-          if (isStandardMoveValid([card], gameState.piles[fid])) {
-              attemptMove([card.id], pileId, fid);
-              return;
-          }
-      }
-      
-      // 2. Try Tableaus (Only if exactly one valid target)
-      const tableauKeys = Object.keys(gameState.piles).filter(k => k.startsWith('tableau') && k !== pileId);
-      const validTableaus = tableauKeys.filter(tid => isStandardMoveValid([card], gameState.piles[tid]));
-      
-      if (validTableaus.length === 1) {
-          attemptMove([card.id], pileId, validTableaus[0]);
-      }
+         const movingIds = [card.id];
+         const valids = computeValidTargets(movingIds, pileId);
+
+         if (valids.length === 0) {
+            // Show red outline on the selected card to indicate no valid moves
+            setGameState(prev => ({ ...prev, selectedCardIds: movingIds }));
+            setSelectedPileId(pileId);
+            setHintTargets([]);
+            setSuggestionColor('red');
+            return;
+         }
+
+         if (valids.length === 1) {
+            attemptMove(movingIds, pileId, valids[0]);
+            setHintTargets([]);
+            setSuggestionColor('none');
+            return;
+         }
+
+         // Multiple valid targets - show them and let user pick
+         setGameState(prev => ({ ...prev, selectedCardIds: movingIds }));
+         setSelectedPileId(pileId);
+         setHintTargets(valids);
+         setSuggestionColor('yellow');
   };
 
   const discardAndDrawHand = () => {
@@ -931,8 +1016,18 @@ export default function SolitaireEngine({
             visualCard = { ...visualCard, ...eff.transformCardVisual(card, pile) };
          }
       }
-    const isSelected = gameState.selectedCardIds?.includes(card.id);
-    const isHintTarget = hintTargets.includes(pileId) && index === pile.cards.length - 1;
+      const isSelected = gameState.selectedCardIds?.includes(card.id);
+      const isHintTarget = hintTargets.includes(pileId) && index === pile.cards.length - 1;
+      const isLeader = !!(gameState.selectedCardIds && gameState.selectedCardIds[0] === card.id);
+      const getRingClass = (color: 'none'|'green'|'yellow'|'red') => {
+         switch (color) {
+            case 'green': return 'ring-2 ring-green-400';
+            case 'yellow': return 'ring-2 ring-yellow-400';
+            case 'red': return 'ring-2 ring-red-400';
+            default: return '';
+         }
+      };
+      const ringClass = (isHintTarget || isLeader) ? getRingClass(suggestionColor) : '';
     const color = getCardColor(visualCard.suit);
     
     
@@ -955,7 +1050,7 @@ export default function SolitaireEngine({
          return (
             <button
                key={card.id}
-               className="absolute w-11 h-16 bg-blue-800 rounded border border-white shadow-md flex items-center justify-center"
+               className={`absolute w-11 h-16 bg-blue-800 rounded border border-white shadow-md flex items-center justify-center ${isLeader || isHintTarget ? getRingClass(suggestionColor) : ''}`}
                style={{ top: `${pileId.includes('tableau') ? index * 10 : 0}px` }}
                onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
                onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick(pileId, index); }}
@@ -978,7 +1073,7 @@ export default function SolitaireEngine({
             aria-label={`${getRankDisplay(visualCard.rank)} ${visualCard.suit} card`}
          >
         <div className={`relative w-full h-full duration-500 transform-style-3d transition-transform ${visualCard.faceUp ? 'rotate-y-0' : 'rotate-y-180'}`}>
-          <div className={`absolute inset-0 backface-hidden bg-white rounded shadow-md flex flex-col items-center justify-between p-0.5 border border-gray-300 ${isHintTarget || isSelected ? 'ring-2 ring-yellow-400' : ''}`}
+         <div className={`absolute inset-0 backface-hidden bg-white rounded shadow-md flex flex-col items-center justify-between p-0.5 border border-gray-300 ${ringClass}`}
                style={{ opacity: visualCard.meta?.disabled ? 0.5 : 1, filter: visualCard.meta?.hiddenDimension ? 'grayscale(100%) blur(2px)' : 'none' }}>
              
              {/* Special Blessing Card Rendering */}
@@ -1432,7 +1527,7 @@ export default function SolitaireEngine({
                                          </div>
                                          <div className="flex flex-wrap gap-1">
                                             {run.blessings.map((b, i) => (
-                                               <img key={i} src={getEffectIcon(b.id || b.name, 'blessing')} alt={b.name} title={b.name} className="w-5 h-5 rounded" onError={(e) => { (e.target as HTMLImageElement).src = categoryIcons.blessing; }} />
+                                               <ResponsiveIcon key={i} name={b.id || b.name} fallbackType="blessing" size={20} className="w-5 h-5 rounded" alt={b.name} />
                                             ))}
                                          </div>
                                       </div>
@@ -1775,7 +1870,7 @@ export default function SolitaireEngine({
                        const effectType = e.type === 'danger' ? 'danger' : e.type === 'fear' ? 'fear' : e.type === 'blessing' ? 'blessing' : e.type === 'curse' ? 'curse' : 'exploit';
                        return (
                        <div key={e.id} className={`p-3 rounded border ${rarityColors.bg} ${rarityColors.border} flex gap-3`}>
-                          <img src={getEffectIcon(e.id || e.name, effectType)} alt="" className="w-10 h-10 rounded shrink-0" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons[effectType]; }} />
+                          <ResponsiveIcon name={e.id || e.name} fallbackType={effectType} size={40} className="w-10 h-10 rounded shrink-0" alt={e.name} />
                           <div className="flex-1 min-w-0">
                              <div className="flex justify-between items-start gap-2">
                                <div className="font-bold text-white truncate">{e.name}</div>
@@ -1843,7 +1938,7 @@ export default function SolitaireEngine({
       <div className="flex-1 w-full max-w-2xl mx-auto p-2 pb-48 overflow-y-auto">
         <div className="grid grid-cols-7 gap-1 mb-4">
                 <div className="relative w-11 h-16">
-                   <button type="button" className="w-full h-full bg-blue-900 border border-slate-600 rounded flex items-center justify-center" onClick={() => discardAndDrawHand()} aria-label="Draw from deck">
+                   <button type="button" className={`w-full h-full bg-blue-900 border border-slate-600 rounded flex items-center justify-center ${hintTargets.includes('deck') ? (suggestionColor === 'green' ? 'ring-2 ring-green-400' : suggestionColor === 'yellow' ? 'ring-2 ring-yellow-400' : suggestionColor === 'red' ? 'ring-2 ring-red-400' : '') : ''}`} onClick={() => discardAndDrawHand()} aria-label="Draw from deck">
                         <div className="absolute -top-2 -left-1 bg-slate-700 text-[8px] px-1 rounded-full border border-slate-500 z-10">Draw</div>
                         {gameState.piles.deck.cards.length > 0 ? <div className="font-bold text-blue-300 text-xs">{gameState.piles.deck.cards.length}</div> : <RefreshCw className="text-slate-600 w-4 h-4" />}
                    </button>
@@ -1852,7 +1947,7 @@ export default function SolitaireEngine({
                 {/* Shadow Realm Pile */}
                 {gameState.piles['shadow-realm'] && (
                    <div 
-                      className="relative w-11 h-16 bg-purple-900/30 border border-purple-500/50 rounded flex items-center justify-center cursor-pointer hover:bg-purple-900/50 transition-colors"
+                      className={`relative w-11 h-16 bg-purple-900/30 border border-purple-500/50 rounded flex items-center justify-center cursor-pointer hover:bg-purple-900/50 transition-colors ${hintTargets.includes('shadow-realm') ? (suggestionColor === 'green' ? 'ring-2 ring-green-400' : suggestionColor === 'yellow' ? 'ring-2 ring-yellow-400' : suggestionColor === 'red' ? 'ring-2 ring-red-400' : '') : ''}`}
                       onClick={handleShadowRealmClick}
                       title="Shadow Realm: Click to summon back (10 coins)">
                       <div className="absolute -top-2 -left-1 bg-purple-900 text-[8px] px-1 rounded-full border border-purple-500 z-10">Realm</div>
@@ -1876,10 +1971,11 @@ export default function SolitaireEngine({
                 {foundationPiles.map(pile => {
                    const suitSymbol = pile.id.includes('hearts') ? '♥' : pile.id.includes('diamonds') ? '♦' : pile.id.includes('clubs') ? '♣' : '♠';
                    const suitColor = pile.id.includes('hearts') || pile.id.includes('diamonds') ? 'text-red-600' : 'text-white';
+                   const isTarget = hintTargets.includes(pile.id);
                    return (
-                   <div key={pile.id} className="relative w-11 h-16 bg-slate-800/50 rounded border border-slate-700 flex items-center justify-center">
+                   <div key={pile.id} className={`relative w-11 h-16 bg-slate-800/50 rounded border border-slate-700 flex items-center justify-center ${isTarget ? (suggestionColor === 'green' ? 'ring-2 ring-green-400' : suggestionColor === 'yellow' ? 'ring-2 ring-yellow-400' : suggestionColor === 'red' ? 'ring-2 ring-red-400' : '') : ''}`}>
                       {pile.cards.length === 0 ? (
-                         <button type="button" aria-label={`Empty foundation ${pile.id}`} className={`text-xl opacity-20 ${suitColor} bg-transparent border-0`} onClick={() => handleCardClick(pile.id, -1)}>{suitSymbol}</button>
+                         <button type="button" aria-label={`Empty foundation ${pile.id}`} className={`text-xl opacity-20 ${suitColor} bg-transparent border-0 ${isTarget ? (suggestionColor === 'green' ? 'ring-2 ring-green-400' : suggestionColor === 'yellow' ? 'ring-2 ring-yellow-400' : suggestionColor === 'red' ? 'ring-2 ring-red-400' : '') : ''}`} onClick={() => handleCardClick(pile.id, -1)}>{suitSymbol}</button>
                       ) : null}
                       {pile.cards.map((c, i) => renderCard(c, i, pile.id))}
                    </div>
@@ -1922,8 +2018,9 @@ export default function SolitaireEngine({
                   const isLinkedTurn = isLinked && gameState.effectState?.lastLinkedPlayed !== pile.id;
                   const isParasite = activeEffects.includes('parasite_pile') && gameState.effectState?.parasiteTarget === pile.id;
 
+                  const isTarget = hintTargets.includes(pile.id);
                   return (
-                  <div key={pile.id} className={`relative w-full h-full ${isLinked ? 'border-t-2 border-purple-500/50 rounded-t-lg pt-1' : ''} ${isParasite ? 'border-t-2 border-green-500/50 rounded-t-lg pt-1' : ''}`}>
+                  <div key={pile.id} className={`relative w-full h-full ${isLinked ? 'border-t-2 border-purple-500/50 rounded-t-lg pt-1' : ''} ${isParasite ? 'border-t-2 border-green-500/50 rounded-t-lg pt-1' : ''} ${isTarget ? (suggestionColor === 'green' ? 'ring-2 ring-green-400' : suggestionColor === 'yellow' ? 'ring-2 ring-yellow-400' : suggestionColor === 'red' ? 'ring-2 ring-red-400' : '') : ''}`}>
                       {/* Linked Fates Indicator */}
                       {isLinked && (
                          <div className={`absolute -top-7 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center ${isLinkedTurn ? 'text-purple-400 animate-pulse' : 'text-slate-600 opacity-50'}`}>
@@ -2151,7 +2248,7 @@ export default function SolitaireEngine({
                                           openShop();
                                       }
                                    }}>
-                                 <img src={getEffectIcon(item.id || item.name, 'blessing')} alt="" className="w-8 h-8 rounded shrink-0" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons.blessing; }} />
+                                 <ResponsiveIcon name={item.id || item.name} fallbackType="blessing" size={32} className="w-8 h-8 rounded shrink-0" alt={item.name} />
                                  <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
                                        <span className="font-bold text-white text-xs truncate">{item.name}</span>
@@ -2172,7 +2269,7 @@ export default function SolitaireEngine({
                               const itemType = item.type === 'curse' ? 'curse' : item.type === 'blessing' ? 'blessing' : 'exploit';
                               return (
                               <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3`}>
-                                 <img src={getEffectIcon(item.id || item.name, itemType)} alt="" className="w-8 h-8 rounded shrink-0" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons[itemType]; }} />
+                                 <ResponsiveIcon name={item.id || item.name} fallbackType={itemType} size={32} className="w-8 h-8 rounded shrink-0" alt={item.name} />
                                  <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
                                        <span className="font-bold text-white text-xs truncate">{item.name}</span>
@@ -2218,7 +2315,7 @@ export default function SolitaireEngine({
                                  onClick={() => { if ((effect as any).type !== 'blessing') toggleEffect(effect.id); }}
                                  aria-label={`Toggle effect ${effect.name}`}
                                  className={`p-2 rounded border cursor-pointer text-xs flex items-center gap-3 transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : `${rarityColors.bg} ${rarityColors.border}`} ${isReady ? 'ring-1 ring-yellow-400' : ''}`}>
-                                 <img src={getEffectIcon(effect.id || effect.name, effectType)} alt="" className="w-8 h-8 rounded shrink-0" onError={(ev) => { (ev.target as HTMLImageElement).src = categoryIcons[effectType]; }} />
+                                 <ResponsiveIcon name={effect.id || effect.name} fallbackType={effectType} size={32} className="w-8 h-8 rounded shrink-0" alt={effect.name} />
                                  <div className="flex-1 min-w-0 text-left">
                                      <div className="font-bold text-white flex gap-1 items-center flex-wrap">
                                          <span className="truncate">{effect.name}</span>

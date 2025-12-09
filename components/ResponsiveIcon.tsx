@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ADDITIONAL_ICON_SYNONYMS from './iconMappings';
 
 interface ResponsiveIconProps {
   name: string; // basename or key, e.g. 'exploits' or 'coin' or category:item (ex: 'blessings:loaner')
@@ -10,7 +11,9 @@ interface ResponsiveIconProps {
 }
 
 // Small synonyms map for common registry keys vs actual filenames in /public/icons
-const SYNONYMS: Record<string, string> = {
+// Named ICON_SYNONYMS to avoid colliding with other modules that may declare
+// a SYNONYMS identifier in the global build scope.
+const ICON_SYNONYMS: Record<string, string> = {
   coins: 'coin',
   coin: 'coin',
   fortunes: 'fortune',
@@ -84,7 +87,20 @@ const SYNONYMS: Record<string, string> = {
   alchemist: 'alchemy',
   'fog-of-war': 'fogofwar',
   'moon-toad-cheeks': 'moontoadcheeks',
-};
+ };
+
+
+// Merge-in any additional suggested mappings from a dedicated file. We only
+// add keys that aren't already defined in the local `ICON_SYNONYMS` to avoid
+// unintended overrides.
+for (const [k, v] of Object.entries(ADDITIONAL_ICON_SYNONYMS)) {
+  if (!(k in ICON_SYNONYMS)) {
+    // Mutate the object so subsequent lookups find the suggested mapping.
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore - dynamic extension of a const object is intentional here.
+    (ICON_SYNONYMS as any)[k] = v;
+  }
+}
 
 // Map common emoji (used in registries) to canonical icon file basenames
 const EMOJI_MAP: Record<string, string> = {};
@@ -140,7 +156,7 @@ export default function ResponsiveIcon(props: Readonly<ResponsiveIconProps>) {
     if (!cleaned) return candidates;
     
     // synonyms override
-    const syn = SYNONYMS[cleaned.toLowerCase()];
+    const syn = ICON_SYNONYMS[cleaned.toLowerCase()];
     if (syn) candidates.push(syn);
     
     // Try the underscore-based format that matches optimize-icons.mjs output
@@ -424,199 +440,35 @@ export default function ResponsiveIcon(props: Readonly<ResponsiveIconProps>) {
     );
   }
 
-  // No image found -> render a silent SVG placeholder (no emoji glyphs).
-  return (
-    <svg
-      className={className}
-      aria-hidden="true"
-      width={size}
-      height={size}
-    />
-  );
-}
-// Synonyms map for common registry keys vs actual filenames
-const SYNONYMS: Record<string, string> = {
-  coins: 'coin',
-  coin: 'coin',
-  fortunes: 'fortune',
-  fortune: 'fortune',
-  blessings: 'blessing',
-  blessing: 'blessing',
-  curses: 'curse',
-  curse: 'curse',
-  hand: 'hand size',
-  'hand size': 'hand size',
-  shuffle: 'shuffle',
-  shuffles: 'shuffle',
-  discard: 'discard',
-  discards: 'discard',
-  exploit: 'exploit',
-  exploits: 'exploit',
-  danger: 'danger',
-  dangers: 'danger',
-  fear: 'fear',
-  fears: 'fear',
-  barricade: 'barricade',
-  resign: 'resign',
-  orangehelp: 'orangehelp',
-  purplehelp: 'purplehelp',
-  whitehelp: 'whitehelp',
-  notdanger: 'notdanger',
-  history: 'run history',
-  'run history': 'run history',
-  ghost: 'sign in',
-  'sign in': 'sign in',
-  signin: 'sign in',
-  feats: 'feats',
-  ascension: 'ascension',
-  settings: 'settings',
-  setting: 'settings',
-  // UI/Menu icons
-  back: 'back',
-  save: 'save',
-  pause: 'pause',
-  play: 'play',
-  volume: 'volume',
-  mute: 'volume',
-  sound: 'volume',
-  close: 'close',
-  exit: 'close',
-  feedback: 'feedback',
-  glossary: 'glossary',
-  login: 'login',
-  signup: 'sign up',
-
-  // Registry ID to Filename Mappings
-  bait_switch: 'baitandswitch',
-  stolen_valor: 'stolenvalor',
-  creative_accounting: 'creativeaccounting',
-  martial_law: 'martiallaw',
-  path_least_resistance: 'pathofleastresistance',
-  gift_gab: 'giftofgab',
-  beginners_luck: 'beginnersluck',
-  diplomatic_immunity: 'diplomaticimmunity',
-  angel_investor: 'angelinvestor',
-  bag_of_holding: 'bagofholding',
-  street_smarts: 'streetsmarts',
-  legitimate_business: 'legitimatebusiness',
-  liquid_assets: 'liquidassets',
-  fountain_youth: 'fountainofyouth',
-  insider_trading: 'insidertrading',
-  daruma_karma: 'duarmakarma',
-  golden_parachute: 'goldenparachute',
-  
-  // Native Effects Mappings
-  alchemist: 'alchemy',
-  'fog-of-war': 'fogofwar',
-  'moon-toad-cheeks': 'moontoadcheeks',
-};
-
-const CATEGORY_ICONS: Record<string, string> = {
-   danger: '/icons/danger.png',
-   fear: '/icons/fear.png',
-   blessing: '/icons/blessing.png',
-   exploit: '/icons/exploit.png',
-   curse: '/icons/curse.png',
-};
-
-function slug(s: string) {
-  return s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '');
-}
-
-function slugWithUnderscores(s: string) {
-  return s.replace(/[^a-z0-9-_]/gi, '_').toLowerCase();
-}
-
-export default function ResponsiveIcon(props: ResponsiveIconProps) {
-  const { name, alt, size = 24, className, fallbackType } = props;
-  const [resolvedSrc, setResolvedSrc] = useState<string | null>(null);
-
-  // Build candidate list ordered by likelihood
-  const buildCandidates = (baseName: string) => {
-    const cleaned = String(baseName || '').trim();
-    let candidates: string[] = [];
-    if (!cleaned) return candidates;
-    
-    const lower = cleaned.toLowerCase();
-
-    // 1. Exact match (lowercased)
-    candidates.push(lower);
-
-    // 2. Synonyms
-    if (SYNONYMS[lower]) candidates.push(SYNONYMS[lower]);
-    
-    // 3. ID-like to Filename-like (bait_switch -> baitandswitch)
-    const asId = lower.replace(/\s+/g, '_').replace(/&/g, 'and').replace(/[^a-z0-9_]/g, '');
-    if (SYNONYMS[asId]) candidates.push(SYNONYMS[asId]);
-
-    // 4. Underscore <-> Space <-> Hyphen permutations
-    // "above_the_law" -> "above the law"
-    if (lower.includes('_')) candidates.push(lower.replace(/_/g, ' '));
-    // "above-the-law" -> "above the law"
-    if (lower.includes('-')) candidates.push(lower.replace(/-/g, ' '));
-    // "above the law" -> "above_the_law"
-    if (lower.includes(' ')) candidates.push(lower.replace(/\s/g, '_'));
-    
-    // 5. Underscore <-> Hyphen
-    if (lower.includes('_')) candidates.push(lower.replace(/_/g, '-'));
-    if (lower.includes('-')) candidates.push(lower.replace(/-/g, '_'));
-
-    return [...new Set(candidates)]; // Dedupe
+  // No image found -> render a visible, accessible fallback so missing icons
+  // still show something in the HUD (first-letter or emoji). This prevents
+  // entirely blank UI elements when an icon file is absent.
+  const label = alt || name || '';
+  const fallbackText = emojiFallback || (label ? label.charAt(0).toUpperCase() : '?');
+  const fallbackStyle: React.CSSProperties = {
+    width: size,
+    height: size,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#0f172a', // slate-900
+    color: '#e2e8f0', // slate-200
+    borderRadius: Math.max(4, Math.floor(size * 0.15)),
+    fontSize: Math.max(10, Math.floor(size * 0.45)),
+    lineHeight: 1,
+    userSelect: 'none'
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    setResolvedSrc(null);
-    if (!name) return;
-
-    const candidates = buildCandidates(name);
-    
-    const tryLoad = (url: string) => {
-      return new Promise<boolean>((resolve) => {
-        const img = new Image();
-        img.onload = () => resolve(true);
-        img.onerror = () => resolve(false);
-        img.src = url;
-      });
-    };
-
-    (async () => {
-      for (const cand of candidates) {
-        // Try .png (most common in this repo)
-        const pngPath = `/icons/${encodeURIComponent(cand)}.png`;
-        if (await tryLoad(pngPath)) {
-          if (!cancelled) setResolvedSrc(pngPath);
-          return;
-        }
-
-        // Try .webp (some exist)
-        const webpPath = `/icons/${encodeURIComponent(cand)}.webp`;
-        if (await tryLoad(webpPath)) {
-          if (!cancelled) setResolvedSrc(webpPath);
-          return;
-        }
-      }
-      
-      // Fallback to category icon if provided
-      if (fallbackType && CATEGORY_ICONS[fallbackType]) {
-         if (!cancelled) setResolvedSrc(CATEGORY_ICONS[fallbackType]);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [name, fallbackType]);
-
-  if (resolvedSrc) {
-    return (
-      <img
-        src={resolvedSrc}
-        alt={alt || name}
-        style={{ width: size, height: size }}
-        className={className}
-      />
-    );
-  }
-
-  // Render nothing or a placeholder if no image found
-  return <div style={{ width: size, height: size }} className={className} />;
+  return (
+    <div
+      role="img"
+      aria-label={label}
+      title={label}
+      style={fallbackStyle}
+      className={className}
+    >
+      <span aria-hidden="true">{fallbackText}</span>
+    </div>
+  );
 }
+
