@@ -1,4 +1,5 @@
 import { GameEffect, Suit, Card, Rank, Pile, GameState, MoveContext } from '../types';
+import { getNextLowerRank, getOrderedRankValue, isHighestRank, isNextHigherInOrder, isNextLowerInOrder } from '../utils/rankOrder';
 
 export const getCardColor = (suit: Suit) => {
   if (suit === 'special') return 'purple';
@@ -94,7 +95,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
       if (target.type === 'tableau' && cards.length > 0) {
         const moving = cards[0];
         const targetCard = target.cards[target.cards.length - 1];
-        if (targetCard && targetCard.faceUp && moving.rank === 1 && targetCard.rank === 13) {
+          if (targetCard && targetCard.faceUp && moving.rank === 1 && isHighestRank(targetCard.rank)) {
            return getCardColor(moving.suit) !== getCardColor(targetCard.suit);
         }
       }
@@ -122,8 +123,11 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
       if (source.type === 'foundation' && target.type === 'tableau') {
         const moving = cards[0];
         const targetCard = target.cards[target.cards.length - 1];
-        if (!targetCard) return moving.rank === 13;
-        return (getCardColor(moving.suit) !== getCardColor(targetCard.suit) && targetCard.rank === moving.rank + 1);
+        if (!targetCard) return isHighestRank(moving.rank);
+        return (
+          getCardColor(moving.suit) !== getCardColor(targetCard.suit) &&
+          isNextLowerInOrder(moving.rank, targetCard.rank)
+        );
       }
       return defaultAllowed;
     },
@@ -215,7 +219,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     description: 'Tableau plays ignore suit & rank then become correct card.',
     canMove: (cards, source, target, defaultAllowed) => {
       if (target.type === 'tableau' && target.cards.length > 0) return true;
-      if (target.type === 'tableau' && target.cards.length === 0 && cards[0].rank === 13) return true;
+      if (target.type === 'tableau' && target.cards.length === 0 && isHighestRank(cards[0].rank)) return true;
       return defaultAllowed;
     },
     onMoveComplete: (state, context) => {
@@ -225,10 +229,10 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
         if (anchorIndex >= 0) {
           const anchorCard = pile.cards[anchorIndex];
           const movedCards = pile.cards.slice(anchorIndex + 1);
-          const targetRank = (anchorCard.rank - 1) as Rank;
+          const targetRank = getNextLowerRank(anchorCard.rank);
           const targetColor = getCardColor(anchorCard.suit) === 'red' ? 'black' : 'red';
           const targetSuit: Suit = targetColor === 'red' ? 'hearts' : 'spades';
-          if (targetRank >= 1) {
+          if (targetRank && getOrderedRankValue(targetRank) >= 1) {
              const transformedCard = { ...movedCards[0], rank: targetRank, suit: targetSuit };
              const newPileCards = [...pile.cards];
              newPileCards[anchorIndex + 1] = transformedCard;
@@ -711,8 +715,11 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
        if (source.type === 'foundation' && target.type === 'tableau') {
           const moving = cards[0];
           const targetCard = target.cards[target.cards.length - 1];
-          if (!targetCard) return moving.rank === 13;
-          return (getCardColor(moving.suit) !== getCardColor(targetCard.suit) && targetCard.rank === moving.rank + 1);
+         if (!targetCard) return isHighestRank(moving.rank);
+         return (
+          getCardColor(moving.suit) !== getCardColor(targetCard.suit) &&
+          isNextLowerInOrder(moving.rank, targetCard.rank)
+         );
        }
        return defaultAllowed;
     }
@@ -824,7 +831,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
        if (target.type === 'tableau' && cards.length > 0) {
           const targetCard = target.cards[target.cards.length - 1];
           if (targetCard && targetCard.faceUp) {
-             if (targetCard.rank === cards[0].rank + 1) return true;
+           if (isNextLowerInOrder(cards[0].rank, targetCard.rank)) return true;
           }
        }
        return defaultAllowed;
@@ -974,7 +981,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
           const moving = cards[0];
           const top = target.cards[target.cards.length - 1];
           if (!top) return moving.rank === 1; 
-          if (getCardColor(moving.suit) === getCardColor(top.suit) && moving.rank === top.rank + 1) return true;
+         if (getCardColor(moving.suit) === getCardColor(top.suit) && isNextHigherInOrder(moving.rank, top.rank)) return true;
        }
        return defaultAllowed;
     },
@@ -1059,8 +1066,8 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
           const top = target.cards[target.cards.length - 1];
           if (top) {
              const isColorAlt = getCardColor(moving.suit) !== getCardColor(top.suit);
-             if (isColorAlt && top.rank === moving.rank - 1) return true;
-             if (isColorAlt && top.rank === moving.rank + 1) return false; 
+            if (isColorAlt && isNextHigherInOrder(moving.rank, top.rank)) return true;
+            if (isColorAlt && isNextLowerInOrder(moving.rank, top.rank)) return false; 
           }
        }
        return defaultAllowed;
@@ -1528,11 +1535,11 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
              const anchor = pile.cards[anchorIdx];
              const newCard = pile.cards[newCardIdx];
              
-             const targetRank = (anchor.rank - 1) as Rank;
+             const targetRank = getNextLowerRank(anchor.rank);
              const targetColor = getCardColor(anchor.suit) === 'red' ? 'black' : 'red';
              const targetSuit: Suit = targetColor === 'red' ? 'hearts' : 'spades';
              
-             if (targetRank >= 1) {
+             if (targetRank && getOrderedRankValue(targetRank) >= 1) {
                 const fixedCard = { ...newCard, rank: targetRank, suit: targetSuit };
                 const newCards = [...pile.cards];
                 newCards[newCardIdx] = fixedCard;
@@ -1582,18 +1589,18 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
           const targetCard = target.cards[target.cards.length - 1];
           if (targetCard.faceUp) {
              const isColorAlt = getCardColor(moving.suit) !== getCardColor(targetCard.suit);
-             if (isColorAlt && moving.rank === targetCard.rank + 1) return true; 
-             if (isColorAlt && moving.rank === targetCard.rank - 1) return false;
+           if (isColorAlt && isNextHigherInOrder(moving.rank, targetCard.rank)) return true; 
+           if (isColorAlt && isNextLowerInOrder(moving.rank, targetCard.rank)) return false;
           }
        }
        
        if (target.type === 'foundation') {
           const targetCard = target.cards[target.cards.length - 1];
           if (targetCard) {
-             if (moving.suit === targetCard.suit && moving.rank === targetCard.rank - 1) return true;
-             if (moving.suit === targetCard.suit && moving.rank === targetCard.rank + 1) return false;
+           if (moving.suit === targetCard.suit && isNextLowerInOrder(moving.rank, targetCard.rank)) return true;
+           if (moving.suit === targetCard.suit && isNextHigherInOrder(moving.rank, targetCard.rank)) return false;
           } else {
-             if (moving.rank === 13) return true;
+           if (isHighestRank(moving.rank)) return true;
              if (moving.rank === 1) return false;
           }
        }
@@ -2605,15 +2612,15 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
       // Use foundation rules: same suit, ascending
       const targetCard = target.cards[target.cards.length - 1];
       if (!targetCard) return moving.rank === 1; // Ace to empty
-      return targetCard.suit === moving.suit && targetCard.rank === moving.rank - 1;
+      return targetCard.suit === moving.suit && isNextHigherInOrder(moving.rank, targetCard.rank);
     }
     
     if (target.type === 'foundation') {
       // Use tableau rules: alternate colors, descending
       const targetCard = target.cards[target.cards.length - 1];
-      if (!targetCard) return moving.rank === 13; // King to empty
+      if (!targetCard) return isHighestRank(moving.rank); // Highest card to empty
       return getCardColor(moving.suit) !== getCardColor(targetCard.suit) && 
-             targetCard.rank === moving.rank + 1;
+             isNextLowerInOrder(moving.rank, targetCard.rank);
     }
     
     return defaultAllowed;
@@ -2909,7 +2916,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
       if (targetCard.faceUp) {
         // Must be opposite color and one rank higher than bottom card
         return getCardColor(moving.suit) !== getCardColor(targetCard.suit) &&
-               moving.rank === targetCard.rank - 1;
+               isNextHigherInOrder(moving.rank, targetCard.rank);
       }
     }
     return defaultAllowed;
@@ -3091,9 +3098,9 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     if (source.type === 'foundation' && target.type === 'tableau') {
       const moving = cards[0];
       const targetCard = target.cards[target.cards.length - 1];
-      if (!targetCard) return moving.rank === 13;
+      if (!targetCard) return isHighestRank(moving.rank);
       return getCardColor(moving.suit) !== getCardColor(targetCard.suit) &&
-             targetCard.rank === moving.rank + 1;
+             isNextLowerInOrder(moving.rank, targetCard.rank);
     }
     return defaultAllowed;
   },
@@ -3272,9 +3279,9 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
       if (target.type === 'tableau') {
         const moving = cards[0];
         const targetTop = target.cards[target.cards.length - 1];
-        if (!targetTop) return moving.rank === 13; // empty tableau -> only King
+        if (!targetTop) return isHighestRank(moving.rank); // empty tableau -> highest card
         // ignore suit/color - only require correct rank
-        return targetTop.rank === moving.rank + 1;
+        return isNextLowerInOrder(moving.rank, targetTop.rank);
       }
       if (target.type === 'foundation') {
           // foundation plays: make suit-agnostic under Maneki-Neko — only rank sequence matters
@@ -3283,7 +3290,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
           const targetTop = target.cards[target.cards.length - 1];
           if (!targetTop) return moving.rank === 1; // ace starts any foundation
           // suit-agnostic: allow placing if ranks are sequential regardless of suit
-          return moving.rank === targetTop.rank + 1;
+          return isNextHigherInOrder(moving.rank, targetTop.rank);
       }
       return undefined;
     }

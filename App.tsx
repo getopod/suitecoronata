@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { LayoutGrid, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, HelpCircle, RefreshCw, X, Gift, Trophy, ArrowLeftRight, SkipBack, SkipForward, MessageSquare, FlaskConical, Save, Flag, Settings, ChevronDown, Pause, ShoppingCart, User, Unlock, Map as MapIcon, BarChart3, Link as LinkIcon, Bug } from 'lucide-react';
 import { Card, GameState, Pile, Rank, Suit, MoveContext, Encounter, GameEffect, Wander, WanderChoice, MinigameResult } from './types';
 import { getCardColor, generateNewBoard, EFFECTS_REGISTRY } from './data/effects';
+import { isHighestRank, isNextHigherInOrder, isNextLowerInOrder } from './utils/rankOrder';
 import { Minigames } from './utils/minigames';
 import ResponsiveIcon from './components/ResponsiveIcon';
 
@@ -92,14 +93,17 @@ const isStandardMoveValid = (movingCards: Card[], targetPile: Pile): boolean => 
   const leader = movingCards[0];
   const targetTop = targetPile.cards[targetPile.cards.length - 1];
   if (targetPile.type === 'tableau') {
-    if (!targetTop) return leader.rank === 13;
-    return (getCardColor(leader.suit) !== getCardColor(targetTop.suit) && targetTop.rank === leader.rank + 1);
+      if (!targetTop) return isHighestRank(leader.rank);
+      return (
+         getCardColor(leader.suit) !== getCardColor(targetTop.suit) &&
+         isNextLowerInOrder(leader.rank, targetTop.rank)
+      );
   }
   if (targetPile.type === 'foundation') {
     if (movingCards.length > 1) return false;
     if (!targetTop) return leader.rank === 1; // Any ace can start any foundation
-    // Must match suit of foundation's first card and be next rank
-    return leader.suit === targetTop.suit && leader.rank === targetTop.rank + 1;
+      // Must match suit of foundation's first card and be next rank (custom ordering)
+      return leader.suit === targetTop.suit && isNextHigherInOrder(leader.rank, targetTop.rank);
   }
   return false;
 };
@@ -347,14 +351,14 @@ export default function SolitaireEngine({
             const cid = eff.params[0];
             if (!newOwned.includes(cid)) { newOwned.push(cid); newActive.push(cid); }
         }
-        if (eff.type === 'add_random_blessing') { 
-            const b = effectsRegistry.filter(e => e.type === 'blessing')[Math.floor(Math.random() * 5)]; 
-            if (b && !newOwned.includes(b.id)) { newOwned.push(b.id); } // Blessings don't activate immediately
-        }
-        if (eff.type === 'add_blessing_by_id') {
-            const bid = eff.params[0];
-            if (!newOwned.includes(bid)) { newOwned.push(bid); }
-        }
+      if (eff.type === 'add_random_blessing') { 
+         const b = effectsRegistry.filter(e => e.type === 'blessing')[Math.floor(Math.random() * 5)]; 
+         if (b && !newOwned.includes(b.id)) { newOwned.push(b.id); if (!newActive.includes(b.id)) newActive.push(b.id); }
+      }
+      if (eff.type === 'add_blessing_by_id') {
+         const bid = eff.params[0];
+         if (!newOwned.includes(bid)) { newOwned.push(bid); if (!newActive.includes(bid)) newActive.push(bid); }
+      }
         if (eff.type === 'add_random_exploit') { 
             const x = effectsRegistry.filter(e => e.type === 'exploit')[Math.floor(Math.random() * 5)]; 
             if (x && !newOwned.includes(x.id)) { newOwned.push(x.id); newActive.push(x.id); } 
@@ -373,7 +377,7 @@ export default function SolitaireEngine({
     };
     apply(effects);
     setGameState(prev => ({ ...prev, ...updates, ownedEffects: newOwned }));
-    setActiveEffects(newActive);
+      setActiveEffects(Array.from(new Set(newActive)));
   };
 
   // Placeholder wanders for when no wander registry is provided
@@ -450,62 +454,49 @@ export default function SolitaireEngine({
      if (nextIdx < runPlan.length) {
         const nextEncounter = runPlan[nextIdx];
         
-        // Retain only Exploits/Curses/Dangers (Blessings must be played)
+        // Retain only persistent effects (blessings now persist like exploits/curses)
         const keptEffects = activeEffects.filter(id => { 
             const e = effectsRegistry.find(x => x.id === id); 
-            return e?.type === 'exploit' || e?.type === 'curse' || e?.type === 'epic' || e?.type === 'legendary'; 
+            return e?.type === 'exploit' || e?.type === 'curse' || e?.type === 'epic' || e?.type === 'legendary' || e?.type === 'blessing'; 
         });
         
         // Generate Board
         const newBoard = generateNewBoard(0, gameState.coins, gameState.scoreMultiplier, gameState.coinMultiplier);
-        
-        // Inject Owned Blessings into Deck
-        const ownedBlessings = gameState.ownedEffects.filter(id => {
-            const e = effectsRegistry.find(x => x.id === id);
-            return e?.type === 'blessing';
-        });
-        
-        const blessingCards: Card[] = ownedBlessings.map(bid => {
-            const def = effectsRegistry.find(e => e.id === bid);
-            return {
-                id: `blessing-${bid}-${Math.random()}`,
-                suit: 'special',
-                rank: 0,
-                faceUp: false,
-                meta: { isBlessing: true, effectId: bid, name: def?.name || 'Blessing' }
-            };
-        });
-        
-        newBoard.piles.deck.cards = [...newBoard.piles.deck.cards, ...blessingCards].sort(() => 0.5 - Math.random());
 
         // Calculate new active effects list
         let nextActiveEffects = [...keptEffects];
         if (nextEncounter.effectId) nextActiveEffects.push(nextEncounter.effectId);
+      nextActiveEffects = Array.from(new Set(nextActiveEffects));
 
-        // Prepare state updates
-        let stateUpdates: Partial<GameState> = { 
+        // Prepare base state for the new encounter
+        let nextState: GameState = { 
+            ...gameState,
             piles: newBoard.piles, 
             score: 0, 
+            moves: 0,
+            selectedCardIds: null,
+            activeMinigame: null,
+            minigameResult: null,
             coins: gameState.coins, 
             runIndex: nextIdx, 
             currentScoreGoal: nextEncounter.goal, 
             isLevelComplete: false, 
             charges: newCharges, 
-            wanderState: 'none' 
+            wanderState: 'none',
+            lastActionType: 'none'
         };
 
         // Apply onActivate for the new encounter effect
         const newEffectDef = effectsRegistry.find(e => e.id === nextEncounter.effectId);
         if (newEffectDef?.onActivate) {
-           const tempState = { ...gameState, ...stateUpdates };
-           const changes = newEffectDef.onActivate(tempState, nextActiveEffects);
+           const changes = newEffectDef.onActivate(nextState, nextActiveEffects);
            if (changes) {
               const anyChanges = changes as any;
               if (anyChanges.newActiveEffects) {
                  nextActiveEffects = anyChanges.newActiveEffects;
                  delete anyChanges.newActiveEffects;
               }
-              stateUpdates = { ...stateUpdates, ...anyChanges };
+              nextState = { ...nextState, ...anyChanges };
            }
         }
 
@@ -513,20 +504,20 @@ export default function SolitaireEngine({
         nextActiveEffects.forEach(eid => {
            const def = effectsRegistry.find(e => e.id === eid);
            if (def?.onEncounterStart) {
-              const tempState = { ...gameState, ...stateUpdates };
-              const changes = def.onEncounterStart(tempState);
+              const changes = def.onEncounterStart(nextState);
               if (changes) {
-                 stateUpdates = { ...stateUpdates, ...changes, effectState: { ...(stateUpdates.effectState || gameState.effectState), ...changes.effectState } };
+                 nextState = { ...nextState, ...changes, effectState: { ...nextState.effectState, ...changes.effectState } };
               }
            }
         });
 
+        // Draw opening hand automatically for the encounter
+        const encounterEffects = effectsRegistry.filter(e => nextActiveEffects.includes(e.id));
+        nextState = dealHand(nextState, encounterEffects);
+
         // Update State
         setActiveEffects(nextActiveEffects);
-        setGameState(prev => ({ 
-            ...prev, 
-            ...stateUpdates
-        }));
+        setGameState(nextState);
      } else { alert("Run Complete!"); setCurrentView('home'); }
   };
 
@@ -559,6 +550,10 @@ export default function SolitaireEngine({
             }
          }
       }
+
+      // Auto-draw opening hand for the first encounter
+      const initialEffectsList = effectsRegistry.filter(e => initialActive.includes(e.id));
+      freshState = dealHand(freshState, initialEffectsList);
 
       setRunPlan(plan);
       setGameState(freshState);
@@ -672,19 +667,6 @@ export default function SolitaireEngine({
     if (!pile) return;
     const clickedCard = cardIndex >= 0 ? pile.cards[cardIndex] : null;
 
-    // Special Card Interactions (Blessing/Items) in Hand
-    if (clickedCard && pileId === 'hand' && clickedCard.meta?.isBlessing) {
-        // Play Blessing
-        const effectId = clickedCard.meta.effectId;
-        setActiveEffects(prev => [...prev, effectId]);
-        
-        // Remove from hand (Exhaust)
-        const newCards = [...pile.cards];
-        newCards.splice(cardIndex, 1);
-        setGameState(prev => ({ ...prev, piles: { ...prev.piles, hand: { ...pile, cards: newCards } } }));
-        return;
-    }
-
     if (clickedCard && clickedCard.meta?.locked) {
        const hasPanopticon = activeEffects.includes('panopticon');
        if (hasPanopticon) {
@@ -722,17 +704,6 @@ export default function SolitaireEngine({
       const pile = gameState.piles[pileId];
       if (!pile || cardIndex < 0) return;
       const card = pile.cards[cardIndex];
-      
-      // Auto-Play Blessing Logic
-      if (pileId === 'hand' && card.meta?.isBlessing) {
-          const effectId = card.meta.effectId;
-          setActiveEffects(prev => [...prev, effectId]);
-          const newCards = [...pile.cards];
-          newCards.splice(cardIndex, 1);
-          setGameState(prev => ({ ...prev, piles: { ...prev.piles, hand: { ...pile, cards: newCards } } }));
-          return;
-      }
-
         // Only single card auto-move logic for now to stay simple
         if (cardIndex !== pile.cards.length - 1) return;
 
@@ -754,33 +725,46 @@ export default function SolitaireEngine({
         }
   };
 
-  const discardAndDrawHand = () => {
-    const deck = gameState.piles['deck'];
-    const hand = gameState.piles['hand'];
+  const dealHand = (state: GameState, effects: GameEffect[]): GameState => {
+    const deck = state.piles['deck'];
+    const hand = state.piles['hand'];
     const oldHand = hand.cards.map(c => ({ ...c, faceUp: false }));
-    let newDeckCards = [...deck.cards, ...oldHand]; 
-    const drawCount = 5; 
+    let newDeckCards = [...deck.cards, ...oldHand];
+    const drawCount = 5;
     const drawn = newDeckCards.splice(0, drawCount).map(c => ({ ...c, faceUp: true }));
-    let newState: GameState = { ...gameState, piles: { ...gameState.piles, deck: { ...deck, cards: newDeckCards }, hand: { ...hand, cards: drawn } }, lastActionType: 'shuffle' as const };
-    
+
+    let nextState: GameState = {
+      ...state,
+      piles: {
+        ...state.piles,
+        deck: { ...deck, cards: newDeckCards },
+        hand: { ...hand, cards: drawn }
+      },
+      lastActionType: 'shuffle'
+    };
+
     const context: MoveContext = { source: 'hand', target: 'deck', cards: oldHand };
-    const effects = getEffects();
     let minigameTrigger: string | undefined;
 
     effects.forEach(eff => {
        if (eff.onMoveComplete) {
-          const result = eff.onMoveComplete(newState, context);
-          if (result.triggerMinigame) minigameTrigger = result.triggerMinigame;
-          const { triggerMinigame, ...stateUpdates } = result;
-          newState = { ...newState, ...stateUpdates };
+          const result = eff.onMoveComplete(nextState, context);
+          if ((result as any)?.triggerMinigame) minigameTrigger = (result as any).triggerMinigame;
+          const { triggerMinigame, ...stateUpdates } = result as any;
+          nextState = { ...nextState, ...stateUpdates };
        }
     });
 
     if (minigameTrigger) {
-       newState.activeMinigame = { type: minigameTrigger, title: minigameTrigger.toUpperCase() };
+       nextState = { ...nextState, activeMinigame: { type: minigameTrigger, title: minigameTrigger.toUpperCase() } };
     }
 
-    setGameState(newState);
+    return nextState;
+  };
+
+  const discardAndDrawHand = () => {
+    const effects = getEffects();
+    setGameState(prev => dealHand(prev, effects));
   };
 
   const attemptMove = (cardIds: string[], sourcePileId: string, targetPileId: string) => {
@@ -855,6 +839,9 @@ export default function SolitaireEngine({
   const completeLevel = () => {
      setShowLevelComplete(false);
      const currentEncounter = runPlan[gameState.runIndex];
+     if (!currentEncounter) return;
+     const reward = currentEncounter.type === 'danger' ? 100 : currentEncounter.type === 'fear' ? 50 : 0;
+     setGameState(prev => ({ ...prev, coins: prev.coins + reward, score: 0 }));
      if (currentEncounter.type === 'danger') {
         // Always show blessing selection after danger (use placeholder if empty)
         const blessings = effectsRegistry.filter(e => e.type === 'blessing').sort(() => 0.5 - Math.random());
@@ -922,10 +909,8 @@ export default function SolitaireEngine({
        ownedEffects: [...p.ownedEffects, effect.id] 
      }));
      
-     // Auto-activate exploits and curses (but not blessings - those go to deck)
-     if ((effect as any).type !== 'blessing') {
+       // Auto-activate all purchased effects (blessings now activate immediately)
        toggleEffect(effect.id, true);
-     }
   };
 
   const renderCard = (card: Card, index: number, pileId: string, totalCards: number = 0) => {
@@ -2042,6 +2027,9 @@ export default function SolitaireEngine({
          {activeDrawer && (
             <div className="absolute bottom-0 left-0 w-full bg-slate-800 border-t border-slate-700 p-4 pb-16 overflow-y-auto z-40 animate-in slide-in-from-bottom-10 pointer-events-auto h-64">
                <div className="max-w-md mx-auto">
+                  {activeDrawer === 'shop' && (
+                    <button onClick={startWanderPhase} className="w-full py-3 mb-2 rounded bg-emerald-600 text-white font-bold flex items-center justify-center gap-2">Continue <ArrowLeftRight size={16}/></button>
+                  )}
                   <div className="flex justify-between items-center mb-2">
                      <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">
                         {activeDrawer === 'pause' ? 'Menu' 
@@ -2126,36 +2114,24 @@ export default function SolitaireEngine({
                      </div>
                   ) : activeDrawer === 'blessing_select' ? (
                       <div className="flex flex-col gap-2">
-                        <div className="text-center text-sm text-slate-300 mb-2">Choose a Blessing to add to your deck</div>
+                        <div className="text-center text-sm text-slate-300 mb-2">Choose a Blessing to gain immediately</div>
                         <div className="grid grid-cols-1 gap-2">
                            {blessingChoices.slice(0,4).map(item => {
                               const rarityColors = getRarityColor(item.rarity);
                               return (
                               <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3 hover:brightness-110 cursor-pointer`}
                                    onClick={() => {
-                                      setGameState(p => ({ ...p, ownedEffects: [...p.ownedEffects, item.id] }));
-                                      // Don't activate, just own. It will be added to deck next encounter.
-                                      // Special case for startRun: We are already in encounter 0. 
-                                      // We need to inject it NOW if we want to use it this turn?
-                                      // Or just wait for next? Usually "Add to deck" implies immediate availability or next shuffle.
-                                      // Since we are at start of run, let's inject into deck immediately.
-                                      if (gameState.runIndex === 0 && gameState.score === 0) {
-                                          const card: Card = {
-                                              id: `blessing-${item.id}-${Math.random()}`,
-                                              suit: 'special', rank: 0, faceUp: false,
-                                              meta: { isBlessing: true, effectId: item.id, name: item.name }
-                                          };
-                                          setGameState(p => ({
-                                              ...p,
-                                              piles: {
-                                                  ...p.piles,
-                                                  deck: { ...p.piles.deck, cards: [...p.piles.deck.cards, card].sort(() => 0.5 - Math.random()) }
-                                              }
-                                          }));
-                                          setActiveDrawer(null);
-                                      } else {
-                                          openShop();
-                                      }
+                                   if (!gameState.ownedEffects.includes(item.id)) {
+                                    setGameState(p => ({ ...p, ownedEffects: [...p.ownedEffects, item.id] }));
+                                   }
+                                   if (!activeEffects.includes(item.id)) {
+                                    toggleEffect(item.id, true);
+                                   }
+                                   if (gameState.runIndex === 0 && gameState.score === 0) {
+                                      setActiveDrawer(null);
+                                   } else {
+                                      openShop();
+                                   }
                                    }}>
                                  <ResponsiveIcon name={item.id || item.name} fallbackType="blessing" size={32} className="w-8 h-8 rounded shrink-0" alt={item.name} />
                                  <div className="flex-1 min-w-0">
@@ -2195,7 +2171,6 @@ export default function SolitaireEngine({
                               </div>
                            );})}
                         </div>
-                        <button onClick={startWanderPhase} className="w-full py-3 mt-4 rounded bg-emerald-600 text-white font-bold flex items-center justify-center gap-2">Depart <ArrowLeftRight size={16}/></button>
                      </div>
                   ) : (
                      <div className="grid grid-cols-1 gap-2">
