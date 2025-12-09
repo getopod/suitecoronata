@@ -1,5 +1,5 @@
 // Auto-generated merged icon mappings (existing + fuzzy suggestions)
-// Keep this file checked in; regenerate via scripts/fuzzy-icon-mapping.cjs
+// Keep this file checked in; it's safe to re-generate from scripts/fuzzy-map.cjs
 export const ADDITIONAL_ICON_SYNONYMS: Record<string, string> = {
   alchemist: 'alchemist',
   analysis_paralysis: 'analysis-paralysis',

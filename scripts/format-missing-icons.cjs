@@ -1,3 +1,6 @@
+// Formats the missing icon list into a human-friendly Markdown table.
+// Uses the same candidate generation logic as scripts/check-icons.cjs.
+
 const fs = require('fs');
 const path = require('path');
 
@@ -6,41 +9,31 @@ const effectsFile = path.join(root, 'data', 'effects.ts');
 const iconsDir = path.join(root, 'public', 'icons');
 const optimized48 = path.join(iconsDir, 'optimized', '48');
 const optimized96 = path.join(iconsDir, 'optimized', '96');
-
-// Try to read additional mappings generated in components/iconMappings.ts
 const additionalFile = path.join(root, 'components', 'iconMappings.ts');
+
 let ADDITIONAL_MAP = {};
 if (fs.existsSync(additionalFile)) {
-  try {
-    const txt = fs.readFileSync(additionalFile, 'utf8');
-    const objRegex = /export const ADDITIONAL_ICON_SYNONYMS:[\s\S]*?=\s*\{([\s\S]*?)\};/m;
-    const m = objRegex.exec(txt);
-    if (m) {
-      const body = m[1];
-      const lineRe = /['\"]?([a-z0-9_\-\s]+)['\"]?\s*:\s*['\"]([^'\"]+)['\"]/gi;
-      let r;
-      while ((r = lineRe.exec(body))) {
-        ADDITIONAL_MAP[r[1].trim().toLowerCase()] = r[2].trim();
-      }
+  const txt = fs.readFileSync(additionalFile, 'utf8');
+  const objRegex = /export const ADDITIONAL_ICON_SYNONYMS:[\s\S]*?=\s*\{([\s\S]*?)\};/m;
+  const m = objRegex.exec(txt);
+  if (m) {
+    const body = m[1];
+    const lineRe = /['"]?([a-z0-9_\-\s]+)['"]?\s*:\s*['"]([^'"]+)['"]/gi;
+    let r;
+    while ((r = lineRe.exec(body))) {
+      ADDITIONAL_MAP[r[1].trim().toLowerCase()] = r[2].trim();
     }
-  } catch (err) {
-    // ignore
   }
 }
 
-function slug(s) {
-  return String(s || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '');
-}
-function slugWithUnderscores(s) {
-  return String(s || '').replace(/[^a-z0-9-_]/gi, '_').toLowerCase();
-}
+function slug(s) { return String(s || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, ''); }
+function slugWithUnderscores(s) { return String(s || '').replace(/[^a-z0-9-_]/gi, '_').toLowerCase(); }
 
 function buildCandidates(baseName) {
   const cleaned = String(baseName || '').trim();
   const candidates = [];
   if (!cleaned) return candidates;
   const lower = cleaned.toLowerCase();
-  // Prefer ADDITIONAL_MAP (auto/fuzzy suggestions), then small local SYN fallback
   if (ADDITIONAL_MAP[lower]) candidates.push(ADDITIONAL_MAP[lower]);
   const SYN = {
     'bait_switch': 'baitandswitch',
@@ -82,36 +75,41 @@ function existsAny(names) {
       path.join(iconsDir, 'categories', `${name}.png`),
       path.join(iconsDir, 'categories', `${name}.svg`),
     ];
-    for (const p of paths) {
-      if (fs.existsSync(p)) return p;
-    }
+    for (const p of paths) if (fs.existsSync(p)) return p;
   }
   return null;
 }
 
-(function main() {
-  if (!fs.existsSync(effectsFile)) { console.error('effects file not found:', effectsFile); process.exit(1); }
+function main() {
+  if (!fs.existsSync(effectsFile)) {
+    console.error('effects file not found:', effectsFile);
+    process.exit(1);
+  }
   const txt = fs.readFileSync(effectsFile, 'utf8');
   const ids = new Set();
   const regex = /id:\s*['"]([^'"]+)['"]/g;
   let m;
   while ((m = regex.exec(txt))) ids.add(m[1]);
   const idList = Array.from(ids).sort();
-  console.log(`Found ${idList.length} effect ids`);
+
   const missing = [];
-  const found = [];
   for (const id of idList) {
     const candidates = buildCandidates(id);
     const p = existsAny(candidates);
-    if (p) found.push({ id, path: p, candidates: candidates.slice(0,5) });
-    else missing.push({ id, candidates: candidates.slice(0,5) });
+    if (!p) missing.push({ id, candidates: candidates.slice(0, 6) });
   }
-  console.log('\n-- FOUND ICONS ('+found.length+') --');
-  found.slice(0,200).forEach(f => console.log(f.id, '->', path.relative(root, f.path)));
-  console.log('\n-- MISSING ICONS ('+missing.length+') --');
-  missing.slice(0,200).forEach(m => console.log(m.id, 'candidates:', m.candidates));
 
-  // Print stats for some sample names
-  console.log('\nSample checks: maneki-neko, bait_switch, tortoiseshell');
-  ['maneki-neko','bait_switch','tortoiseshell'].forEach(s => console.log(s, buildCandidates(s)));
-})();
+  const lines = [];
+  lines.push('# Missing Icons');
+  lines.push('');
+  lines.push('Effect ID | Suggested filenames (top candidates)');
+  lines.push('--- | ---');
+  for (const m of missing) {
+    lines.push(`${m.id} | ${m.candidates.join(', ')}`);
+  }
+  const outPath = path.join(root, 'scripts', 'missing-icons-human.md');
+  fs.writeFileSync(outPath, lines.join('\n'));
+  console.log(`Wrote ${missing.length} missing entries to ${outPath}`);
+}
+
+main();

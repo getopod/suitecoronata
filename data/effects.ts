@@ -3261,4 +3261,31 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     description: 'Build tokens on pile. Spend for wild/unlock/pts.',
     onMoveComplete: (state) => ({ effectState: { ...state.effectState, momentum: (state.effectState.momentum || 0) + 1 } })
   }
+  ,
+  {
+    id: 'maneki_neko',
+    name: 'Maneki-Neko',
+    type: 'blessing',
+    description: 'Lucky cat: tableau stacking ignores suit/color (only rank matters) and foundations build by rank regardless of suit.',
+    // Allow placing on tableaus regardless of suit/color as long as the rank fits.
+    canMove: (cards, source, target, defaultAllowed) => {
+      if (target.type === 'tableau') {
+        const moving = cards[0];
+        const targetTop = target.cards[target.cards.length - 1];
+        if (!targetTop) return moving.rank === 13; // empty tableau -> only King
+        // ignore suit/color - only require correct rank
+        return targetTop.rank === moving.rank + 1;
+      }
+      if (target.type === 'foundation') {
+          // foundation plays: make suit-agnostic under Maneki-Neko — only rank sequence matters
+          if (cards.length > 1) return false;
+          const moving = cards[0];
+          const targetTop = target.cards[target.cards.length - 1];
+          if (!targetTop) return moving.rank === 1; // ace starts any foundation
+          // suit-agnostic: allow placing if ranks are sequential regardless of suit
+          return moving.rank === targetTop.rank + 1;
+      }
+      return undefined;
+    }
+  }
 ];
