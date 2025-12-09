@@ -380,39 +380,6 @@ export default function SolitaireEngine({
       setActiveEffects(Array.from(new Set(newActive)));
   };
 
-  // Placeholder wanders for when no wander registry is provided
-  const PLACEHOLDER_WANDERS: Wander[] = [
-    {
-      id: 'placeholder_wander_1',
-      label: 'The Crossroads',
-      description: 'Two paths diverge before you. Each seems to promise something different.',
-      type: 'wander',
-      choices: [
-        { label: 'Take the left path', result: 'You find a small cache of coins.', effects: [{ type: 'modify_coin', params: [15] }] },
-        { label: 'Take the right path', result: 'A shortcut! You feel invigorated.', effects: [{ type: 'modify_score', params: [25] }] },
-      ],
-    },
-    {
-      id: 'placeholder_wander_2',
-      label: 'The Merchant',
-      description: 'A traveling merchant offers you a deal.',
-      type: 'wander',
-      choices: [
-        { label: 'Trade coins for points (-20 coins)', result: 'A fair exchange.', effects: [{ type: 'modify_coin', params: [-20] }, { type: 'modify_score', params: [50] }] },
-        { label: 'Decline politely', result: 'The merchant nods and moves on.', effects: [] },
-      ],
-    },
-    {
-      id: 'placeholder_wander_3',
-      label: 'The Gamble',
-      description: 'A mysterious figure offers you a wager.',
-      type: 'wander',
-      choices: [
-        { label: 'Accept the bet', result: 'Fortune favors the bold!', effects: [{ type: 'modify_coin', params: [30] }] },
-        { label: 'Walk away', result: 'Sometimes caution is wise.', effects: [{ type: 'modify_score', params: [10] }] },
-      ],
-    },
-  ];
 
   const startWanderPhase = () => {
      setActiveDrawer(null);
@@ -2114,7 +2081,6 @@ export default function SolitaireEngine({
                      </div>
                   ) : activeDrawer === 'blessing_select' ? (
                       <div className="flex flex-col gap-2">
-                        <div className="text-center text-sm text-slate-300 mb-2">Choose a Blessing to gain immediately</div>
                         <div className="grid grid-cols-1 gap-2">
                            {blessingChoices.slice(0,4).map(item => {
                               const rarityColors = getRarityColor(item.rarity);
