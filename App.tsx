@@ -32,95 +32,137 @@ const createSeededRng = (seed: number) => {
    };
 };
 
-const shuffleArray = <T,>(arr: T[], rng?: () => number): T[] => {
-   const out = arr.slice();
-   const r = rng ?? Math.random;
-   for (let i = out.length - 1; i > 0; i--) {
-      const j = Math.floor(r() * (i + 1));
-      [out[i], out[j]] = [out[j], out[i]];
-   }
-   return out;
-};
+                  {activeDrawer === 'pause' ? (
+                     <div className="grid grid-cols-4 gap-2">
+                        <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><SkipBack size={16} /><span className="text-[8px]">Prev</span></button>
+                        <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><Play size={16} /><span className="text-[8px]">Play/Pause</span></button>
+                        <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><SkipForward size={16} /><span className="text-[8px]">Next</span></button>
+                        <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('feedback')}><MessageSquare size={16} /><span className="text-[8px]">Feedback</span></button>
+                        <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('test')}><FlaskConical size={16} /><span className="text-[8px]">Test UI</span></button>
+                        <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><Save size={16} /><span className="text-[8px]">Save</span></button>
+                        <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('resign')}><Flag size={16} /><span className="text-[8px]">Resign</span></button>
+                        <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><Settings size={16} /><span className="text-[8px]">Settings</span></button>
+                     </div>
+                  ) : activeDrawer === 'shop' ? (
+                     <div className="flex flex-col gap-2">
+                        <div className="grid grid-cols-1 gap-2">
+                          {shopTab === 'buy' && shopInventory.map(item => {
+                              const rarityColors = getRarityColor(item.rarity);
+                              const itemType = item.type === 'curse' ? 'curse' : item.type === 'blessing' ? 'blessing' : 'exploit';
+                              return (
+                              <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3`}>
+                                 <ResponsiveIcon name={item.id || item.name} fallbackType={itemType} size={32} className="w-8 h-8 rounded shrink-0" alt={item.name} />
+                                 <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                       <span className="font-bold text-white text-xs truncate">{item.name}</span>
+                                       <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
+                                    </div>
+                                    <div className="text-slate-400 text-[10px]">{item.description}</div>
+                                 </div>
+                                 <button 
+                                   className={`text-white px-2 py-1 rounded text-xs font-bold shrink-0 ${gameState.coins >= (item.cost || 50) ? 'bg-yellow-600 hover:bg-yellow-500' : 'bg-slate-600 cursor-not-allowed'}`}
+                                   onClick={() => buyEffect(item)}
+                                   disabled={gameState.coins < (item.cost || 50)}>
+                                   Buy {item.cost || 50}
+                                 </button>
+                              </div>
+                           );})}
 
-const generateRunPlan = (effectsRegistry: GameEffect[], rng?: () => number): Encounter[] => {
-   const encounters: Encounter[] = [];
-   const fears = effectsRegistry.filter(e => e.type === 'fear');
-   const dangers = effectsRegistry.filter(e => e.type === 'danger');
-
-   // If no effects, generate simple encounters with no effect
-   if (fears.length === 0 && dangers.length === 0) {
-      for (let i = 0; i < 15; i++) {
-         const isDanger = (i + 1) % 3 === 0;
-         const goal = Math.floor(150 + (i / 14) * (4200 - 150));
-         encounters.push({
-            index: i,
-            type: isDanger ? 'danger' : 'fear',
-            effectId: '', // No effect
-            goal: goal,
-            completed: false
-         });
-      }
-      return encounters;
-   }
-
-   const shuffledFears = shuffleArray([...fears], rng);
-   const shuffledDangers = shuffleArray([...dangers], rng);
-
-   for (let i = 0; i < 15; i++) {
-      const isDanger = (i + 1) % 3 === 0;
-      const goal = Math.floor(150 + (i / 14) * (4200 - 150));
-      const effect = isDanger 
-         ? (shuffledDangers[i % shuffledDangers.length] || shuffledFears[0]) 
-         : (shuffledFears[i % shuffledFears.length] || shuffledDangers[0]);
-
-      encounters.push({
-         index: i,
-         type: isDanger ? 'danger' : 'fear',
-         effectId: effect?.id || '',
-         goal: goal,
-         completed: false
-      });
-   }
-   return encounters;
-};
-
-const initialGameState = (): GameState => {
-  return generateNewBoard(0, 150, 1, 1);
-};
-
-const isStandardMoveValid = (movingCards: Card[], targetPile: Pile): boolean => {
-  if (movingCards.length === 0) return false;
-  const leader = movingCards[0];
-  const targetTop = targetPile.cards[targetPile.cards.length - 1];
-  if (targetPile.type === 'tableau') {
-      if (!targetTop) return isHighestRank(leader.rank);
-      return (
-         getCardColor(leader.suit) !== getCardColor(targetTop.suit) &&
-         isNextLowerInOrder(leader.rank, targetTop.rank)
-      );
-  }
-  if (targetPile.type === 'foundation') {
-    if (movingCards.length > 1) return false;
-    if (!targetTop) return leader.rank === 1; // Any ace can start any foundation
-      // Must match suit of foundation's first card and be next rank (custom ordering)
-      return leader.suit === targetTop.suit && isNextHigherInOrder(leader.rank, targetTop.rank);
-  }
-  return false;
-};
-
-// UI helper: human-readable rank display
-const getRankDisplay = (r: Rank) => {
-   if (r === 0) return '';
-   if ((r as number) === -1) return '?';
-   if (r === 1) return 'A';
-   if (r === 11) return 'J';
-   if (r === 12) return 'Q';
-   if (r === 13) return 'K';
-   return r;
-};
-
-// Rarity color helper - returns Tailwind classes for rarity
-const getRarityColor = (rarity?: string): { bg: string; text: string; border: string } => {
+                          {shopTab === 'sell' && (() => {
+                             const ownedExploits = effectsRegistry.filter(e => (['exploit','epic','legendary','rare','uncommon'].includes(e.type)) && gameState.ownedEffects.includes(e.id));
+                             if (ownedExploits.length === 0) return <div className="text-center text-slate-500 text-xs py-4">No exploitable items to sell.</div>;
+                             return ownedExploits.map(item => {
+                                const rarityColors = getRarityColor(item.rarity);
+                                const sellPrice = Math.floor((item.cost || 50) / 2);
+                                return (
+                                   <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3`}>
+                                      <ResponsiveIcon name={item.id || item.name} fallbackType={'exploit'} size={32} className="w-8 h-8 rounded shrink-0" alt={item.name} />
+                                      <div className="flex-1 min-w-0">
+                                         <div className="flex items-center gap-2">
+                                            <span className="font-bold text-white text-xs truncate">{item.name}</span>
+                                            <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
+                                         </div>
+                                         <div className="text-slate-400 text-[10px]">{item.description}</div>
+                                      </div>
+                                      <button className={`text-white px-2 py-1 rounded text-xs font-bold shrink-0 bg-slate-700 hover:bg-slate-600`} onClick={() => {
+                                         const price = sellPrice;
+                                         setGameState(p => ({ ...p, coins: p.coins + price, ownedEffects: p.ownedEffects.filter(id => id !== item.id) }));
+                                         if (activeEffects.includes(item.id)) toggleEffect(item.id, false);
+                                      }}>Sell {sellPrice}</button>
+                                   </div>
+                                );
+                             });
+                          })()}
+                        </div>
+                     </div>
+                  ) : activeDrawer === 'feedback' ? (
+                     <div className="flex flex-col gap-2 text-sm text-slate-200">
+                        <label className="flex flex-col gap-1">
+                           <span className="text-xs uppercase text-slate-400">Feedback</span>
+                           <textarea className="w-full h-24 rounded bg-slate-700 border border-slate-600 p-2 text-white" placeholder="Tell us what's on your mind" />
+                        </label>
+                        <button className="w-full bg-emerald-600 text-white py-2 rounded font-bold" onClick={() => { alert('Feedback Sent!'); setActiveDrawer('pause'); }}>Submit Report</button>
+                     </div>
+                  ) : activeDrawer === 'resign' ? (
+                     <div className="flex flex-col gap-4 text-center">
+                        <div className="text-slate-300 text-sm">Quit Run?</div>
+                        <div className="grid grid-cols-2 gap-3 text-xs text-slate-400">
+                            <div className="bg-slate-700/50 p-2 rounded">Time: {Math.floor((Date.now() - gameState.startTime)/1000)}s</div>
+                            <div className="bg-slate-700/50 p-2 rounded">Seed: {gameState.seed}</div>
+                        </div>
+                        <div className="flex gap-3">
+                           <button className="flex-1 bg-slate-700 text-white py-3 rounded font-bold" onClick={() => setActiveDrawer('pause')}>Cancel</button>
+                           <button className="flex-1 bg-red-600 text-white py-3 rounded font-bold" onClick={() => { setCurrentView('home'); setActiveDrawer(null); }}>Give Up</button>
+                        </div>
+                     </div>
+                  ) : activeDrawer === 'settings' ? (
+                     <div className="flex flex-col gap-4">
+                        {['Gameplay', 'Audio', 'Display', 'Data', 'Other'].map(cat => (
+                           <div key={cat} className="border-b border-slate-700 pb-2">
+                              <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">{cat}</h4>
+                              <div className="flex items-center justify-between text-sm text-slate-200">
+                                 <span>Example Option</span>
+                                 <div className="w-8 h-4 bg-slate-600 rounded-full relative"><div className="absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full"></div></div>
+                              </div>
+                           </div>
+                        ))}
+                        <button className="text-xs text-slate-500 underline" onClick={() => setActiveDrawer('pause')}>Back to Menu</button>
+                     </div>
+                  ) : activeDrawer === 'blessing_select' ? (
+                      <div className="flex flex-col gap-2">
+                        <div className="grid grid-cols-1 gap-2">
+                           {blessingChoices.slice(0,4).map(item => {
+                              const rarityColors = getRarityColor(item.rarity);
+                              return (
+                              <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3 hover:brightness-110 cursor-pointer`}
+                                   onClick={() => {
+                                   if (!gameState.ownedEffects.includes(item.id)) {
+                                    setGameState(p => ({ ...p, ownedEffects: [...p.ownedEffects, item.id] }));
+                                   }
+                                   if (!activeEffects.includes(item.id)) {
+                                    toggleEffect(item.id, true);
+                                   }
+                                   if (gameState.runIndex === 0 && gameState.score === 0) {
+                                      setActiveDrawer(null);
+                                      setNonClosableDrawer(null);
+                                   } else {
+                                      openShop(true);
+                                   }
+                                   }}>
+                                 <ResponsiveIcon name={item.id || item.name} fallbackType="blessing" size={32} className="w-8 h-8 rounded shrink-0" alt={item.name} />
+                                 <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                       <span className="font-bold text-white text-xs truncate">{item.name}</span>
+                                       <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
+                                    </div>
+                                    <div className="text-slate-400 text-[10px]">{item.description}</div>
+                                 </div>
+                                 <Gift size={16} className="text-purple-400 shrink-0" />
+                              </div>
+                           );})}
+                        </div>
+                     </div>
+                  ) : (
    const r = (rarity || 'common').toLowerCase();
    switch (r) {
       case 'uncommon': return { bg: 'bg-green-900/30', text: 'text-green-300', border: 'border-green-600' };
@@ -261,12 +303,48 @@ export default function SolitaireEngine({
   const [gameState, setGameState] = useState<GameState>(initialGameState());
   const [activeEffects, setActiveEffects] = useState<string[]>([]);
   const [selectedPileId, setSelectedPileId] = useState<string | null>(null);
+   const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
    const [hintTargets, setHintTargets] = useState<string[]>([]);
+   const [selectionColor, setSelectionColor] = useState<'none' | 'green' | 'yellow' | 'red'>('none');
+   const [highlightedMoves, setHighlightedMoves] = useState<{ tableauIds: string[]; foundationIds: string[] }>({ tableauIds: [], foundationIds: [] });
   
   const [activeDrawer, setActiveDrawer] = useState<'pause' | 'exploit' | 'curse' | 'blessing' | 'shop' | 'feedback' | 'test' | 'settings' | 'resign' | 'blessing_select' | null>(null);
   const [shopInventory, setShopInventory] = useState<GameEffect[]>([]);
   const [blessingChoices, setBlessingChoices] = useState<GameEffect[]>([]);
   const [showLevelComplete, setShowLevelComplete] = useState(false);
+   // When set, this drawer is intentionally non-closable by the collapse button
+   const [nonClosableDrawer, setNonClosableDrawer] = useState<'blessing_select' | 'shop' | null>(null);
+   // Shop tab state (buy / sell / continue)
+   const [shopTab, setShopTab] = useState<'buy' | 'sell' | 'continue'>('buy');
+
+   // Reset any non-closable lock when the drawer is closed by other means
+   React.useEffect(() => {
+      if (!activeDrawer && nonClosableDrawer) setNonClosableDrawer(null);
+   }, [activeDrawer, nonClosableDrawer]);
+
+   // Compute the items shown in the active drawer so we can size the drawer dynamically
+   const drawerItems = React.useMemo(() => {
+      if (!activeDrawer) return [] as GameEffect[];
+      if (activeDrawer === 'blessing_select') return blessingChoices;
+      if (activeDrawer === 'shop') return shopInventory;
+      // Owned effect lists for exploit/curse/blessing drawers
+      if (['exploit', 'curse', 'blessing'].includes(activeDrawer)) {
+         return effectsRegistry.filter(e => {
+            const isOwned = gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll;
+            if (!isOwned) return false;
+            if (activeDrawer === 'exploit') return ['exploit', 'epic', 'legendary', 'rare', 'uncommon'].includes(e.type);
+            if (activeDrawer === 'curse') return ['curse', 'fear', 'danger'].includes(e.type);
+            if (activeDrawer === 'blessing') return ['blessing'].includes(e.type);
+            return false;
+         });
+      }
+      return [] as GameEffect[];
+   }, [activeDrawer, blessingChoices, shopInventory, gameState.ownedEffects, gameState.debugUnlockAll, effectsRegistry]);
+
+   const drawerVisibleCount = Math.min(drawerItems.length, 4);
+   const DRAWER_ITEM_HEIGHT = 72; // px per row (approx)
+   const DRAWER_BASE_HEIGHT = 140; // px for header/padding
+   const drawerMaxHeightPx = `${DRAWER_BASE_HEIGHT + drawerVisibleCount * DRAWER_ITEM_HEIGHT}px`;
   
   // Home menu overlay states
   const [showGlossary, setShowGlossary] = useState(false);
@@ -539,6 +617,8 @@ export default function SolitaireEngine({
       ] as GameEffect[];
       setBlessingChoices(blessingOptions);
       setActiveDrawer('blessing_select');
+      // Prevent collapsing the blessing picker at run start
+      setNonClosableDrawer('blessing_select');
   };
 
   const getEffects = useCallback(() => { return effectsRegistry.filter(e => activeEffects.includes(e.id)); }, [activeEffects, effectsRegistry]);
@@ -629,11 +709,41 @@ export default function SolitaireEngine({
      }
   };
 
+   const clearSelection = () => {
+      setGameState(prev => ({ ...prev, selectedCardIds: null }));
+      setSelectedPileId(null);
+      setSelectedCardIndex(null);
+      setHintTargets([]);
+      setSelectionColor('none');
+      setHighlightedMoves({ tableauIds: [], foundationIds: [] });
+   };
+
+   const selectCardAndCompute = (pileId: string, cardIndex: number) => {
+      const pile = gameState.piles[pileId];
+      if (!pile) return;
+      const card = pile.cards[cardIndex];
+      if (!card) return;
+      if (!card.faceUp && pile.type === 'tableau') return; // selection only for face-up cards (tableau)
+
+      const movingCards = pile.type === 'tableau' ? pile.cards.slice(cardIndex) : [card];
+      const moves = findValidMoves(movingCards, pileId, cardIndex, gameState.piles);
+      const allTargets = [...moves.tableauIds, ...moves.foundationIds];
+      const color: 'red' | 'green' | 'yellow' | 'none' = allTargets.length === 0 ? 'red' : allTargets.length === 1 ? 'green' : 'yellow';
+
+      setGameState(prev => ({ ...prev, selectedCardIds: movingCards.map(c => c.id) }));
+      setSelectedPileId(pileId);
+      setSelectedCardIndex(cardIndex);
+      setHintTargets(allTargets);
+      setSelectionColor(color);
+      setHighlightedMoves({ tableauIds: moves.tableauIds, foundationIds: moves.foundationIds });
+   };
+
   const handleCardClick = (pileId: string, cardIndex: number) => {
     const pile = gameState.piles[pileId];
     if (!pile) return;
     const clickedCard = cardIndex >= 0 ? pile.cards[cardIndex] : null;
 
+    // Locked card unlock flow (Panopticon minigame or pay coins)
     if (clickedCard && clickedCard.meta?.locked) {
        const hasPanopticon = activeEffects.includes('panopticon');
        if (hasPanopticon) {
@@ -656,40 +766,63 @@ export default function SolitaireEngine({
     
     if (!gameState.selectedCardIds) {
       if (pile.type === 'deck') { discardAndDrawHand(); return; }
-      if (!clickedCard) return;
-      if (pile.type === 'hand') { setGameState(prev => ({ ...prev, selectedCardIds: [clickedCard.id] })); setSelectedPileId(pileId); return; }
-      if (pile.type === 'tableau') { if (clickedCard.faceUp) { const stack = pile.cards.slice(cardIndex).map(c => c.id); setGameState(prev => ({ ...prev, selectedCardIds: stack })); setSelectedPileId(pileId); return; } else if (cardIndex === pile.cards.length - 1) { const newCards = [...pile.cards]; newCards[cardIndex] = { ...clickedCard, faceUp: true }; setGameState(prev => ({ ...prev, piles: { ...prev.piles, [pileId]: { ...pile, cards: newCards } } })); return; } }
-      if (pile.type === 'foundation' && pile.cards.length > 0) { setGameState(prev => ({ ...prev, selectedCardIds: [clickedCard.id] })); setSelectedPileId(pileId); return; }
+      if (!clickedCard) { clearSelection(); return; }
+      if (pile.type === 'tableau') {
+         if (!clickedCard.faceUp && cardIndex === pile.cards.length - 1) {
+            const newCards = [...pile.cards];
+            newCards[cardIndex] = { ...clickedCard, faceUp: true };
+            setGameState(prev => ({ ...prev, piles: { ...prev.piles, [pileId]: { ...pile, cards: newCards } } }));
+            clearSelection();
+            return;
+         }
+         if (clickedCard.faceUp) { selectCardAndCompute(pileId, cardIndex); return; }
+      }
+      if (pile.type === 'hand' || pile.type === 'foundation') { selectCardAndCompute(pileId, cardIndex); return; }
       return;
     }
-    attemptMove(gameState.selectedCardIds, selectedPileId!, pileId);
-    setGameState(prev => ({ ...prev, selectedCardIds: null }));
-    setSelectedPileId(null);
+
+    // If clicking a different card in the same pile, treat as reselection (tableau stacks)
+    if (pileId === selectedPileId && cardIndex >= 0 && pile.type === 'tableau' && clickedCard?.faceUp) {
+       selectCardAndCompute(pileId, cardIndex);
+       return;
+    }
+
+    const moved = attemptMove(gameState.selectedCardIds, selectedPileId!, pileId, selectedCardIndex ?? undefined);
+    if (moved) {
+       clearSelection();
+       return;
+    }
+
+    // If move failed, allow switching selection to the clicked card
+    if (clickedCard) {
+       if (pile.type === 'tableau' && clickedCard.faceUp) { selectCardAndCompute(pileId, cardIndex); return; }
+       if (pile.type === 'hand' || pile.type === 'foundation') { selectCardAndCompute(pileId, cardIndex); return; }
+    }
   };
   
   const handleDoubleClick = (pileId: string, cardIndex: number) => {
       const pile = gameState.piles[pileId];
       if (!pile || cardIndex < 0) return;
       const card = pile.cards[cardIndex];
-        // Only single card auto-move logic for now to stay simple
-        if (cardIndex !== pile.cards.length - 1) return;
+      if (!card.faceUp) return;
+      if (cardIndex !== pile.cards.length - 1) return; // only top card auto-move
 
-        // 1. Try Foundations
-        const foundationKeys = Object.keys(gameState.piles).filter(k => k.startsWith('foundation'));
-        for (const fid of foundationKeys) {
-           if (isStandardMoveValid([card], gameState.piles[fid])) {
-              attemptMove([card.id], pileId, fid);
-              return;
-           }
-        }
-      
-        // 2. Try Tableaus (Only if exactly one valid target)
-        const tableauKeys = Object.keys(gameState.piles).filter(k => k.startsWith('tableau') && k !== pileId);
-        const validTableaus = tableauKeys.filter(tid => isStandardMoveValid([card], gameState.piles[tid]));
-      
-        if (validTableaus.length === 1) {
-           attemptMove([card.id], pileId, validTableaus[0]);
-        }
+      const moves = findValidMoves([card], pileId, cardIndex, gameState.piles);
+
+      // Prefer foundations
+      if (moves.foundationIds.length > 0) {
+         const target = moves.foundationIds[0];
+         const moved = attemptMove([card.id], pileId, target, cardIndex);
+         if (moved) clearSelection();
+         return;
+      }
+
+      // Only auto to tableau if exactly one option
+      if (moves.tableauIds.length === 1) {
+         const target = moves.tableauIds[0];
+         const moved = attemptMove([card.id], pileId, target, cardIndex);
+         if (moved) clearSelection();
+      }
   };
 
   const dealHand = (state: GameState, effects: GameEffect[]): GameState => {
@@ -734,13 +867,13 @@ export default function SolitaireEngine({
     setGameState(prev => dealHand(prev, effects));
   };
 
-  const attemptMove = (cardIds: string[], sourcePileId: string, targetPileId: string) => {
-    if (sourcePileId === targetPileId) return;
+  const attemptMove = (cardIds: string[], sourcePileId: string, targetPileId: string, sourceCardIndex?: number): boolean => {
+    if (sourcePileId === targetPileId) return false;
     let finalTargetPileId = targetPileId;
     const effects = getEffects();
     const sourcePile = gameState.piles[sourcePileId];
     const movingCards = sourcePile.cards.filter(c => cardIds.includes(c.id));
-    if (movingCards.length === 0) return;
+    if (movingCards.length === 0) return false;
 
     let context: MoveContext = { source: sourcePileId, target: targetPileId, cards: movingCards };
     effects.forEach(eff => {
@@ -751,7 +884,10 @@ export default function SolitaireEngine({
     });
     
     const targetPile = gameState.piles[finalTargetPileId];
-    let valid = isStandardMoveValid(movingCards, targetPile);
+
+    const baseMoves = findValidMoves(movingCards, sourcePileId, sourceCardIndex, gameState.piles);
+    let valid = baseMoves.tableauIds.includes(finalTargetPileId) || baseMoves.foundationIds.includes(finalTargetPileId);
+
     effects.forEach(eff => {
        if (eff.canMove) {
           const res = eff.canMove(movingCards, sourcePile, targetPile, valid, gameState);
@@ -759,7 +895,7 @@ export default function SolitaireEngine({
        }
     });
 
-    if (!valid) return;
+    if (!valid) return false;
 
     const newSourceCards = sourcePile.cards.filter(c => !cardIds.includes(c.id));
     if (sourcePile.type === 'tableau' && newSourceCards.length > 0) { const newTop = newSourceCards[newSourceCards.length - 1]; if (!newTop.faceUp) newSourceCards[newSourceCards.length - 1] = { ...newTop, faceUp: true }; }
@@ -801,6 +937,8 @@ export default function SolitaireEngine({
        setGameState(p => ({ ...p, isLevelComplete: true }));
        setShowLevelComplete(true);
     }
+
+    return true;
   };
 
   const completeLevel = () => {
@@ -817,30 +955,36 @@ export default function SolitaireEngine({
           { id: 'placeholder_blessing_2', name: 'Lucky Draw', type: 'blessing', description: 'Increased chance of finding rare cards.', rarity: 'uncommon', cost: 0 },
           { id: 'placeholder_blessing_3', name: 'Golden Touch', type: 'blessing', description: 'Earn bonus coins on foundation plays.', rarity: 'rare', cost: 0 },
         ] as GameEffect[];
-        setBlessingChoices(blessingOptions); 
-        setActiveDrawer('blessing_select');
+      setBlessingChoices(blessingOptions); 
+      setActiveDrawer('blessing_select');
+      // Lock the blessing selection so the player can't accidentally collapse it
+      setNonClosableDrawer('blessing_select');
      } else {
-        openShop();
+        // Open shop as post-encounter flow and lock it to prevent accidental collapse
+        openShop(true);
      }
   };
   
-  const openShop = () => {
-     const exploits = effectsRegistry.filter(e => e.type === 'exploit').sort(() => 0.5 - Math.random()).slice(0, 4);
-     const curses = effectsRegistry.filter(e => e.type === 'curse').sort(() => 0.5 - Math.random()).slice(0, 4);
-     
-     // Always show shop (use placeholder items if empty)
-     let shopItems = [...exploits, ...curses];
-     if (shopItems.length === 0) {
-       shopItems = [
-         { id: 'placeholder_exploit_1', name: 'Card Counter', type: 'exploit', description: 'See the next card in the deck.', rarity: 'common', cost: 50 },
-         { id: 'placeholder_exploit_2', name: 'Deep Pockets', type: 'exploit', description: 'Start with extra coins each encounter.', rarity: 'uncommon', cost: 75 },
-         { id: 'placeholder_curse_1', name: 'Heavy Hands', type: 'curse', description: 'Cards cost more to play.', rarity: 'common', cost: 0 },
-         { id: 'placeholder_curse_2', name: 'Bad Luck', type: 'curse', description: 'Reduced score from low cards.', rarity: 'uncommon', cost: 0 },
-       ] as GameEffect[];
-     }
-     setShopInventory(shopItems);
-     setActiveDrawer('shop');
-  };
+   const openShop = (lock: boolean = false) => {
+       const owned = gameState.ownedEffects || [];
+       const exploits = effectsRegistry.filter(e => e.type === 'exploit' && !owned.includes(e.id)).sort(() => 0.5 - Math.random()).slice(0, 4);
+       const curses = effectsRegistry.filter(e => e.type === 'curse' && !owned.includes(e.id)).sort(() => 0.5 - Math.random()).slice(0, 4);
+
+       // Always show shop (use placeholder items if empty)
+       let shopItems = [...exploits, ...curses];
+       if (shopItems.length === 0) {
+          shopItems = [
+             { id: 'placeholder_exploit_1', name: 'Card Counter', type: 'exploit', description: 'See the next card in the deck.', rarity: 'common', cost: 50 },
+             { id: 'placeholder_exploit_2', name: 'Deep Pockets', type: 'exploit', description: 'Start with extra coins each encounter.', rarity: 'uncommon', cost: 75 },
+             { id: 'placeholder_curse_1', name: 'Heavy Hands', type: 'curse', description: 'Cards cost more to play.', rarity: 'common', cost: 0 },
+             { id: 'placeholder_curse_2', name: 'Bad Luck', type: 'curse', description: 'Reduced score from low cards.', rarity: 'uncommon', cost: 0 },
+          ] as GameEffect[];
+       }
+       setShopInventory(shopItems);
+       setShopTab('buy');
+       setActiveDrawer('shop');
+       setNonClosableDrawer(lock ? 'shop' : null);
+   };
 
   const toggleEffect = (id: string, forceState?: boolean) => {
       setActiveEffects(prev => {
@@ -869,13 +1013,15 @@ export default function SolitaireEngine({
   const buyEffect = (effect: GameEffect) => {
      const cost = effect.cost || 50;
      if (gameState.coins < cost) return; // Can't afford
-     
-     setGameState(p => ({ 
-       ...p, 
-       coins: p.coins - cost, 
-       ownedEffects: [...p.ownedEffects, effect.id] 
-     }));
-     
+       // Prevent owning duplicates
+       if (gameState.ownedEffects.includes(effect.id)) return;
+
+       setGameState(p => ({ 
+          ...p, 
+          coins: p.coins - cost, 
+          ownedEffects: [...p.ownedEffects, effect.id] 
+       }));
+
        // Auto-activate all purchased effects (blessings now activate immediately)
        toggleEffect(effect.id, true);
   };
@@ -891,6 +1037,15 @@ export default function SolitaireEngine({
       }
     const isSelected = gameState.selectedCardIds?.includes(card.id);
     const isHintTarget = hintTargets.includes(pileId) && index === pile.cards.length - 1;
+    const ringColor = isSelected || isHintTarget
+      ? selectionColor === 'green'
+         ? 'ring-emerald-400'
+         : selectionColor === 'yellow'
+            ? 'ring-amber-300'
+            : selectionColor === 'red'
+               ? 'ring-rose-400'
+               : 'ring-yellow-300'
+      : '';
     const color = getCardColor(visualCard.suit);
     
     
@@ -936,7 +1091,7 @@ export default function SolitaireEngine({
             aria-label={`${getRankDisplay(visualCard.rank)} ${visualCard.suit} card`}
          >
         <div className={`relative w-full h-full duration-500 transform-style-3d transition-transform ${visualCard.faceUp ? 'rotate-y-0' : 'rotate-y-180'}`}>
-         <div className={`absolute inset-0 backface-hidden bg-white rounded shadow-md flex flex-col items-center justify-between p-0.5 border border-gray-300 ${isHintTarget || isSelected ? 'ring-2 ring-yellow-400' : ''}`}
+            <div className={`absolute inset-0 backface-hidden bg-white rounded shadow-md flex flex-col items-center justify-between p-0.5 border border-gray-300 ${ringColor ? `ring-2 ${ringColor}` : ''}`}
                style={{ opacity: visualCard.meta?.disabled ? 0.5 : 1, filter: visualCard.meta?.hiddenDimension ? 'grayscale(100%) blur(2px)' : 'none' }}>
              
              {/* Special Blessing Card Rendering */}
@@ -1834,10 +1989,11 @@ export default function SolitaireEngine({
                 {foundationPiles.map(pile => {
                    const suitSymbol = pile.id.includes('hearts') ? '♥' : pile.id.includes('diamonds') ? '♦' : pile.id.includes('clubs') ? '♣' : '♠';
                    const suitColor = pile.id.includes('hearts') || pile.id.includes('diamonds') ? 'text-red-600' : 'text-white';
+                   const isHighlighted = highlightedMoves.foundationIds.includes(pile.id);
                    return (
-                   <div key={pile.id} className="relative w-11 h-16 bg-slate-800/50 rounded border border-slate-700 flex items-center justify-center">
+                   <div key={pile.id} className={`relative w-11 h-16 bg-slate-800/50 rounded border border-slate-700 flex items-center justify-center ${isHighlighted ? 'ring-2 ring-amber-300 shadow-[0_0_0_2px_rgba(251,191,36,0.25)]' : ''}`}>
                       {pile.cards.length === 0 ? (
-                         <button type="button" aria-label={`Empty foundation ${pile.id}`} className={`text-xl opacity-20 ${suitColor} bg-transparent border-0`} onClick={() => handleCardClick(pile.id, -1)}>{suitSymbol}</button>
+                         <button type="button" aria-label={`Empty foundation ${pile.id}`} className={`text-xl opacity-20 ${suitColor} bg-transparent border-0 ${isHighlighted ? 'ring-2 ring-amber-300 rounded' : ''}`} onClick={() => handleCardClick(pile.id, -1)}>{suitSymbol}</button>
                       ) : null}
                       {pile.cards.map((c, i) => renderCard(c, i, pile.id))}
                    </div>
@@ -1879,9 +2035,10 @@ export default function SolitaireEngine({
                   const isLinked = activeEffects.includes('linked_fates') && gameState.effectState?.linkedTableaus?.includes(pile.id);
                   const isLinkedTurn = isLinked && gameState.effectState?.lastLinkedPlayed !== pile.id;
                   const isParasite = activeEffects.includes('parasite_pile') && gameState.effectState?.parasiteTarget === pile.id;
+                  const isHighlighted = highlightedMoves.tableauIds.includes(pile.id);
 
                   return (
-                  <div key={pile.id} className={`relative w-full h-full ${isLinked ? 'border-t-2 border-purple-500/50 rounded-t-lg pt-1' : ''} ${isParasite ? 'border-t-2 border-green-500/50 rounded-t-lg pt-1' : ''}`}>
+                  <div key={pile.id} className={`relative w-full h-full ${isLinked ? 'border-t-2 border-purple-500/50 rounded-t-lg pt-1' : ''} ${isParasite ? 'border-t-2 border-green-500/50 rounded-t-lg pt-1' : ''} ${isHighlighted ? 'ring-2 ring-amber-300 rounded-md ring-offset-2 ring-offset-slate-900' : ''}`}>
                       {/* Linked Fates Indicator */}
                       {isLinked && (
                          <div className={`absolute -top-7 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center ${isLinkedTurn ? 'text-purple-400 animate-pulse' : 'text-slate-600 opacity-50'}`}>
@@ -1902,7 +2059,7 @@ export default function SolitaireEngine({
 
                       {pile.locked && <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-20 text-red-500"><Lock size={10} /></div>}
                       {pile.cards.length === 0 && (
-                         <button type="button" aria-label={`Empty ${pile.id}`} className="absolute inset-0 w-full h-full bg-transparent" onClick={() => handleCardClick(pile.id, -1)} />
+                         <button type="button" aria-label={`Empty ${pile.id}`} className={`absolute inset-0 w-full h-full bg-transparent ${isHighlighted ? 'ring-2 ring-amber-300 rounded-md' : ''}`} onClick={() => handleCardClick(pile.id, -1)} />
                       )}
                       {pile.cards.map((c, idx) => renderCard(c, idx, pile.id))}
                   </div>
@@ -1992,11 +2149,17 @@ export default function SolitaireEngine({
 
          {/* Drawer Content */}
          {activeDrawer && (
-            <div className="absolute bottom-0 left-0 w-full bg-slate-800 border-t border-slate-700 p-4 pb-16 overflow-y-auto z-40 animate-in slide-in-from-bottom-10 pointer-events-auto h-64">
+            <div className="absolute bottom-0 left-0 w-full bg-slate-800 border-t border-slate-700 p-4 pb-16 overflow-y-auto z-40 animate-in slide-in-from-bottom-10 pointer-events-auto" style={{ maxHeight: drawerMaxHeightPx, transition: 'max-height 260ms ease' }}>
                <div className="max-w-md mx-auto">
-                  {activeDrawer === 'shop' && (
-                    <button onClick={startWanderPhase} className="w-full py-3 mb-2 rounded bg-emerald-600 text-white font-bold flex items-center justify-center gap-2">Continue <ArrowLeftRight size={16}/></button>
-                  )}
+                           {activeDrawer === 'shop' && (
+                              <div className="w-full mb-2">
+                                 <div className="grid grid-cols-3 gap-2">
+                                    <button onClick={() => setShopTab('buy')} className={`py-2 rounded font-bold ${shopTab === 'buy' ? 'bg-yellow-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Buy</button>
+                                    <button onClick={() => setShopTab('sell')} className={`py-2 rounded font-bold ${shopTab === 'sell' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Sell</button>
+                                    <button onClick={() => { setShopTab('continue'); startWanderPhase(); }} className={`py-2 rounded font-bold ${shopTab === 'continue' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Continue</button>
+                                 </div>
+                              </div>
+                           )}
                   <div className="flex justify-between items-center mb-2">
                      <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">
                         {activeDrawer === 'pause' ? 'Menu' 
@@ -2007,7 +2170,11 @@ export default function SolitaireEngine({
                          : activeDrawer === 'blessing_select' ? 'Select a Blessing' 
                          : `${activeDrawer} Registry`}
                      </h3>
-                     <button onClick={() => setActiveDrawer(null)}><ChevronDown className="text-slate-500" /></button>
+                     {nonClosableDrawer === activeDrawer ? (
+                        <div style={{ width: 28 }} />
+                     ) : (
+                        <button onClick={() => { setActiveDrawer(null); setNonClosableDrawer(null); }}><ChevronDown className="text-slate-500" /></button>
+                     )}
                   </div>
                   {activeDrawer === 'pause' ? (
                      <div className="grid grid-cols-4 gap-2">
@@ -2020,33 +2187,60 @@ export default function SolitaireEngine({
                         <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('resign')}><Flag size={16} /><span className="text-[8px]">Resign</span></button>
                         <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><Settings size={16} /><span className="text-[8px]">Settings</span></button>
                      </div>
-                  ) : activeDrawer === 'test' ? (
-                     <div className="flex flex-col gap-4">
-                        <div className="flex items-center gap-2">
-                           <input type="number" value={testAmount} onChange={(e) => setTestAmount(Number.parseInt((e.target as HTMLInputElement).value, 10) || 0)} className="bg-slate-900 border border-slate-600 rounded p-2 text-white w-24" />
-                           <span className="text-xs text-slate-400">Amount</span>
+                  ) : activeDrawer === 'shop' ? (
+                     <div className="flex flex-col gap-2">
+                        <div className="grid grid-cols-1 gap-2">
+                          {shopTab === 'buy' && shopInventory.map(item => {
+                              const rarityColors = getRarityColor(item.rarity);
+                              const itemType = item.type === 'curse' ? 'curse' : item.type === 'blessing' ? 'blessing' : 'exploit';
+                              return (
+                              <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3`}>
+                                 <ResponsiveIcon name={item.id || item.name} fallbackType={itemType} size={32} className="w-8 h-8 rounded shrink-0" alt={item.name} />
+                                 <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                       <span className="font-bold text-white text-xs truncate">{item.name}</span>
+                                       <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
+                                    </div>
+                                    <div className="text-slate-400 text-[10px]">{item.description}</div>
+                                 </div>
+                                 <button 
+                                   className={`text-white px-2 py-1 rounded text-xs font-bold shrink-0 ${gameState.coins >= (item.cost || 50) ? 'bg-yellow-600 hover:bg-yellow-500' : 'bg-slate-600 cursor-not-allowed'}`}
+                                   onClick={() => buyEffect(item)}
+                                   disabled={gameState.coins < (item.cost || 50)}>
+                                   Buy {item.cost || 50}
+                                 </button>
+                              </div>
+                           );})}
+
+                          {shopTab === 'sell' && (() => {
+                             const ownedExploits = effectsRegistry.filter(e => (['exploit','epic','legendary','rare','uncommon'].includes(e.type)) && gameState.ownedEffects.includes(e.id));
+                             if (ownedExploits.length === 0) return <div className="text-center text-slate-500 text-xs py-4">No exploitable items to sell.</div>;
+                             return ownedExploits.map(item => {
+                                const rarityColors = getRarityColor(item.rarity);
+                                const sellPrice = Math.floor((item.cost || 50) / 2);
+                                return (
+                                   <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3`}>
+                                      <ResponsiveIcon name={item.id || item.name} fallbackType={'exploit'} size={32} className="w-8 h-8 rounded shrink-0" alt={item.name} />
+                                      <div className="flex-1 min-w-0">
+                                         <div className="flex items-center gap-2">
+                                            <span className="font-bold text-white text-xs truncate">{item.name}</span>
+                                            <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
+                                         </div>
+                                         <div className="text-slate-400 text-[10px]">{item.description}</div>
+                                      </div>
+                                      <button className={`text-white px-2 py-1 rounded text-xs font-bold shrink-0 bg-slate-700 hover:bg-slate-600`} onClick={() => {
+                                         const price = sellPrice;
+                                         setGameState(p => ({ ...p, coins: p.coins + price, ownedEffects: p.ownedEffects.filter(id => id !== item.id) }));
+                                         // Deactivate effect if active
+                                         if (activeEffects.includes(item.id)) toggleEffect(item.id, false);
+                                      }}>Sell {sellPrice}</button>
+                                   </div>
+                                );
+                             });
+                          })()}
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                           <button className="bg-yellow-600 text-white p-2 rounded font-bold flex items-center justify-center gap-2" onClick={() => setGameState(p => ({...p, coins: p.coins + testAmount}))}><Coins size={16}/> Add Coins</button>
-                           <button className="bg-emerald-600 text-white p-2 rounded font-bold flex items-center justify-center gap-2" onClick={() => setGameState(p => ({...p, score: p.score + testAmount}))}><Trophy size={16}/> Add Score</button>
-                        </div>
-                        <button className="bg-purple-600 text-white p-2 rounded font-bold flex items-center justify-center gap-2" onClick={() => setGameState(p => ({...p, debugUnlockAll: !p.debugUnlockAll}))}><Unlock size={16} /> Toggle All</button>
-                        <button className="text-xs text-slate-500 underline mt-4" onClick={() => setActiveDrawer('pause')}>Back to Menu</button>
                      </div>
-                  ) : activeDrawer === 'feedback' ? (
-                     <div className="flex flex-col gap-3">
-                        <div className="flex gap-2">
-                           {['bug', 'ui', 'effect', 'request'].map(t => (
-                              <button key={t} onClick={() => setFeedbackType(t)} className={`px-2 py-1 rounded text-xs uppercase font-bold ${feedbackType === t ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'}`}>{t}</button>
-                           ))}
-                        </div>
-                        <textarea className="w-full h-20 bg-slate-900 border border-slate-600 rounded p-2 text-xs text-white" placeholder="Describe issue or idea..." value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} />
-                        <div className="h-32 overflow-y-auto border border-slate-700 rounded bg-slate-900/50 p-2">
-                           <div className="text-[10px] text-slate-500 mb-2 uppercase">Related Effects</div>
-                           <div className="grid grid-cols-2 gap-1">
-                              {effectsRegistry.map(e => (
-                                 <label key={e.id} className="flex items-center gap-2 text-xs text-slate-300">
-                                    <input type="checkbox" checked={!!feedbackChecks[e.id]} onChange={() => setFeedbackChecks(p => ({...p, [e.id]: !p[e.id]}))} className="rounded bg-slate-700 border-slate-500" />
+                  ) : (
                                     {e.name}
                                  </label>
                               ))}
@@ -2094,9 +2288,12 @@ export default function SolitaireEngine({
                                     toggleEffect(item.id, true);
                                    }
                                    if (gameState.runIndex === 0 && gameState.score === 0) {
+                                      // Closing initial blessing picker (allow choice to close)
                                       setActiveDrawer(null);
+                                      setNonClosableDrawer(null);
                                    } else {
-                                      openShop();
+                                      // Open shop as part of post-encounter flow and lock it so it can't be collapsed
+                                      openShop(true);
                                    }
                                    }}>
                                  <ResponsiveIcon name={item.id || item.name} fallbackType="blessing" size={32} className="w-8 h-8 rounded shrink-0" alt={item.name} />
@@ -2108,32 +2305,6 @@ export default function SolitaireEngine({
                                     <div className="text-slate-400 text-[10px]">{item.description}</div>
                                  </div>
                                  <Gift size={16} className="text-purple-400 shrink-0" />
-                              </div>
-                           );})}
-                        </div>
-                     </div>
-                  ) : activeDrawer === 'shop' ? (
-                     <div className="flex flex-col gap-2">
-                        <div className="grid grid-cols-1 gap-2">
-                           {shopInventory.map(item => {
-                              const rarityColors = getRarityColor(item.rarity);
-                              const itemType = item.type === 'curse' ? 'curse' : item.type === 'blessing' ? 'blessing' : 'exploit';
-                              return (
-                              <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3`}>
-                                 <ResponsiveIcon name={item.id || item.name} fallbackType={itemType} size={32} className="w-8 h-8 rounded shrink-0" alt={item.name} />
-                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                       <span className="font-bold text-white text-xs truncate">{item.name}</span>
-                                       <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
-                                    </div>
-                                    <div className="text-slate-400 text-[10px]">{item.description}</div>
-                                 </div>
-                                 <button 
-                                   className={`text-white px-2 py-1 rounded text-xs font-bold shrink-0 ${gameState.coins >= (item.cost || 50) ? 'bg-yellow-600 hover:bg-yellow-500' : 'bg-slate-600 cursor-not-allowed'}`}
-                                   onClick={() => buyEffect(item)}
-                                   disabled={gameState.coins < (item.cost || 50)}>
-                                   Buy {item.cost || 50}
-                                 </button>
                               </div>
                            );})}
                         </div>
