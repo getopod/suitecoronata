@@ -105,6 +105,32 @@ const isStandardMoveValid = (movingCards: Card[], targetPile: Pile): boolean => 
   return false;
 };
 
+// Find all valid move targets for a set of cards
+const findValidMoves = (
+  movingCards: Card[], 
+  sourcePileId: string, 
+  _sourceCardIndex: number, 
+  piles: Record<string, Pile>
+): { tableauIds: string[]; foundationIds: string[] } => {
+  const tableauIds: string[] = [];
+  const foundationIds: string[] = [];
+  
+  for (const [pileId, pile] of Object.entries(piles)) {
+    if (pileId === sourcePileId) continue; // Can't move to same pile
+    if (pile.locked) continue; // Can't move to locked piles
+    
+    if (isStandardMoveValid(movingCards, pile)) {
+      if (pile.type === 'tableau') {
+        tableauIds.push(pileId);
+      } else if (pile.type === 'foundation') {
+        foundationIds.push(pileId);
+      }
+    }
+  }
+  
+  return { tableauIds, foundationIds };
+};
+
 // UI helper: human-readable rank display
 const getRankDisplay = (r: Rank) => {
    if (r === 0) return '';
