@@ -93,13 +93,18 @@ const isStandardMoveValid = (movingCards: Card[], targetPile: Pile): boolean => 
   const leader = movingCards[0];
   const targetTop = targetPile.cards[targetPile.cards.length - 1];
   if (targetPile.type === 'tableau') {
-    if (!targetTop) return leader.rank === 13;
-    return (getCardColor(leader.suit) !== getCardColor(targetTop.suit) && targetTop.rank === leader.rank + 1);
+    // Queen is now high (stack rank 13), so empty tableau accepts Queens
+    if (!targetTop) return getStackRank(leader.rank) === 13;
+    // Opposite color and target's stack rank must be one higher than leader's
+    return (getCardColor(leader.suit) !== getCardColor(targetTop.suit) && getStackRank(targetTop.rank) === getStackRank(leader.rank) + 1);
   }
   if (targetPile.type === 'foundation') {
     if (movingCards.length > 1) return false;
-    if (!targetTop) return leader.rank === 1; // Any ace can start any foundation
-    // Must match suit of foundation's first card and be next rank
+    if (!targetTop) {
+      // Aces can only go to their matching suit foundation
+      return leader.rank === 1 && targetPile.id === `foundation-${leader.suit}`;
+    }
+    // Must match suit of foundation's first card and be next rank (foundation uses normal rank order A,2,3...K)
     return leader.suit === targetTop.suit && leader.rank === targetTop.rank + 1;
   }
   return false;
@@ -139,6 +144,14 @@ const getRankDisplay = (r: Rank) => {
    if (r === 11) return 'J';
    if (r === 12) return 'Q';
    if (r === 13) return 'K';
+   return r;
+};
+
+// Stack rank helper: Queens are high for tableau stacking (Q, K, J, 10, 9...3, 2, A)
+// Q(12) -> 13 (highest), K(13) -> 12, others stay same
+const getStackRank = (r: Rank): number => {
+   if (r === 12) return 13; // Queen is now highest
+   if (r === 13) return 12; // King goes under Queen
    return r;
 };
 
@@ -795,8 +808,35 @@ export default function SolitaireEngine({
 
     // If clicking a different card in the same pile, treat as reselection (tableau stacks)
     if (pileId === selectedPileId && cardIndex >= 0 && pile.type === 'tableau' && clickedCard?.faceUp) {
+       // If clicking the same card again, auto-move prioritizing foundation
+       if (cardIndex === selectedCardIndex) {
+          // Foundation takes priority - if any foundation is valid, move there
+          if (highlightedMoves.foundationIds.length > 0) {
+             const moved = attemptMove(gameState.selectedCardIds!, selectedPileId!, highlightedMoves.foundationIds[0], selectedCardIndex ?? undefined);
+             if (moved) { clearSelection(); return; }
+          }
+          // Otherwise, if exactly one tableau target (green), auto-move there
+          if (selectionColor === 'green' && highlightedMoves.tableauIds.length === 1) {
+             const moved = attemptMove(gameState.selectedCardIds!, selectedPileId!, highlightedMoves.tableauIds[0], selectedCardIndex ?? undefined);
+             if (moved) { clearSelection(); return; }
+          }
+       }
        selectCardAndCompute(pileId, cardIndex);
        return;
+    }
+
+    // Same for hand cards - auto-move on re-click, prioritizing foundation
+    if (pileId === selectedPileId && pileId === 'hand' && cardIndex === selectedCardIndex) {
+       // Foundation takes priority
+       if (highlightedMoves.foundationIds.length > 0) {
+          const moved = attemptMove(gameState.selectedCardIds!, selectedPileId!, highlightedMoves.foundationIds[0], selectedCardIndex ?? undefined);
+          if (moved) { clearSelection(); return; }
+       }
+       // Otherwise, if exactly one tableau target (green), auto-move there
+       if (selectionColor === 'green' && highlightedMoves.tableauIds.length === 1) {
+          const moved = attemptMove(gameState.selectedCardIds!, selectedPileId!, highlightedMoves.tableauIds[0], selectedCardIndex ?? undefined);
+          if (moved) { clearSelection(); return; }
+       }
     }
 
     const moved = attemptMove(gameState.selectedCardIds, selectedPileId!, pileId, selectedCardIndex ?? undefined);
@@ -2050,7 +2090,7 @@ export default function SolitaireEngine({
                   const isHighlighted = highlightedMoves.tableauIds.includes(pile.id);
 
                   return (
-                  <div key={pile.id} className={`relative w-full h-full ${isLinked ? 'border-t-2 border-purple-500/50 rounded-t-lg pt-1' : ''} ${isParasite ? 'border-t-2 border-green-500/50 rounded-t-lg pt-1' : ''} ${isHighlighted ? 'ring-2 ring-amber-300 rounded-md ring-offset-2 ring-offset-slate-900' : ''}`}>
+                  <div key={pile.id} className={`relative w-full h-full ${isLinked ? 'border-t-2 border-purple-500/50 rounded-t-lg pt-1' : ''} ${isParasite ? 'border-t-2 border-green-500/50 rounded-t-lg pt-1' : ''}`}>
                       {/* Linked Fates Indicator */}
                       {isLinked && (
                          <div className={`absolute -top-7 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center ${isLinkedTurn ? 'text-purple-400 animate-pulse' : 'text-slate-600 opacity-50'}`}>
