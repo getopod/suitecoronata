@@ -58,43 +58,17 @@ const generateRunPlan = (effectsRegistry: GameEffect[], rng?: () => number): Enc
             effectId: '', // No effect
             goal: goal,
             completed: false
-                          })()}
-                        </div>
-                     </div>
-                  ) : activeDrawer === 'test' ? (
-                     <div className="flex flex-col gap-4">
-                        <div className="flex items-center gap-2">
-                           <input type="number" value={testAmount} onChange={(e) => setTestAmount(Number.parseInt((e.target as HTMLInputElement).value, 10) || 0)} className="bg-slate-900 border border-slate-600 rounded p-2 text-white w-24" />
-                           <span className="text-xs text-slate-400">Amount</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                           <button className="bg-yellow-600 text-white p-2 rounded font-bold flex items-center justify-center gap-2" onClick={() => setGameState(p => ({...p, coins: p.coins + testAmount}))}><Coins size={16}/> Add Coins</button>
-                           <button className="bg-emerald-600 text-white p-2 rounded font-bold flex items-center justify-center gap-2" onClick={() => setGameState(p => ({...p, score: p.score + testAmount}))}><Trophy size={16}/> Add Score</button>
-                        </div>
-                        <button className="bg-purple-600 text-white p-2 rounded font-bold flex items-center justify-center gap-2" onClick={() => setGameState(p => ({...p, debugUnlockAll: !p.debugUnlockAll}))}><Unlock size={16} /> Toggle All</button>
-                        <button className="text-xs text-slate-500 underline mt-4" onClick={() => setActiveDrawer('pause')}>Back to Menu</button>
-                     </div>
-                  ) : activeDrawer === 'feedback' ? (
-                     <div className="flex flex-col gap-3">
-                        <div className="flex gap-2">
-                           {['bug', 'ui', 'effect', 'request'].map(t => (
-                              <button key={t} onClick={() => setFeedbackType(t)} className={`px-2 py-1 rounded text-xs uppercase font-bold ${feedbackType === t ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'}`}>{t}</button>
-                           ))}
-                        </div>
-                        <textarea className="w-full h-20 bg-slate-900 border border-slate-600 rounded p-2 text-xs text-white" placeholder="Describe issue or idea..." value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} />
-                        <div className="h-32 overflow-y-auto border border-slate-700 rounded bg-slate-900/50 p-2">
-                           <div className="text-[10px] text-slate-500 mb-2 uppercase">Related Effects</div>
-                           <div className="grid grid-cols-2 gap-1">
-                              {effectsRegistry.map(e => (
-                                 <label key={e.id} className="flex items-center gap-2 text-xs text-slate-300">
-                                    <input type="checkbox" checked={!!feedbackChecks[e.id]} onChange={() => setFeedbackChecks(p => ({...p, [e.id]: !p[e.id]}))} className="rounded bg-slate-700 border-slate-500" />
-                                    {e.name}
-                                 </label>
-                              ))}
-                           </div>
-                        </div>
-                        <button className="w-full bg-emerald-600 text-white py-2 rounded font-bold" onClick={() => { alert("Feedback Sent!"); setActiveDrawer('pause'); }}>Submit Report</button>
-                     </div>
+         });
+      }
+      return encounters;
+   }
+
+   const shuffledFears = shuffleArray([...fears], rng);
+   const shuffledDangers = shuffleArray([...dangers], rng);
+
+   for (let i = 0; i < 15; i++) {
+      const isDanger = (i + 1) % 3 === 0;
+      const goal = Math.floor(150 + (i / 14) * (4200 - 150));
       const effect = isDanger 
          ? (shuffledDangers[i % shuffledDangers.length] || shuffledFears[0]) 
          : (shuffledFears[i % shuffledFears.length] || shuffledDangers[0]);
@@ -105,10 +79,15 @@ const generateRunPlan = (effectsRegistry: GameEffect[], rng?: () => number): Enc
          effectId: effect?.id || '',
          goal: goal,
          completed: false
-                          })()}
-                        </div>
-                     </div>
-                  ) : activeDrawer === 'feedback' ? (
+      });
+   }
+   return encounters;
+};
+
+const initialGameState = (): GameState => {
+  return generateNewBoard(0, 150, 1, 1);
+};
+
 const isStandardMoveValid = (movingCards: Card[], targetPile: Pile): boolean => {
   if (movingCards.length === 0) return false;
   const leader = movingCards[0];
