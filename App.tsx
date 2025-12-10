@@ -2079,64 +2079,21 @@ export default function SolitaireEngine({
       )}
 
       <div className="fixed bottom-0 left-0 w-full z-50 flex flex-col justify-end pointer-events-none">
-         <div className="absolute top-0 left-0 w-full flex justify-center">
+         {/* Hand cards - positioned relative to bottom panel */}
+         <div className="w-full flex justify-center pointer-events-none">
              <div className="relative w-full max-w-md h-0"> 
                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-0 pointer-events-auto">
                     {gameState.piles.hand.cards.map((c, i) => renderCard(c, i, 'hand', gameState.piles.hand.cards.length))}
                  </div>
              </div>
          </div>
-         <div className={`bg-slate-900 border-t border-slate-800 p-2 w-full max-w-md mx-auto transition-transform duration-300 ${activeDrawer ? '-translate-y-64' : 'translate-y-0'} z-50 relative pointer-events-auto`}>
-            {gameState.interactionMode === 'discard_select' && (
-               <div className="bg-orange-900/80 text-orange-200 text-xs text-center p-1 mb-1 rounded animate-pulse">Select a card in HAND to discard</div>
-            )}
-            <div className="flex justify-between px-2 mb-2 relative group">
-               {runPlan.map((enc, i) => {
-                  const eff = effectsRegistry.find(e => e.id === enc.effectId);
-                  const cls = `w-2 h-2 rounded-full ${i < gameState.runIndex ? 'bg-green-500' : i === gameState.runIndex ? 'bg-white animate-pulse' : enc.type === 'danger' ? 'bg-red-900' : 'bg-slate-700'}`;
-                  return (
-                     <button
-                        key={i}
-                        type="button"
-                        className={cls}
-                        onClick={() => alert(`${enc.type.toUpperCase()}: ${eff?.name || 'Level ' + (i+1)}\n${eff?.description || 'Score goal: ' + enc.goal}`)}
-                        aria-label={`Encounter ${i + 1} ${enc.type} ${eff?.name ?? ''}`}
-                     />
-                  );
-               })}
-            </div>
-            <div className="flex items-center gap-2 mb-2">
-               <div className="flex-1">
-                  <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden border border-slate-700">
-                     <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${Math.min(100, (gameState.score / gameState.currentScoreGoal) * 100)}%` }} />
-                  </div>
-               </div>
-               <div className="flex items-center gap-1 shrink-0 bg-slate-800 px-2 py-1 rounded border border-slate-700">
-                  <Coins size={12} className="text-yellow-400" />
-                  <span className={`text-xs font-bold font-mono ${gameState.coins < 0 ? 'text-red-400' : 'text-yellow-400'}`}>{gameState.coins}</span>
-               </div>
-            </div>
-            <div className="flex w-full gap-1">
-               <button onClick={() => toggleDrawer('pause')} className={`p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}><Pause size={16} /></button>
-               {(['exploit', 'curse', 'blessing'] as const).map((type) => {
-                  const hasReady = effectsRegistry.some(e => e.type === type && isEffectReady(e.id, gameState) && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll));
-                  return (
-                               <button key={type} onClick={() => toggleDrawer(type as any)} 
-                        className={`flex-1 py-1.5 rounded text-[10px] font-bold border flex flex-col items-center justify-center gap-0.5 
-                        ${activeDrawer === type ? 'bg-slate-700 text-white' : 'bg-slate-800 text-slate-400 border-slate-700'}
-                        ${hasReady ? 'ring-1 ring-yellow-400 text-yellow-100 bg-yellow-900/20' : ''}`}>
-                        <img src={categoryIcons[type]} alt="" className="w-4 h-4" />
-                        <span>{type.charAt(0).toUpperCase() + type.slice(1)}s</span>
-                     </button>
-                  );
-               })}
-            </div>
-         </div>
-
-         {/* Drawer Content */}
-         {activeDrawer && (
-            <div className="absolute bottom-0 left-0 w-full bg-slate-800 border-t border-slate-700 p-4 pb-16 overflow-y-auto z-40 animate-in slide-in-from-bottom-10 pointer-events-auto" style={{ maxHeight: drawerMaxHeightPx, transition: 'max-height 260ms ease' }}>
-               <div className="max-w-md mx-auto">
+         
+         {/* Bottom control bar - always at bottom, with drawer expanding up from its top */}
+         <div className={`bg-slate-900 border-t border-slate-800 p-2 w-full max-w-md mx-auto relative pointer-events-auto overflow-visible`}>
+            {/* Drawer Content - positioned absolutely above the bottom bar */}
+            {activeDrawer && (
+               <div className="absolute bottom-full left-0 w-full bg-slate-800 border-t border-slate-700 p-4 overflow-y-auto animate-in slide-in-from-bottom-10 z-50" style={{ maxHeight: drawerMaxHeightPx, transition: 'max-height 260ms ease' }}>
+                  <div className="max-w-md mx-auto">
                            {activeDrawer === 'shop' && (
                               <div className="w-full mb-2">
                                  <div className="grid grid-cols-3 gap-2">
@@ -2226,7 +2183,20 @@ export default function SolitaireEngine({
                           })()}
                         </div>
                      </div>
-                  ) : (
+                  ) : activeDrawer === 'feedback' ? (
+                     <div className="flex flex-col gap-3">
+                        <div className="flex gap-2">
+                           {['bug', 'ui', 'effect', 'request'].map(t => (
+                              <button key={t} onClick={() => setFeedbackType(t)} className={`px-2 py-1 rounded text-xs uppercase font-bold ${feedbackType === t ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'}`}>{t}</button>
+                           ))}
+                        </div>
+                        <textarea className="w-full h-20 bg-slate-900 border border-slate-600 rounded p-2 text-xs text-white" placeholder="Describe issue or idea..." value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} />
+                        <div className="h-32 overflow-y-auto border border-slate-700 rounded bg-slate-900/50 p-2">
+                           <div className="text-[10px] text-slate-500 mb-2 uppercase">Related Effects</div>
+                           <div className="grid grid-cols-2 gap-1">
+                              {effectsRegistry.map(e => (
+                                 <label key={e.id} className="flex items-center gap-2 text-xs text-slate-300">
+                                    <input type="checkbox" checked={!!feedbackChecks[e.id]} onChange={() => setFeedbackChecks(p => ({...p, [e.id]: !p[e.id]}))} className="rounded bg-slate-700 border-slate-500" />
                                     {e.name}
                                  </label>
                               ))}
@@ -2248,32 +2218,30 @@ export default function SolitaireEngine({
                      </div>
                   ) : activeDrawer === 'settings' ? (
                      <div className="flex flex-col gap-4">
-                        {['Gameplay', 'Audio', 'Display', 'Data', 'Other'].map(cat => (
-                           <div key={cat} className="border-b border-slate-700 pb-2">
-                              <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">{cat}</h4>
-                              <div className="flex items-center justify-between text-sm text-slate-200">
-                                 <span>Example Option</span>
-                                 <div className="w-8 h-4 bg-slate-600 rounded-full relative"><div className="absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full"></div></div>
-                              </div>
-                           </div>
-                        ))}
-                        <button className="text-xs text-slate-500 underline" onClick={() => setActiveDrawer('pause')}>Back to Menu</button>
+                        <label className="flex items-center justify-between text-sm text-slate-300"><span>Sound Effects</span><input type="checkbox" className="rounded bg-slate-700 border-slate-500" defaultChecked /></label>
+                        <label className="flex items-center justify-between text-sm text-slate-300"><span>Music</span><input type="checkbox" className="rounded bg-slate-700 border-slate-500" defaultChecked /></label>
+                        <label className="flex items-center justify-between text-sm text-slate-300"><span>Vibration</span><input type="checkbox" className="rounded bg-slate-700 border-slate-500" /></label>
+                        <button className="text-xs text-slate-500 underline mt-4" onClick={() => setActiveDrawer('pause')}>Back to Menu</button>
+                     </div>
+                  ) : activeDrawer === 'test' ? (
+                     <div className="flex flex-col gap-2">
+                        <button className="bg-blue-600 text-white p-2 rounded font-bold" onClick={() => setGameState(p => ({ ...p, score: p.currentScoreGoal }))}>Complete Goal</button>
+                        <button className="bg-green-600 text-white p-2 rounded font-bold" onClick={() => setGameState(p => ({ ...p, coins: p.coins + 100 }))}>+100 Coins</button>
+                        <button className="bg-red-600 text-white p-2 rounded font-bold" onClick={() => setGameState(p => ({ ...p, coins: p.coins - 50 }))}>-50 Coins</button>
+                        <button className="bg-purple-600 text-white p-2 rounded font-bold flex items-center justify-center gap-2" onClick={() => setGameState(p => ({...p, debugUnlockAll: !p.debugUnlockAll}))}><Unlock size={16} /> Toggle All</button>
+                        <button className="text-xs text-slate-500 underline mt-4" onClick={() => setActiveDrawer('pause')}>Back to Menu</button>
                      </div>
                   ) : activeDrawer === 'blessing_select' ? (
-                      <div className="flex flex-col gap-2">
+                     <div className="flex flex-col gap-2">
                         <div className="grid grid-cols-1 gap-2">
-                           {blessingChoices.slice(0,4).map(item => {
+                           {blessingChoices.map(item => {
                               const rarityColors = getRarityColor(item.rarity);
                               return (
-                              <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3 hover:brightness-110 cursor-pointer`}
-                                   onClick={() => {
-                                   if (!gameState.ownedEffects.includes(item.id)) {
-                                    setGameState(p => ({ ...p, ownedEffects: [...p.ownedEffects, item.id] }));
-                                   }
-                                   if (!activeEffects.includes(item.id)) {
-                                    toggleEffect(item.id, true);
-                                   }
-                                   if (gameState.runIndex === 0 && gameState.score === 0) {
+                              <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3 cursor-pointer hover:brightness-110`} onClick={() => {
+                                   // Grant blessing
+                                   setGameState(p => ({ ...p, ownedEffects: [...p.ownedEffects, item.id] }));
+                                   setBlessingChoices([]);
+                                   if (gameState.runIndex === 0) {
                                       // Closing initial blessing picker (allow choice to close)
                                       setActiveDrawer(null);
                                       setNonClosableDrawer(null);
@@ -2340,7 +2308,53 @@ export default function SolitaireEngine({
                   )}
                </div>
             </div>
-         )}
+            )}
+            {gameState.interactionMode === 'discard_select' && (
+               <div className="bg-orange-900/80 text-orange-200 text-xs text-center p-1 mb-1 rounded animate-pulse">Select a card in HAND to discard</div>
+            )}
+            <div className="flex justify-between px-2 mb-2 relative group">
+               {runPlan.map((enc, i) => {
+                  const eff = effectsRegistry.find(e => e.id === enc.effectId);
+                  const cls = `w-2 h-2 rounded-full ${i < gameState.runIndex ? 'bg-green-500' : i === gameState.runIndex ? 'bg-white animate-pulse' : enc.type === 'danger' ? 'bg-red-900' : 'bg-slate-700'}`;
+                  return (
+                     <button
+                        key={i}
+                        type="button"
+                        className={cls}
+                        onClick={() => alert(`${enc.type.toUpperCase()}: ${eff?.name || 'Level ' + (i+1)}\n${eff?.description || 'Score goal: ' + enc.goal}`)}
+                        aria-label={`Encounter ${i + 1} ${enc.type} ${eff?.name ?? ''}`}
+                     />
+                  );
+               })}
+            </div>
+            <div className="flex items-center gap-2 mb-2">
+               <div className="flex-1">
+                  <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden border border-slate-700">
+                     <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${Math.min(100, (gameState.score / gameState.currentScoreGoal) * 100)}%` }} />
+                  </div>
+               </div>
+               <div className="flex items-center gap-1 shrink-0 bg-slate-800 px-2 py-1 rounded border border-slate-700">
+                  <Coins size={12} className="text-yellow-400" />
+                  <span className={`text-xs font-bold font-mono ${gameState.coins < 0 ? 'text-red-400' : 'text-yellow-400'}`}>{gameState.coins}</span>
+               </div>
+            </div>
+            <div className="flex w-full gap-1">
+               <button onClick={() => toggleDrawer('pause')} className={`p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}><Pause size={16} /></button>
+               {(['exploit', 'curse', 'blessing'] as const).map((type) => {
+                  const hasReady = effectsRegistry.some(e => e.type === type && isEffectReady(e.id, gameState) && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll));
+                  return (
+                               <button key={type} onClick={() => toggleDrawer(type as any)} 
+                        className={`flex-1 py-1.5 rounded text-[10px] font-bold border flex flex-col items-center justify-center gap-0.5 
+                        ${activeDrawer === type ? 'bg-slate-700 text-white' : 'bg-slate-800 text-slate-400 border-slate-700'}
+                        ${hasReady ? 'ring-1 ring-yellow-400 text-yellow-100 bg-yellow-900/20' : ''}`}>
+                        <img src={categoryIcons[type]} alt="" className="w-4 h-4" />
+                        <span>{type.charAt(0).toUpperCase() + type.slice(1)}s</span>
+                     </button>
+                  );
+               })}
+            </div>
+         </div>
+
       </div>
 
       {showLevelComplete && (
