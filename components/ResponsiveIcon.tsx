@@ -434,7 +434,7 @@ export default function ResponsiveIcon(props: Readonly<ResponsiveIconProps>) {
         height={size}
         loading="lazy"
         decoding="async"
-        {...{ fetchpriority: 'low' as const }}
+        fetchPriority="low"
         className={className}
       />
     );

@@ -390,12 +390,20 @@ export default function SolitaireEngine({
   
   // Settings state
   const [settings, setSettings] = useState({
-    autoFlip: true,
     confirmResign: true,
     supportPatriarchy: false, // Kings high instead of Queens
-    musicEnabled: true,
-    sfxEnabled: true,
-    masterVolume: 80,
+    // Classic game modes
+    klondikeEnabled: false,
+    klondikeDraw: '3' as '1' | '3',
+    klondikeScoring: 'standard' as 'standard' | 'vegas' | 'none',
+    spiderEnabled: false,
+    spiderSuits: '4' as '1' | '2' | '4',
+    freecellEnabled: false,
+    freecellAutoMove: true,
+    // Audio
+    musicEnabled: false,
+    sfxEnabled: false,
+    masterVolume: 50,
     musicVolume: 60,
     sfxVolume: 100,
     menuMusic: true,
@@ -408,11 +416,14 @@ export default function SolitaireEngine({
     scorePoints: true,
     levelComplete: true,
     uiClicks: true,
+    // Display
     reduceMotion: false,
     highContrast: false,
     colorBlindMode: 'off',
-    cardStyle: 'classic',
+    cardBack: 'card-back',
     cardAnimations: true,
+    theme: 'dark',
+    language: 'en',
     // Advanced (joke) settings
     sarcasmLevel: 50,
     hogwartsHouse: 'undecided',
@@ -421,6 +432,7 @@ export default function SolitaireEngine({
   const [callParentsCount, setCallParentsCount] = useState(0);
   const [showParentsPopup, setShowParentsPopup] = useState(false);
   const [cheatResponse, setCheatResponse] = useState('');
+  const [showCredits, setShowCredits] = useState(false);
   const [testAmount, setTestAmount] = useState(100);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackType, setFeedbackType] = useState('bug');
@@ -961,6 +973,7 @@ export default function SolitaireEngine({
     if (!valid) return false;
 
     const newSourceCards = sourcePile.cards.filter(c => !cardIds.includes(c.id));
+    // Auto-flip top card when exposed (standard solitaire behavior)
     if (sourcePile.type === 'tableau' && newSourceCards.length > 0) { const newTop = newSourceCards[newSourceCards.length - 1]; if (!newTop.faceUp) newSourceCards[newSourceCards.length - 1] = { ...newTop, faceUp: true }; }
     const newTargetCards = [...targetPile.cards, ...movingCards];
     const newPiles = { ...gameState.piles, [sourcePileId]: { ...sourcePile, cards: newSourceCards }, [finalTargetPileId]: { ...targetPile, cards: newTargetCards } };
@@ -1131,14 +1144,14 @@ export default function SolitaireEngine({
        return (
           <button
              key={card.id}
-             className="absolute w-11 h-16 bg-blue-800 rounded border border-white shadow-md flex items-center justify-center"
+             className="absolute w-11 h-16 rounded border border-slate-700 shadow-md overflow-hidden"
              style={{ top: `${pileId.includes('tableau') ? index * 10 : 0}px` }}
              onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
              onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick(pileId, index); }}
              aria-label={`Face down card ${card.id}`}
                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); handleDoubleClick(pileId, index); } }}
           >
-             <div className="w-8 h-12 border border-blue-400/30 rounded flex items-center justify-center"><LayoutGrid className="text-blue-300 opacity-50" size={16} /></div>
+             <img src={`/${settings.cardBack}.png`} alt="Card back" className="w-full h-full object-cover" />
           </button>
        );
     }
@@ -1153,7 +1166,7 @@ export default function SolitaireEngine({
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); handleDoubleClick(pileId, index); } }}
             aria-label={`${getRankDisplay(visualCard.rank)} ${visualCard.suit} card`}
          >
-        <div className={`relative w-full h-full duration-500 transform-style-3d transition-transform ${visualCard.faceUp ? 'rotate-y-0' : 'rotate-y-180'}`}>
+        <div className={`relative w-full h-full transform-style-3d ${settings.cardAnimations ? 'duration-500 transition-transform' : ''} ${visualCard.faceUp ? 'rotate-y-0' : 'rotate-y-180'}`}>
             <div className={`absolute inset-0 backface-hidden bg-white rounded shadow-md flex flex-col items-center justify-between p-0.5 border border-gray-300 ${ringColor ? `ring-2 ${ringColor}` : ''}`}
                style={{ opacity: visualCard.meta?.disabled ? 0.5 : 1, filter: visualCard.meta?.hiddenDimension ? 'grayscale(100%) blur(2px)' : 'none' }}>
              
@@ -1181,8 +1194,8 @@ export default function SolitaireEngine({
              {visualCard.meta?.showWild && <div className="absolute top-0 left-0 text-fuchsia-500"><Smile size={10} /></div>}
              {visualCard.meta?.showFake && <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none"><Skull size={24} className="text-red-900" /></div>}
           </div>
-          <div className="absolute inset-0 backface-hidden rotate-y-180 bg-blue-800 rounded border border-white shadow-md flex items-center justify-center">
-             <div className="w-8 h-12 border border-blue-400/30 rounded flex items-center justify-center"><LayoutGrid className="text-blue-300 opacity-50" size={16} /></div>
+          <div className="absolute inset-0 backface-hidden rotate-y-180 rounded border border-slate-700 shadow-md overflow-hidden">
+             <img src={`/${settings.cardBack}.png`} alt="Card back" className="w-full h-full object-cover" />
           </div>
             </div>
          </button>
@@ -1672,10 +1685,6 @@ export default function SolitaireEngine({
                        {expandedSettingsSection === 'gameplay' && (
                           <div className="space-y-2 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
                              <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                                <div><div className="font-medium text-sm">Auto-flip Cards</div><div className="text-xs text-slate-400">Automatically flip face-down cards</div></div>
-                                <button onClick={() => setSettings(s => ({...s, autoFlip: !s.autoFlip}))} className={`w-12 h-6 ${settings.autoFlip ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.autoFlip ? 'right-0.5' : 'left-0.5'}`}></div></button>
-                             </div>
-                             <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
                                 <div><div className="font-medium text-sm">Confirm Resign</div><div className="text-xs text-slate-400">Ask before giving up a run</div></div>
                                 <button onClick={() => setSettings(s => ({...s, confirmResign: !s.confirmResign}))} className={`w-12 h-6 ${settings.confirmResign ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.confirmResign ? 'right-0.5' : 'left-0.5'}`}></div></button>
                              </div>
@@ -1683,11 +1692,83 @@ export default function SolitaireEngine({
                                 <div><div className="font-medium text-sm">Support the Patriarchy</div><div className="text-xs text-slate-400">Kings are high instead of Queens</div></div>
                                 <button onClick={() => setSettings(s => ({...s, supportPatriarchy: !s.supportPatriarchy}))} className={`w-12 h-6 ${settings.supportPatriarchy ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.supportPatriarchy ? 'right-0.5' : 'left-0.5'}`}></div></button>
                              </div>
+                             
+                             {/* Classic Modes Subsection */}
+                             <div className="border-t border-slate-600 pt-3 mt-3">
+                                <div className="text-xs text-slate-400 uppercase mb-3">Classic Modes</div>
+                                <div className="text-xs text-slate-500 italic mb-3">Traditional solitaire without effects</div>
+                                
+                                {/* Klondike */}
+                                <div className="p-3 bg-slate-700/50 rounded-lg mb-2">
+                                   <div className="flex items-center justify-between mb-2">
+                                      <div><div className="font-medium text-sm">Klondike</div><div className="text-xs text-slate-400">The classic solitaire</div></div>
+                                      <button onClick={() => setSettings(s => ({...s, klondikeEnabled: !s.klondikeEnabled}))} className={`w-12 h-6 ${settings.klondikeEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.klondikeEnabled ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                   </div>
+                                   {settings.klondikeEnabled && (
+                                      <div className="space-y-2 mt-3 pt-3 border-t border-slate-600">
+                                         <div className="flex items-center justify-between">
+                                            <span className="text-xs text-slate-400">Draw</span>
+                                            <div className="flex gap-1">
+                                               <button onClick={() => setSettings(s => ({...s, klondikeDraw: '1'}))} className={`px-2 py-1 text-xs rounded ${settings.klondikeDraw === '1' ? 'bg-emerald-600' : 'bg-slate-600'}`}>1</button>
+                                               <button onClick={() => setSettings(s => ({...s, klondikeDraw: '3'}))} className={`px-2 py-1 text-xs rounded ${settings.klondikeDraw === '3' ? 'bg-emerald-600' : 'bg-slate-600'}`}>3</button>
+                                            </div>
+                                         </div>
+                                         <div className="flex items-center justify-between">
+                                            <span className="text-xs text-slate-400">Scoring</span>
+                                            <select value={settings.klondikeScoring} onChange={(e) => setSettings(s => ({...s, klondikeScoring: e.target.value as 'standard' | 'vegas' | 'none'}))} className="bg-slate-600 border border-slate-500 rounded px-2 py-1 text-xs">
+                                               <option value="standard">Standard</option>
+                                               <option value="vegas">Vegas</option>
+                                               <option value="none">None</option>
+                                            </select>
+                                         </div>
+                                         <div className="text-xs text-purple-400 mt-2">🚧 Coming soon!</div>
+                                      </div>
+                                   )}
+                                </div>
+                                
+                                {/* Spider */}
+                                <div className="p-3 bg-slate-700/50 rounded-lg mb-2">
+                                   <div className="flex items-center justify-between mb-2">
+                                      <div><div className="font-medium text-sm">Spider</div><div className="text-xs text-slate-400">Build sequences by suit</div></div>
+                                      <button onClick={() => setSettings(s => ({...s, spiderEnabled: !s.spiderEnabled}))} className={`w-12 h-6 ${settings.spiderEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.spiderEnabled ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                   </div>
+                                   {settings.spiderEnabled && (
+                                      <div className="space-y-2 mt-3 pt-3 border-t border-slate-600">
+                                         <div className="flex items-center justify-between">
+                                            <span className="text-xs text-slate-400">Suits</span>
+                                            <div className="flex gap-1">
+                                               <button onClick={() => setSettings(s => ({...s, spiderSuits: '1'}))} className={`px-2 py-1 text-xs rounded ${settings.spiderSuits === '1' ? 'bg-emerald-600' : 'bg-slate-600'}`}>1</button>
+                                               <button onClick={() => setSettings(s => ({...s, spiderSuits: '2'}))} className={`px-2 py-1 text-xs rounded ${settings.spiderSuits === '2' ? 'bg-emerald-600' : 'bg-slate-600'}`}>2</button>
+                                               <button onClick={() => setSettings(s => ({...s, spiderSuits: '4'}))} className={`px-2 py-1 text-xs rounded ${settings.spiderSuits === '4' ? 'bg-emerald-600' : 'bg-slate-600'}`}>4</button>
+                                            </div>
+                                         </div>
+                                         <div className="text-xs text-purple-400 mt-2">🚧 Coming soon!</div>
+                                      </div>
+                                   )}
+                                </div>
+                                
+                                {/* Freecell */}
+                                <div className="p-3 bg-slate-700/50 rounded-lg">
+                                   <div className="flex items-center justify-between mb-2">
+                                      <div><div className="font-medium text-sm">Freecell</div><div className="text-xs text-slate-400">Strategic solitaire with free cells</div></div>
+                                      <button onClick={() => setSettings(s => ({...s, freecellEnabled: !s.freecellEnabled}))} className={`w-12 h-6 ${settings.freecellEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.freecellEnabled ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                   </div>
+                                   {settings.freecellEnabled && (
+                                      <div className="space-y-2 mt-3 pt-3 border-t border-slate-600">
+                                         <div className="flex items-center justify-between">
+                                            <span className="text-xs text-slate-400">Auto-move to Foundations</span>
+                                            <button onClick={() => setSettings(s => ({...s, freecellAutoMove: !s.freecellAutoMove}))} className={`w-10 h-5 ${settings.freecellAutoMove ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.freecellAutoMove ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                         </div>
+                                         <div className="text-xs text-purple-400 mt-2">🚧 Coming soon!</div>
+                                      </div>
+                                   )}
+                                </div>
+                             </div>
                           </div>
                        )}
                     </div>
 
-                    {/* Audio - Collapsible (Music + SFX combined) */}
+                    {/* Audio - Collapsible (SFX + Music combined) */}
                     <div className="bg-slate-800/50 rounded-lg overflow-hidden">
                        <button 
                           onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'audio' ? null : 'audio')}
@@ -1701,29 +1782,6 @@ export default function SolitaireEngine({
                              <div className="p-3 bg-slate-700/50 rounded-lg">
                                 <div className="flex justify-between mb-2"><span className="text-sm">Master Volume</span><span className="text-slate-400 text-sm">{settings.masterVolume}%</span></div>
                                 <input type="range" min="0" max="100" value={settings.masterVolume} onChange={(e) => setSettings(s => ({...s, masterVolume: Number(e.target.value)}))} className="w-full h-2 bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-emerald-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
-                             </div>
-                             {/* Music Section */}
-                             <div className="border-t border-slate-600 pt-3">
-                                <div className="flex items-center justify-between mb-2">
-                                   <div className="text-xs text-slate-400 uppercase">Music</div>
-                                   <button onClick={() => setSettings(s => ({...s, musicEnabled: !s.musicEnabled}))} className={`w-10 h-5 ${settings.musicEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.musicEnabled ? 'right-0.5' : 'left-0.5'}`}></div></button>
-                                </div>
-                                {settings.musicEnabled && (
-                                   <>
-                                      <div className="p-3 bg-slate-700/50 rounded-lg mb-2">
-                                         <div className="flex justify-between mb-2"><span className="text-sm">Music Volume</span><span className="text-slate-400 text-sm">{settings.musicVolume}%</span></div>
-                                         <input type="range" min="0" max="100" value={settings.musicVolume} onChange={(e) => setSettings(s => ({...s, musicVolume: Number(e.target.value)}))} className="w-full h-2 bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-emerald-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
-                                      </div>
-                                      <div className="space-y-1">
-                                         {[{key: 'menuMusic', label: 'Menu Music'}, {key: 'gameplayMusic', label: 'Gameplay Music'}, {key: 'shopMusic', label: 'Shop Music'}, {key: 'wanderMusic', label: 'Wander Music'}].map(item => (
-                                            <div key={item.key} className="flex items-center justify-between p-2 bg-slate-700/30 rounded">
-                                               <span className="text-xs">{item.label}</span>
-                                               <button onClick={() => setSettings(s => ({...s, [item.key]: !s[item.key as keyof typeof s]}))} className={`w-10 h-5 ${settings[item.key as keyof typeof settings] ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings[item.key as keyof typeof settings] ? 'right-0.5' : 'left-0.5'}`}></div></button>
-                                            </div>
-                                         ))}
-                                      </div>
-                                   </>
-                                )}
                              </div>
                              {/* SFX Section */}
                              <div className="border-t border-slate-600 pt-3">
@@ -1748,6 +1806,29 @@ export default function SolitaireEngine({
                                    </>
                                 )}
                              </div>
+                             {/* Music Section */}
+                             <div className="border-t border-slate-600 pt-3">
+                                <div className="flex items-center justify-between mb-2">
+                                   <div className="text-xs text-slate-400 uppercase">Music</div>
+                                   <button onClick={() => setSettings(s => ({...s, musicEnabled: !s.musicEnabled}))} className={`w-10 h-5 ${settings.musicEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.musicEnabled ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                </div>
+                                {settings.musicEnabled && (
+                                   <>
+                                      <div className="p-3 bg-slate-700/50 rounded-lg mb-2">
+                                         <div className="flex justify-between mb-2"><span className="text-sm">Music Volume</span><span className="text-slate-400 text-sm">{settings.musicVolume}%</span></div>
+                                         <input type="range" min="0" max="100" value={settings.musicVolume} onChange={(e) => setSettings(s => ({...s, musicVolume: Number(e.target.value)}))} className="w-full h-2 bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-emerald-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
+                                      </div>
+                                      <div className="space-y-1">
+                                         {[{key: 'menuMusic', label: 'Menu Music'}, {key: 'gameplayMusic', label: 'Gameplay Music'}, {key: 'shopMusic', label: 'Shop Music'}, {key: 'wanderMusic', label: 'Wander Music'}].map(item => (
+                                            <div key={item.key} className="flex items-center justify-between p-2 bg-slate-700/30 rounded">
+                                               <span className="text-xs">{item.label}</span>
+                                               <button onClick={() => setSettings(s => ({...s, [item.key]: !s[item.key as keyof typeof s]}))} className={`w-10 h-5 ${settings[item.key as keyof typeof settings] ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings[item.key as keyof typeof settings] ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                            </div>
+                                         ))}
+                                      </div>
+                                   </>
+                                )}
+                             </div>
                           </div>
                        )}
                     </div>
@@ -1763,17 +1844,64 @@ export default function SolitaireEngine({
                        {expandedSettingsSection === 'display' && (
                           <div className="space-y-2 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
                              <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                                <div><div className="font-medium text-sm">Card Style</div><div className="text-xs text-slate-400">Visual appearance of cards</div></div>
-                                <select value={settings.cardStyle} onChange={(e) => setSettings(s => ({...s, cardStyle: e.target.value}))} className="bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm">
-                                   <option value="classic">Classic</option>
-                                   <option value="modern">Modern</option>
-                                   <option value="minimal">Minimal</option>
-                                   <option value="highcontrast">High Contrast</option>
+                                <div><div className="font-medium text-sm">Theme</div><div className="text-xs text-slate-400">Color scheme preference</div></div>
+                                <select value={settings.theme} onChange={(e) => setSettings(s => ({...s, theme: e.target.value}))} className="bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm">
+                                   <option value="dark">Dark</option>
+                                   <option value="light">Light</option>
+                                   <option value="system">System</option>
+                                   <option value="oled">OLED Black</option>
                                 </select>
                              </div>
                              <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
                                 <div><div className="font-medium text-sm">Card Animations</div><div className="text-xs text-slate-400">Enable smooth card animations</div></div>
                                 <button onClick={() => setSettings(s => ({...s, cardAnimations: !s.cardAnimations}))} className={`w-12 h-6 ${settings.cardAnimations ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.cardAnimations ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                             </div>
+                             <div className="p-3 bg-slate-700/50 rounded-lg">
+                                <div className="mb-2"><div className="font-medium text-sm">Card Backs</div><div className="text-xs text-slate-400">Choose your card back design</div></div>
+                                <div className="grid grid-cols-4 gap-2">
+                                   {[
+                                      { id: 'card-back', name: 'Classic' },
+                                      { id: 'blueprint', name: 'Blueprint' },
+                                      { id: 'clockwork', name: 'Clockwork' },
+                                      { id: 'cracked', name: 'Cracked' },
+                                      { id: 'frodtbound', name: 'Frostbound' },
+                                      { id: 'grim', name: 'Grim' },
+                                      { id: 'heratic', name: 'Heretic' },
+                                      { id: 'midas', name: 'Midas' },
+                                      { id: 'molten', name: 'Molten' },
+                                      { id: 'sacred', name: 'Sacred' },
+                                      { id: 'sands', name: 'Sands' },
+                                      { id: 'shattered', name: 'Shattered' },
+                                      { id: 'shrouded', name: 'Shrouded' },
+                                      { id: 'verdant', name: 'Verdant' },
+                                      { id: 'withered', name: 'Withered' },
+                                      { id: 'worn', name: 'Worn' },
+                                   ].map(back => (
+                                      <button
+                                         key={back.id}
+                                         onClick={() => setSettings(s => ({...s, cardBack: back.id}))}
+                                         className={`relative aspect-[5/7] rounded border-2 overflow-hidden transition-all ${settings.cardBack === back.id ? 'border-emerald-500 ring-2 ring-emerald-500/50' : 'border-slate-600 hover:border-slate-500'}`}
+                                      >
+                                         <img src={`/${back.id}.png`} alt={back.name} className="w-full h-full object-cover" />
+                                         {settings.cardBack === back.id && (
+                                            <div className="absolute inset-0 bg-emerald-500/20 flex items-center justify-center">
+                                               <div className="w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center text-white text-xs">✓</div>
+                                            </div>
+                                         )}
+                                      </button>
+                                   ))}
+                                </div>
+                             </div>
+                             <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                <div><div className="font-medium text-sm">Language</div><div className="text-xs text-slate-400">Display language</div></div>
+                                <select value={settings.language} onChange={(e) => setSettings(s => ({...s, language: e.target.value}))} className="bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm">
+                                   <option value="en">English</option>
+                                   <option value="es">Español</option>
+                                   <option value="fr">Français</option>
+                                   <option value="de">Deutsch</option>
+                                   <option value="ja">日本語</option>
+                                   <option value="pirate">🏴‍☠️ Pirate</option>
+                                </select>
                              </div>
                              <div className="border-t border-slate-600 pt-2 mt-2">
                                 <div className="text-xs text-slate-400 uppercase mb-2">Accessibility</div>
@@ -1798,44 +1926,6 @@ export default function SolitaireEngine({
                                    </div>
                                 </div>
                              </div>
-                          </div>
-                       )}
-                    </div>
-
-                    {/* Data - Collapsible */}
-                    <div className="bg-slate-800/50 rounded-lg overflow-hidden">
-                       <button 
-                          onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'data' ? null : 'data')}
-                          className="w-full flex items-center justify-between p-3 hover:bg-slate-800">
-                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Data</h3>
-                          <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'data' ? 'rotate-180' : ''}`} />
-                       </button>
-                       {expandedSettingsSection === 'data' && (
-                          <div className="space-y-2 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
-                             <button className="w-full p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
-                                <span className="text-sm">Export Save Data</span>
-                                <span className="text-slate-500">→</span>
-                             </button>
-                             <button className="w-full p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
-                                <span className="text-sm">Import Save Data</span>
-                                <span className="text-slate-500">→</span>
-                             </button>
-                             <button 
-                                onClick={() => {
-                                   const newCount = callParentsCount + 1;
-                                   setCallParentsCount(newCount);
-                                   if (newCount >= 3) {
-                                      setShowParentsPopup(true);
-                                      setCallParentsCount(0);
-                                   }
-                                }}
-                                className="w-full p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
-                                <span className="text-sm">Call Your Parents</span>
-                                <span className="text-slate-500">📞</span>
-                             </button>
-                             <button className="w-full p-3 bg-red-900/30 border border-red-800 rounded-lg text-left hover:bg-red-900/50 text-red-300 text-sm">
-                                Reset All Progress
-                             </button>
                           </div>
                        )}
                     </div>
@@ -1910,6 +2000,93 @@ export default function SolitaireEngine({
                           </div>
                        )}
                     </div>
+
+                    {/* Data - Collapsible */}
+                    <div className="bg-slate-800/50 rounded-lg overflow-hidden">
+                       <button 
+                          onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'data' ? null : 'data')}
+                          className="w-full flex items-center justify-between p-3 hover:bg-slate-800">
+                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Data</h3>
+                          <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'data' ? 'rotate-180' : ''}`} />
+                       </button>
+                       {expandedSettingsSection === 'data' && (
+                          <div className="space-y-2 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
+                             <button className="w-full p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
+                                <span className="text-sm">Export Save Data</span>
+                                <span className="text-slate-500">→</span>
+                             </button>
+                             <button className="w-full p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
+                                <span className="text-sm">Import Save Data</span>
+                                <span className="text-slate-500">→</span>
+                             </button>
+                             <button 
+                                onClick={() => {
+                                   const newCount = callParentsCount + 1;
+                                   setCallParentsCount(newCount);
+                                   if (newCount >= 3) {
+                                      setShowParentsPopup(true);
+                                      setCallParentsCount(0);
+                                   }
+                                }}
+                                className="w-full p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
+                                <span className="text-sm">Call Your Parents</span>
+                                <span className="text-slate-500">📞</span>
+                             </button>
+                             <div className="border-t border-slate-600 pt-2 mt-2">
+                                <div className="text-xs text-slate-400 uppercase mb-2">Danger Zone</div>
+                                <div className="space-y-2">
+                                   <button className="w-full p-3 bg-orange-900/30 border border-orange-800 rounded-lg text-left hover:bg-orange-900/50 text-orange-300 text-sm">
+                                      Reset Statistics Only
+                                   </button>
+                                   <button className="w-full p-3 bg-red-900/30 border border-red-800 rounded-lg text-left hover:bg-red-900/50 text-red-300 text-sm">
+                                      Reset All Progress
+                                   </button>
+                                </div>
+                             </div>
+                          </div>
+                       )}
+                    </div>
+
+                    {/* About - Collapsible */}
+                    <div className="bg-slate-800/50 rounded-lg overflow-hidden">
+                       <button 
+                          onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'about' ? null : 'about')}
+                          className="w-full flex items-center justify-between p-3 hover:bg-slate-800">
+                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">About</h3>
+                          <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'about' ? 'rotate-180' : ''}`} />
+                       </button>
+                       {expandedSettingsSection === 'about' && (
+                          <div className="space-y-3 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
+                             <div className="text-center py-4">
+                                <div className="text-3xl mb-2">🃏</div>
+                                <div className="font-bold text-lg">Suite Coronata</div>
+                                <div className="text-xs text-slate-400">v0.5.0</div>
+                             </div>
+                             <div className="text-xs text-slate-400 text-center">
+                                A roguelike solitaire adventure with exploits, curses, and blessings.
+                             </div>
+                             <button 
+                                onClick={() => setShowCredits(true)}
+                                className="w-full p-3 bg-slate-700/50 rounded-lg text-center hover:bg-slate-700 text-sm">
+                                View Credits
+                             </button>
+                             <div className="flex gap-2">
+                                <button className="flex-1 p-2 bg-slate-700/50 rounded-lg text-center hover:bg-slate-700 text-xs">
+                                   🐦 Twitter
+                                </button>
+                                <button className="flex-1 p-2 bg-slate-700/50 rounded-lg text-center hover:bg-slate-700 text-xs">
+                                   💬 Discord
+                                </button>
+                                <button className="flex-1 p-2 bg-slate-700/50 rounded-lg text-center hover:bg-slate-700 text-xs">
+                                   🌐 Website
+                                </button>
+                             </div>
+                             <div className="text-[10px] text-slate-500 text-center pt-2">
+                                Made with ☕ and questionable life choices
+                             </div>
+                          </div>
+                       )}
+                    </div>
                  </div>
 
                  {/* Parents Popup */}
@@ -1920,6 +2097,45 @@ export default function SolitaireEngine({
                           <div className="text-lg font-bold mb-2">They miss you.</div>
                           <div className="text-sm text-slate-400 mb-4">Maybe give them an actual call sometime?</div>
                           <button onClick={() => setShowParentsPopup(false)} className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded font-bold text-sm">Okay...</button>
+                       </div>
+                    </div>
+                 )}
+
+                 {/* Credits Popup */}
+                 {showCredits && (
+                    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setShowCredits(false)}>
+                       <div className="bg-slate-800 p-6 rounded-xl border border-slate-600 max-w-sm max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                          <div className="text-center mb-6">
+                             <div className="text-4xl mb-2">🃏</div>
+                             <div className="font-bold text-xl">Suite Coronata</div>
+                             <div className="text-xs text-slate-400">Credits</div>
+                          </div>
+                          <div className="space-y-4 text-sm">
+                             <div>
+                                <div className="text-purple-400 font-bold text-xs uppercase mb-1">Design & Development</div>
+                                <div className="text-slate-300">You (and your AI assistant)</div>
+                             </div>
+                             <div>
+                                <div className="text-purple-400 font-bold text-xs uppercase mb-1">Art Direction</div>
+                                <div className="text-slate-300">The void, staring back</div>
+                             </div>
+                             <div>
+                                <div className="text-purple-400 font-bold text-xs uppercase mb-1">Music & Sound</div>
+                                <div className="text-slate-300">Coming soon™</div>
+                             </div>
+                             <div>
+                                <div className="text-purple-400 font-bold text-xs uppercase mb-1">Special Thanks</div>
+                                <div className="text-slate-300">Coffee, late nights, and everyone who believed in card games with too many features</div>
+                             </div>
+                             <div>
+                                <div className="text-purple-400 font-bold text-xs uppercase mb-1">Beta Testers</div>
+                                <div className="text-slate-300">You, right now, reading this</div>
+                             </div>
+                             <div className="border-t border-slate-700 pt-4 text-center">
+                                <div className="text-slate-500 text-xs">Made with React, TypeScript, Tailwind, and an unhealthy amount of determination</div>
+                             </div>
+                          </div>
+                          <button onClick={() => setShowCredits(false)} className="w-full mt-6 bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded font-bold text-sm">Close</button>
                        </div>
                     </div>
                  )}
@@ -2111,8 +2327,16 @@ export default function SolitaireEngine({
      );
   }
 
+  // Theme class mapping
+  const themeClasses = {
+     dark: 'bg-slate-900 text-slate-100',
+     light: 'bg-slate-100 text-slate-900',
+     oled: 'bg-black text-slate-100',
+     system: 'bg-slate-900 text-slate-100', // TODO: detect system preference
+  };
+
   return (
-    <div className="h-screen w-full bg-slate-900 text-slate-100 font-sans flex flex-col overflow-hidden relative">
+    <div className={`h-screen w-full font-sans flex flex-col overflow-hidden relative ${themeClasses[settings.theme as keyof typeof themeClasses] || themeClasses.dark} ${settings.reduceMotion ? '[&_*]:!transition-none [&_*]:!animate-none' : ''}`}>
       <div className="flex-1 w-full max-w-2xl mx-auto p-2 pb-40 overflow-hidden">
         <div className="grid grid-cols-7 gap-1 mb-4">
                 <div className="relative w-11 h-16">
@@ -2302,7 +2526,14 @@ export default function SolitaireEngine({
                               <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('feedback')}><MessageSquare size={16} /><span className="text-[8px]">Feedback</span></button>
                               <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('test')}><FlaskConical size={16} /><span className="text-[8px]">Test UI</span></button>
                               <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><Save size={16} /><span className="text-[8px]">Save</span></button>
-                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('resign')}><Flag size={16} /><span className="text-[8px]">Resign</span></button>
+                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => {
+                                 if (settings.confirmResign) {
+                                    setActiveDrawer('resign');
+                                 } else {
+                                    setCurrentView('home');
+                                    setActiveDrawer(null);
+                                 }
+                              }}><Flag size={16} /><span className="text-[8px]">Resign</span></button>
                               <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><Settings size={16} /><span className="text-[8px]">Settings</span></button>
                            </div>
                         ) : activeDrawer === 'shop' ? (

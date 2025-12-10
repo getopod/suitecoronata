@@ -1461,7 +1461,12 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     onActivate: (state) => {
        const newPiles = { ...state.piles };
        const wildCard: Card = { id: `jester-${Math.random()}`, rank: 0, suit: 'special', faceUp: true, meta: { isWild: true } };
-       newPiles['waste'].cards = [...newPiles['waste'].cards, wildCard];
+       // Add to waste if it exists, otherwise add to hand if it exists
+       if (newPiles['waste']?.cards) {
+         newPiles['waste'] = { ...newPiles['waste'], cards: [...newPiles['waste'].cards, wildCard] };
+       } else if (newPiles['hand']?.cards) {
+         newPiles['hand'] = { ...newPiles['hand'], cards: [...newPiles['hand'].cards, wildCard] };
+       }
        return { piles: newPiles };
     },
     canMove: (cards, source, target, defaultAllowed) => {
