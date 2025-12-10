@@ -667,6 +667,8 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
       return 0;
     },
     calculateCoinTransaction: (delta, context) => {
+      // Prevent coin loss on tableau plays
+      if (context.target.includes('tableau') && delta < 0) return 0;
       if (context.target.includes('foundation')) return delta + 10;
       return delta;
     }
