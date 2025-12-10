@@ -2090,224 +2090,226 @@ export default function SolitaireEngine({
          
          {/* Bottom control bar - always at bottom, with drawer expanding up from its top */}
          <div className={`bg-slate-900 border-t border-slate-800 p-2 w-full max-w-md mx-auto relative pointer-events-auto overflow-visible`}>
-            {/* Drawer Content - positioned absolutely above the bottom bar */}
+            {/* Drawer Content - positioned absolutely above the bottom bar, grows up until screen top then scrolls */}
             {activeDrawer && (
-               <div className="absolute bottom-full left-0 w-full bg-slate-800 border-t border-slate-700 p-4 overflow-y-auto animate-in slide-in-from-bottom-10 z-50" style={{ maxHeight: drawerMaxHeightPx, transition: 'max-height 260ms ease' }}>
-                  <div className="max-w-md mx-auto">
-                           {activeDrawer === 'shop' && (
-                              <div className="w-full mb-2">
-                                 <div className="grid grid-cols-3 gap-2">
-                                    <button onClick={() => setShopTab('buy')} className={`py-2 rounded font-bold ${shopTab === 'buy' ? 'bg-yellow-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Buy</button>
-                                    <button onClick={() => setShopTab('sell')} className={`py-2 rounded font-bold ${shopTab === 'sell' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Sell</button>
-                                    <button onClick={() => { setShopTab('continue'); startWanderPhase(); }} className={`py-2 rounded font-bold ${shopTab === 'continue' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Continue</button>
-                                 </div>
-                              </div>
-                           )}
-                  <div className="flex justify-between items-center mb-2">
-                     <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">
-                        {activeDrawer === 'pause' ? 'Menu' 
-                         : activeDrawer === 'shop' ? 'The Trade' 
-                         : activeDrawer === 'feedback' ? 'Feedback' 
-                         : activeDrawer === 'test' ? 'Test UI' 
-                         : activeDrawer === 'settings' ? 'Settings' 
-                         : activeDrawer === 'blessing_select' ? 'Select a Blessing' 
-                         : `${activeDrawer} Registry`}
-                     </h3>
-                     {nonClosableDrawer === activeDrawer ? (
-                        <div style={{ width: 28 }} />
-                     ) : (
-                        <button onClick={() => { setActiveDrawer(null); setNonClosableDrawer(null); }}><ChevronDown className="text-slate-500" /></button>
-                     )}
-                  </div>
-                  {activeDrawer === 'pause' ? (
-                     <div className="grid grid-cols-4 gap-2">
-                        <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><SkipBack size={16} /><span className="text-[8px]">Prev</span></button>
-                        <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><Play size={16} /><span className="text-[8px]">Play/Pause</span></button>
-                        <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><SkipForward size={16} /><span className="text-[8px]">Next</span></button>
-                        <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('feedback')}><MessageSquare size={16} /><span className="text-[8px]">Feedback</span></button>
-                        <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('test')}><FlaskConical size={16} /><span className="text-[8px]">Test UI</span></button>
-                        <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><Save size={16} /><span className="text-[8px]">Save</span></button>
-                        <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('resign')}><Flag size={16} /><span className="text-[8px]">Resign</span></button>
-                        <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><Settings size={16} /><span className="text-[8px]">Settings</span></button>
-                     </div>
-                  ) : activeDrawer === 'shop' ? (
-                     <div className="flex flex-col gap-2">
-                        <div className="grid grid-cols-1 gap-2">
-                          {shopTab === 'buy' && shopInventory.map(item => {
-                              const rarityColors = getRarityColor(item.rarity);
-                              const itemType = item.type === 'curse' ? 'curse' : item.type === 'blessing' ? 'blessing' : 'exploit';
-                              return (
-                              <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3`}>
-                                 <ResponsiveIcon name={item.id || item.name} fallbackType={itemType} size={32} className="w-8 h-8 rounded shrink-0" alt={item.name} />
-                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                       <span className="font-bold text-white text-xs truncate">{item.name}</span>
-                                       <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
-                                    </div>
-                                    <div className="text-slate-400 text-[10px]">{item.description}</div>
-                                 </div>
-                                 <button 
-                                   className={`text-white px-2 py-1 rounded text-xs font-bold shrink-0 ${gameState.coins >= (item.cost || 50) ? 'bg-yellow-600 hover:bg-yellow-500' : 'bg-slate-600 cursor-not-allowed'}`}
-                                   onClick={() => buyEffect(item)}
-                                   disabled={gameState.coins < (item.cost || 50)}>
-                                   Buy {item.cost || 50}
-                                 </button>
-                              </div>
-                           );})}
-
-                          {shopTab === 'sell' && (() => {
-                             const ownedExploits = effectsRegistry.filter(e => (['exploit','epic','legendary','rare','uncommon'].includes(e.type)) && gameState.ownedEffects.includes(e.id));
-                             if (ownedExploits.length === 0) return <div className="text-center text-slate-500 text-xs py-4">No exploitable items to sell.</div>;
-                             return ownedExploits.map(item => {
-                                const rarityColors = getRarityColor(item.rarity);
-                                const sellPrice = Math.floor((item.cost || 50) / 2);
-                                return (
-                                   <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3`}>
-                                      <ResponsiveIcon name={item.id || item.name} fallbackType={'exploit'} size={32} className="w-8 h-8 rounded shrink-0" alt={item.name} />
-                                      <div className="flex-1 min-w-0">
-                                         <div className="flex items-center gap-2">
-                                            <span className="font-bold text-white text-xs truncate">{item.name}</span>
-                                            <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
-                                         </div>
-                                         <div className="text-slate-400 text-[10px]">{item.description}</div>
-                                      </div>
-                                      <button className={`text-white px-2 py-1 rounded text-xs font-bold shrink-0 bg-slate-700 hover:bg-slate-600`} onClick={() => {
-                                         const price = sellPrice;
-                                         setGameState(p => ({ ...p, coins: p.coins + price, ownedEffects: p.ownedEffects.filter(id => id !== item.id) }));
-                                         // Deactivate effect if active
-                                         if (activeEffects.includes(item.id)) toggleEffect(item.id, false);
-                                      }}>Sell {sellPrice}</button>
-                                   </div>
-                                );
-                             });
-                          })()}
-                        </div>
-                     </div>
-                  ) : activeDrawer === 'feedback' ? (
-                     <div className="flex flex-col gap-3">
-                        <div className="flex gap-2">
-                           {['bug', 'ui', 'effect', 'request'].map(t => (
-                              <button key={t} onClick={() => setFeedbackType(t)} className={`px-2 py-1 rounded text-xs uppercase font-bold ${feedbackType === t ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'}`}>{t}</button>
-                           ))}
-                        </div>
-                        <textarea className="w-full h-20 bg-slate-900 border border-slate-600 rounded p-2 text-xs text-white" placeholder="Describe issue or idea..." value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} />
-                        <div className="h-32 overflow-y-auto border border-slate-700 rounded bg-slate-900/50 p-2">
-                           <div className="text-[10px] text-slate-500 mb-2 uppercase">Related Effects</div>
-                           <div className="grid grid-cols-2 gap-1">
-                              {effectsRegistry.map(e => (
-                                 <label key={e.id} className="flex items-center gap-2 text-xs text-slate-300">
-                                    <input type="checkbox" checked={!!feedbackChecks[e.id]} onChange={() => setFeedbackChecks(p => ({...p, [e.id]: !p[e.id]}))} className="rounded bg-slate-700 border-slate-500" />
-                                    {e.name}
-                                 </label>
-                              ))}
+               <div className="absolute bottom-full left-0 w-full max-h-[calc(100vh-80px)] overflow-y-auto bg-slate-800 border-t border-slate-700 animate-in slide-in-from-bottom-10 z-50">
+                  <div className="p-4">
+                     {activeDrawer === 'shop' && (
+                        <div className="w-full mb-2">
+                           <div className="grid grid-cols-3 gap-2">
+                              <button onClick={() => setShopTab('buy')} className={`py-2 rounded font-bold ${shopTab === 'buy' ? 'bg-yellow-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Buy</button>
+                              <button onClick={() => setShopTab('sell')} className={`py-2 rounded font-bold ${shopTab === 'sell' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Sell</button>
+                              <button onClick={() => { setShopTab('continue'); startWanderPhase(); }} className={`py-2 rounded font-bold ${shopTab === 'continue' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Continue</button>
                            </div>
                         </div>
-                        <button className="w-full bg-emerald-600 text-white py-2 rounded font-bold" onClick={() => { alert("Feedback Sent!"); setActiveDrawer('pause'); }}>Submit Report</button>
+                     )}
+                     <div className="flex justify-between items-center">
+                        <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">
+                           {activeDrawer === 'pause' ? 'Menu' 
+                            : activeDrawer === 'shop' ? 'The Trade' 
+                            : activeDrawer === 'feedback' ? 'Feedback' 
+                            : activeDrawer === 'test' ? 'Test UI' 
+                            : activeDrawer === 'settings' ? 'Settings' 
+                            : activeDrawer === 'blessing_select' ? 'Select a Blessing' 
+                            : `${activeDrawer} Registry`}
+                        </h3>
+                        {nonClosableDrawer === activeDrawer ? (
+                           <div style={{ width: 28 }} />
+                        ) : (
+                           <button onClick={() => { setActiveDrawer(null); setNonClosableDrawer(null); }}><ChevronDown className="text-slate-500" /></button>
+                        )}
                      </div>
-                  ) : activeDrawer === 'resign' ? (
-                     <div className="flex flex-col gap-4 text-center">
-                        <div className="text-slate-300 text-sm">Quit Run?</div>
-                        <div className="grid grid-cols-2 gap-3 text-xs text-slate-400">
-                            <div className="bg-slate-700/50 p-2 rounded">Time: {Math.floor((Date.now() - gameState.startTime)/1000)}s</div>
-                            <div className="bg-slate-700/50 p-2 rounded">Seed: {gameState.seed}</div>
-                        </div>
-                        <div className="flex gap-3">
-                           <button className="flex-1 bg-slate-700 text-white py-3 rounded font-bold" onClick={() => setActiveDrawer('pause')}>Cancel</button>
-                           <button className="flex-1 bg-red-600 text-white py-3 rounded font-bold" onClick={() => { setCurrentView('home'); setActiveDrawer(null); }}>Give Up</button>
-                        </div>
-                     </div>
-                  ) : activeDrawer === 'settings' ? (
-                     <div className="flex flex-col gap-4">
-                        <label className="flex items-center justify-between text-sm text-slate-300"><span>Sound Effects</span><input type="checkbox" className="rounded bg-slate-700 border-slate-500" defaultChecked /></label>
-                        <label className="flex items-center justify-between text-sm text-slate-300"><span>Music</span><input type="checkbox" className="rounded bg-slate-700 border-slate-500" defaultChecked /></label>
-                        <label className="flex items-center justify-between text-sm text-slate-300"><span>Vibration</span><input type="checkbox" className="rounded bg-slate-700 border-slate-500" /></label>
-                        <button className="text-xs text-slate-500 underline mt-4" onClick={() => setActiveDrawer('pause')}>Back to Menu</button>
-                     </div>
-                  ) : activeDrawer === 'test' ? (
-                     <div className="flex flex-col gap-2">
-                        <button className="bg-blue-600 text-white p-2 rounded font-bold" onClick={() => setGameState(p => ({ ...p, score: p.currentScoreGoal }))}>Complete Goal</button>
-                        <button className="bg-green-600 text-white p-2 rounded font-bold" onClick={() => setGameState(p => ({ ...p, coins: p.coins + 100 }))}>+100 Coins</button>
-                        <button className="bg-red-600 text-white p-2 rounded font-bold" onClick={() => setGameState(p => ({ ...p, coins: p.coins - 50 }))}>-50 Coins</button>
-                        <button className="bg-purple-600 text-white p-2 rounded font-bold flex items-center justify-center gap-2" onClick={() => setGameState(p => ({...p, debugUnlockAll: !p.debugUnlockAll}))}><Unlock size={16} /> Toggle All</button>
-                        <button className="text-xs text-slate-500 underline mt-4" onClick={() => setActiveDrawer('pause')}>Back to Menu</button>
-                     </div>
-                  ) : activeDrawer === 'blessing_select' ? (
-                     <div className="flex flex-col gap-2">
-                        <div className="grid grid-cols-1 gap-2">
-                           {blessingChoices.map(item => {
-                              const rarityColors = getRarityColor(item.rarity);
-                              return (
-                              <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3 cursor-pointer hover:brightness-110`} onClick={() => {
-                                   // Grant blessing
-                                   setGameState(p => ({ ...p, ownedEffects: [...p.ownedEffects, item.id] }));
-                                   setBlessingChoices([]);
-                                   if (gameState.runIndex === 0) {
-                                      // Closing initial blessing picker (allow choice to close)
-                                      setActiveDrawer(null);
-                                      setNonClosableDrawer(null);
-                                   } else {
-                                      // Open shop as part of post-encounter flow and lock it so it can't be collapsed
-                                      openShop(true);
-                                   }
-                                   }}>
-                                 <ResponsiveIcon name={item.id || item.name} fallbackType="blessing" size={32} className="w-8 h-8 rounded shrink-0" alt={item.name} />
-                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                       <span className="font-bold text-white text-xs truncate">{item.name}</span>
-                                       <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
+                     <div className="max-w-md mx-auto mt-2">
+                        {activeDrawer === 'pause' ? (
+                           <div className="grid grid-cols-4 gap-2">
+                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><SkipBack size={16} /><span className="text-[8px]">Prev</span></button>
+                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><Play size={16} /><span className="text-[8px]">Play/Pause</span></button>
+                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><SkipForward size={16} /><span className="text-[8px]">Next</span></button>
+                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('feedback')}><MessageSquare size={16} /><span className="text-[8px]">Feedback</span></button>
+                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('test')}><FlaskConical size={16} /><span className="text-[8px]">Test UI</span></button>
+                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><Save size={16} /><span className="text-[8px]">Save</span></button>
+                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('resign')}><Flag size={16} /><span className="text-[8px]">Resign</span></button>
+                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><Settings size={16} /><span className="text-[8px]">Settings</span></button>
+                           </div>
+                        ) : activeDrawer === 'shop' ? (
+                           <div className="flex flex-col gap-2">
+                              <div className="grid grid-cols-1 gap-2">
+                                {shopTab === 'buy' && shopInventory.map(item => {
+                                    const rarityColors = getRarityColor(item.rarity);
+                                    const itemType = item.type === 'curse' ? 'curse' : item.type === 'blessing' ? 'blessing' : 'exploit';
+                                    return (
+                                    <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3`}>
+                                       <ResponsiveIcon name={item.id || item.name} fallbackType={itemType} size={32} className="w-8 h-8 rounded shrink-0" alt={item.name} />
+                                       <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-2">
+                                             <span className="font-bold text-white text-xs truncate">{item.name}</span>
+                                             <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
+                                          </div>
+                                          <div className="text-slate-400 text-[10px]">{item.description}</div>
+                                       </div>
+                                       <button 
+                                         className={`text-white px-2 py-1 rounded text-xs font-bold shrink-0 ${gameState.coins >= (item.cost || 50) ? 'bg-yellow-600 hover:bg-yellow-500' : 'bg-slate-600 cursor-not-allowed'}`}
+                                         onClick={() => buyEffect(item)}
+                                         disabled={gameState.coins < (item.cost || 50)}>
+                                         Buy {item.cost || 50}
+                                       </button>
                                     </div>
-                                    <div className="text-slate-400 text-[10px]">{item.description}</div>
-                                 </div>
-                                 <Gift size={16} className="text-purple-400 shrink-0" />
+                                 );})}
+
+                                {shopTab === 'sell' && (() => {
+                                   const ownedExploits = effectsRegistry.filter(e => (['exploit','epic','legendary','rare','uncommon'].includes(e.type)) && gameState.ownedEffects.includes(e.id));
+                                   if (ownedExploits.length === 0) return <div className="text-center text-slate-500 text-xs py-4">No exploitable items to sell.</div>;
+                                   return ownedExploits.map(item => {
+                                      const rarityColors = getRarityColor(item.rarity);
+                                      const sellPrice = Math.floor((item.cost || 50) / 2);
+                                      return (
+                                         <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3`}>
+                                            <ResponsiveIcon name={item.id || item.name} fallbackType={'exploit'} size={32} className="w-8 h-8 rounded shrink-0" alt={item.name} />
+                                            <div className="flex-1 min-w-0">
+                                               <div className="flex items-center gap-2">
+                                                  <span className="font-bold text-white text-xs truncate">{item.name}</span>
+                                                  <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
+                                               </div>
+                                               <div className="text-slate-400 text-[10px]">{item.description}</div>
+                                            </div>
+                                            <button className={`text-white px-2 py-1 rounded text-xs font-bold shrink-0 bg-slate-700 hover:bg-slate-600`} onClick={() => {
+                                               const price = sellPrice;
+                                               setGameState(p => ({ ...p, coins: p.coins + price, ownedEffects: p.ownedEffects.filter(id => id !== item.id) }));
+                                               // Deactivate effect if active
+                                               if (activeEffects.includes(item.id)) toggleEffect(item.id, false);
+                                            }}>Sell {sellPrice}</button>
+                                         </div>
+                                      );
+                                   });
+                                })()}
                               </div>
-                           );})}
-                        </div>
-                     </div>
-                  ) : (
-                     <div className="grid grid-cols-1 gap-2">
-                        {effectsRegistry.filter(e => {
-                           const isOwned = gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll;
-                           if (!isOwned) return false; 
-                           if (activeDrawer === 'exploit') return ['exploit', 'epic', 'legendary', 'rare', 'uncommon'].includes(e.type);
-                           if (activeDrawer === 'curse') return ['curse', 'fear', 'danger'].includes(e.type);
-                           if (activeDrawer === 'blessing') return ['blessing'].includes(e.type);
-                           return false;
-                        }).sort((a,b) => {
-                           const aReady = isEffectReady(a.id, gameState);
-                           const bReady = isEffectReady(b.id, gameState);
-                           return (aReady === bReady) ? 0 : aReady ? -1 : 1;
-                        }).map(effect => {
-                           const isActive = activeEffects.includes(effect.id);
-                           const isReady = isEffectReady(effect.id, gameState);
-                           const charges = gameState.charges[effect.id] ?? effect.maxCharges;
-                           const rarityColors = getRarityColor(effect.rarity);
-                           
-                           const effectType = effect.type === 'curse' ? 'curse' : effect.type === 'fear' ? 'fear' : effect.type === 'danger' ? 'danger' : effect.type === 'blessing' ? 'blessing' : 'exploit';
-                           return (
-                              <button
-                                 key={effect.id}
-                                 type="button"
-                                 onClick={() => { if ((effect as any).type !== 'blessing') toggleEffect(effect.id); }}
-                                 aria-label={`Toggle effect ${effect.name}`}
-                                 className={`p-2 rounded border cursor-pointer text-xs flex items-center gap-3 transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : `${rarityColors.bg} ${rarityColors.border}`} ${isReady ? 'ring-1 ring-yellow-400' : ''}`}>
-                                 <ResponsiveIcon name={effect.id || effect.name} fallbackType={effectType} size={32} className="w-8 h-8 rounded shrink-0" alt={effect.name} />
-                                 <div className="flex-1 min-w-0 text-left">
-                                     <div className="font-bold text-white flex gap-1 items-center flex-wrap">
-                                         <span className="truncate">{effect.name}</span>
-                                         <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{effect.rarity || 'Common'}</span>
-                                         {effect.maxCharges && <span className="text-[9px] bg-slate-600 px-1 rounded text-white shrink-0">{charges}/{effect.maxCharges}</span>}
-                                     </div>
-                                     <div className="text-slate-400 text-[10px]">{effect.description}</div>
+                           </div>
+                        ) : activeDrawer === 'feedback' ? (
+                           <div className="flex flex-col gap-3">
+                              <div className="flex gap-2">
+                                 {['bug', 'ui', 'effect', 'request'].map(t => (
+                                    <button key={t} onClick={() => setFeedbackType(t)} className={`px-2 py-1 rounded text-xs uppercase font-bold ${feedbackType === t ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'}`}>{t}</button>
+                                 ))}
+                              </div>
+                              <textarea className="w-full h-20 bg-slate-900 border border-slate-600 rounded p-2 text-xs text-white" placeholder="Describe issue or idea..." value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} />
+                              <div className="h-32 overflow-y-auto border border-slate-700 rounded bg-slate-900/50 p-2">
+                                 <div className="text-[10px] text-slate-500 mb-2 uppercase">Related Effects</div>
+                                 <div className="grid grid-cols-2 gap-1">
+                                    {effectsRegistry.map(e => (
+                                       <label key={e.id} className="flex items-center gap-2 text-xs text-slate-300">
+                                          <input type="checkbox" checked={!!feedbackChecks[e.id]} onChange={() => setFeedbackChecks(p => ({...p, [e.id]: !p[e.id]}))} className="rounded bg-slate-700 border-slate-500" />
+                                          {e.name}
+                                       </label>
+                                    ))}
                                  </div>
-                                 {isActive && <div className="w-2 h-2 bg-green-400 rounded-full shrink-0"></div>}
-                              </button>
-                           );
-                        })}
-                        {gameState.ownedEffects.length === 0 && !gameState.debugUnlockAll && <div className="text-center text-slate-500 text-xs py-4">No effects owned yet. Visit the Trade!</div>}
+                              </div>
+                              <button className="w-full bg-emerald-600 text-white py-2 rounded font-bold" onClick={() => { alert("Feedback Sent!"); setActiveDrawer('pause'); }}>Submit Report</button>
+                           </div>
+                        ) : activeDrawer === 'resign' ? (
+                           <div className="flex flex-col gap-4 text-center">
+                              <div className="text-slate-300 text-sm">Quit Run?</div>
+                              <div className="grid grid-cols-2 gap-3 text-xs text-slate-400">
+                                  <div className="bg-slate-700/50 p-2 rounded">Time: {Math.floor((Date.now() - gameState.startTime)/1000)}s</div>
+                                  <div className="bg-slate-700/50 p-2 rounded">Seed: {gameState.seed}</div>
+                              </div>
+                              <div className="flex gap-3">
+                                 <button className="flex-1 bg-slate-700 text-white py-3 rounded font-bold" onClick={() => setActiveDrawer('pause')}>Cancel</button>
+                                 <button className="flex-1 bg-red-600 text-white py-3 rounded font-bold" onClick={() => { setCurrentView('home'); setActiveDrawer(null); }}>Give Up</button>
+                              </div>
+                           </div>
+                        ) : activeDrawer === 'settings' ? (
+                           <div className="flex flex-col gap-4">
+                              <label className="flex items-center justify-between text-sm text-slate-300"><span>Sound Effects</span><input type="checkbox" className="rounded bg-slate-700 border-slate-500" defaultChecked /></label>
+                              <label className="flex items-center justify-between text-sm text-slate-300"><span>Music</span><input type="checkbox" className="rounded bg-slate-700 border-slate-500" defaultChecked /></label>
+                              <label className="flex items-center justify-between text-sm text-slate-300"><span>Vibration</span><input type="checkbox" className="rounded bg-slate-700 border-slate-500" /></label>
+                              <button className="text-xs text-slate-500 underline mt-4" onClick={() => setActiveDrawer('pause')}>Back to Menu</button>
+                           </div>
+                        ) : activeDrawer === 'test' ? (
+                           <div className="flex flex-col gap-2">
+                              <button className="bg-blue-600 text-white p-2 rounded font-bold" onClick={() => setGameState(p => ({ ...p, score: p.currentScoreGoal }))}>Complete Goal</button>
+                              <button className="bg-green-600 text-white p-2 rounded font-bold" onClick={() => setGameState(p => ({ ...p, coins: p.coins + 100 }))}>+100 Coins</button>
+                              <button className="bg-red-600 text-white p-2 rounded font-bold" onClick={() => setGameState(p => ({ ...p, coins: p.coins - 50 }))}>-50 Coins</button>
+                              <button className="bg-purple-600 text-white p-2 rounded font-bold flex items-center justify-center gap-2" onClick={() => setGameState(p => ({...p, debugUnlockAll: !p.debugUnlockAll}))}><Unlock size={16} /> Toggle All</button>
+                              <button className="text-xs text-slate-500 underline mt-4" onClick={() => setActiveDrawer('pause')}>Back to Menu</button>
+                           </div>
+                        ) : activeDrawer === 'blessing_select' ? (
+                           <div className="flex flex-col gap-2">
+                              <div className="grid grid-cols-1 gap-2">
+                                 {blessingChoices.map(item => {
+                                    const rarityColors = getRarityColor(item.rarity);
+                                    return (
+                                    <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3 cursor-pointer hover:brightness-110`} onClick={() => {
+                                         // Grant blessing
+                                         setGameState(p => ({ ...p, ownedEffects: [...p.ownedEffects, item.id] }));
+                                         setBlessingChoices([]);
+                                         if (gameState.runIndex === 0) {
+                                            // Closing initial blessing picker (allow choice to close)
+                                            setActiveDrawer(null);
+                                            setNonClosableDrawer(null);
+                                         } else {
+                                            // Open shop as part of post-encounter flow and lock it so it can't be collapsed
+                                            openShop(true);
+                                         }
+                                         }}>
+                                       <ResponsiveIcon name={item.id || item.name} fallbackType="blessing" size={32} className="w-8 h-8 rounded shrink-0" alt={item.name} />
+                                       <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-2">
+                                             <span className="font-bold text-white text-xs truncate">{item.name}</span>
+                                             <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
+                                          </div>
+                                          <div className="text-slate-400 text-[10px]">{item.description}</div>
+                                       </div>
+                                       <Gift size={16} className="text-purple-400 shrink-0" />
+                                    </div>
+                                 );})}
+                              </div>
+                           </div>
+                        ) : (
+                           <div className="grid grid-cols-1 gap-2">
+                              {effectsRegistry.filter(e => {
+                                 const isOwned = gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll;
+                                 if (!isOwned) return false; 
+                                 if (activeDrawer === 'exploit') return ['exploit', 'epic', 'legendary', 'rare', 'uncommon'].includes(e.type);
+                                 if (activeDrawer === 'curse') return ['curse', 'fear', 'danger'].includes(e.type);
+                                 if (activeDrawer === 'blessing') return ['blessing'].includes(e.type);
+                                 return false;
+                              }).sort((a,b) => {
+                                 const aReady = isEffectReady(a.id, gameState);
+                                 const bReady = isEffectReady(b.id, gameState);
+                                 return (aReady === bReady) ? 0 : aReady ? -1 : 1;
+                              }).map(effect => {
+                                 const isActive = activeEffects.includes(effect.id);
+                                 const isReady = isEffectReady(effect.id, gameState);
+                                 const charges = gameState.charges[effect.id] ?? effect.maxCharges;
+                                 const rarityColors = getRarityColor(effect.rarity);
+                                 
+                                 const effectType = effect.type === 'curse' ? 'curse' : effect.type === 'fear' ? 'fear' : effect.type === 'danger' ? 'danger' : effect.type === 'blessing' ? 'blessing' : 'exploit';
+                                 return (
+                                    <button
+                                       key={effect.id}
+                                       type="button"
+                                       onClick={() => { if ((effect as any).type !== 'blessing') toggleEffect(effect.id); }}
+                                       aria-label={`Toggle effect ${effect.name}`}
+                                       className={`p-2 rounded border cursor-pointer text-xs flex items-center gap-3 transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : `${rarityColors.bg} ${rarityColors.border}`} ${isReady ? 'ring-1 ring-yellow-400' : ''}`}>
+                                       <ResponsiveIcon name={effect.id || effect.name} fallbackType={effectType} size={32} className="w-8 h-8 rounded shrink-0" alt={effect.name} />
+                                       <div className="flex-1 min-w-0 text-left">
+                                           <div className="font-bold text-white flex gap-1 items-center flex-wrap">
+                                               <span className="truncate">{effect.name}</span>
+                                               <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{effect.rarity || 'Common'}</span>
+                                               {effect.maxCharges && <span className="text-[9px] bg-slate-600 px-1 rounded text-white shrink-0">{charges}/{effect.maxCharges}</span>}
+                                           </div>
+                                           <div className="text-slate-400 text-[10px]">{effect.description}</div>
+                                       </div>
+                                       {isActive && <div className="w-2 h-2 bg-green-400 rounded-full shrink-0"></div>}
+                                    </button>
+                                 );
+                              })}
+                              {gameState.ownedEffects.length === 0 && !gameState.debugUnlockAll && <div className="text-center text-slate-500 text-xs py-4">No effects owned yet. Visit the Trade!</div>}
+                           </div>
+                        )}
                      </div>
-                  )}
+                  </div>
                </div>
-            </div>
             )}
             {gameState.interactionMode === 'discard_select' && (
                <div className="bg-orange-900/80 text-orange-200 text-xs text-center p-1 mb-1 rounded animate-pulse">Select a card in HAND to discard</div>
