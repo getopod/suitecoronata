@@ -1939,7 +1939,7 @@ export default function SolitaireEngine({
 
   return (
     <div className="h-screen w-full bg-slate-900 text-slate-100 font-sans flex flex-col overflow-hidden relative">
-      <div className="flex-1 w-full max-w-2xl mx-auto p-2 pb-48 overflow-y-auto">
+      <div className="flex-1 w-full max-w-2xl mx-auto p-2 pb-40 overflow-hidden">
         <div className="grid grid-cols-7 gap-1 mb-4">
                 <div className="relative w-11 h-16">
                    <button type="button" className="w-full h-full bg-blue-900 border border-slate-600 rounded flex items-center justify-center" onClick={() => discardAndDrawHand()} aria-label="Draw from deck">
@@ -2092,7 +2092,7 @@ export default function SolitaireEngine({
          <div className={`bg-slate-900 border-t border-slate-800 p-2 w-full max-w-md mx-auto relative pointer-events-auto overflow-visible`}>
             {/* Drawer Content - positioned absolutely above the bottom bar, grows up until screen top then scrolls */}
             {activeDrawer && (
-               <div className="absolute bottom-full left-0 w-full max-h-[calc(100vh-80px)] overflow-y-auto bg-slate-800 border-t border-slate-700 animate-in slide-in-from-bottom-10 z-50">
+               <div className="absolute bottom-full left-0 w-full max-h-[calc(100vh-140px)] overflow-y-auto bg-slate-800 border-t border-slate-700 animate-in slide-in-from-bottom-10 z-50">
                   <div className="p-4">
                      {activeDrawer === 'shop' && (
                         <div className="w-full mb-2">
