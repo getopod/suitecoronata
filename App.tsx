@@ -88,15 +88,15 @@ const initialGameState = (): GameState => {
   return generateNewBoard(0, 150, 1, 1);
 };
 
-const isStandardMoveValid = (movingCards: Card[], targetPile: Pile): boolean => {
+const isStandardMoveValid = (movingCards: Card[], targetPile: Pile, patriarchyMode: boolean = false): boolean => {
   if (movingCards.length === 0) return false;
   const leader = movingCards[0];
   const targetTop = targetPile.cards[targetPile.cards.length - 1];
   if (targetPile.type === 'tableau') {
-    // Queen is now high (stack rank 13), so empty tableau accepts Queens
-    if (!targetTop) return getStackRank(leader.rank) === 13;
+    // Queen is high by default (stack rank 13), Kings high if patriarchy mode
+    if (!targetTop) return getStackRank(leader.rank, patriarchyMode) === 13;
     // Opposite color and target's stack rank must be one higher than leader's
-    return (getCardColor(leader.suit) !== getCardColor(targetTop.suit) && getStackRank(targetTop.rank) === getStackRank(leader.rank) + 1);
+    return (getCardColor(leader.suit) !== getCardColor(targetTop.suit) && getStackRank(targetTop.rank, patriarchyMode) === getStackRank(leader.rank, patriarchyMode) + 1);
   }
   if (targetPile.type === 'foundation') {
     if (movingCards.length > 1) return false;
@@ -115,7 +115,8 @@ const findValidMoves = (
   movingCards: Card[], 
   sourcePileId: string, 
   _sourceCardIndex: number, 
-  piles: Record<string, Pile>
+  piles: Record<string, Pile>,
+  patriarchyMode: boolean = false
 ): { tableauIds: string[]; foundationIds: string[] } => {
   const tableauIds: string[] = [];
   const foundationIds: string[] = [];
@@ -124,7 +125,7 @@ const findValidMoves = (
     if (pileId === sourcePileId) continue; // Can't move to same pile
     if (pile.locked) continue; // Can't move to locked piles
     
-    if (isStandardMoveValid(movingCards, pile)) {
+    if (isStandardMoveValid(movingCards, pile, patriarchyMode)) {
       if (pile.type === 'tableau') {
         tableauIds.push(pileId);
       } else if (pile.type === 'foundation') {
@@ -147,10 +148,12 @@ const getRankDisplay = (r: Rank) => {
    return r;
 };
 
-// Stack rank helper: Queens are high for tableau stacking (Q, K, J, 10, 9...3, 2, A)
-// Q(12) -> 13 (highest), K(13) -> 12, others stay same
-const getStackRank = (r: Rank): number => {
-   if (r === 12) return 13; // Queen is now highest
+// Stack rank helper: By default Queens are high for tableau stacking (Q, K, J, 10, 9...3, 2, A)
+// If patriarchy mode is enabled, Kings are high (standard solitaire order)
+// Q(12) -> 13 (highest by default), K(13) -> 12 by default
+const getStackRank = (r: Rank, patriarchyMode: boolean = false): number => {
+   if (patriarchyMode) return r; // Standard: K=13 highest
+   if (r === 12) return 13; // Queen is highest
    if (r === 13) return 12; // King goes under Queen
    return r;
 };
@@ -388,9 +391,10 @@ export default function SolitaireEngine({
   // Settings state
   const [settings, setSettings] = useState({
     autoFlip: true,
-    confirmMoves: false,
     confirmResign: true,
-    showHints: true,
+    supportPatriarchy: false, // Kings high instead of Queens
+    musicEnabled: true,
+    sfxEnabled: true,
     masterVolume: 80,
     musicVolume: 60,
     sfxVolume: 100,
@@ -409,7 +413,14 @@ export default function SolitaireEngine({
     colorBlindMode: 'off',
     cardStyle: 'classic',
     cardAnimations: true,
+    // Advanced (joke) settings
+    sarcasmLevel: 50,
+    hogwartsHouse: 'undecided',
+    cheatCode: '',
   });
+  const [callParentsCount, setCallParentsCount] = useState(0);
+  const [showParentsPopup, setShowParentsPopup] = useState(false);
+  const [cheatResponse, setCheatResponse] = useState('');
   const [testAmount, setTestAmount] = useState(100);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackType, setFeedbackType] = useState('bug');
@@ -751,7 +762,7 @@ export default function SolitaireEngine({
       if (!card.faceUp && pile.type === 'tableau') return; // selection only for face-up cards (tableau)
 
       const movingCards = pile.type === 'tableau' ? pile.cards.slice(cardIndex) : [card];
-      const moves = findValidMoves(movingCards, pileId, cardIndex, gameState.piles);
+      const moves = findValidMoves(movingCards, pileId, cardIndex, gameState.piles, settings.supportPatriarchy);
       const allTargets = [...moves.tableauIds, ...moves.foundationIds];
       const color: 'red' | 'green' | 'yellow' | 'none' = allTargets.length === 0 ? 'red' : allTargets.length === 1 ? 'green' : 'yellow';
 
@@ -859,7 +870,7 @@ export default function SolitaireEngine({
       if (!card.faceUp) return;
       if (cardIndex !== pile.cards.length - 1) return; // only top card auto-move
 
-      const moves = findValidMoves([card], pileId, cardIndex, gameState.piles);
+      const moves = findValidMoves([card], pileId, cardIndex, gameState.piles, settings.supportPatriarchy);
 
       // Prefer foundations
       if (moves.foundationIds.length > 0) {
@@ -937,7 +948,7 @@ export default function SolitaireEngine({
     
     const targetPile = gameState.piles[finalTargetPileId];
 
-    const baseMoves = findValidMoves(movingCards, sourcePileId, sourceCardIndex, gameState.piles);
+    const baseMoves = findValidMoves(movingCards, sourcePileId, sourceCardIndex, gameState.piles, settings.supportPatriarchy);
     let valid = baseMoves.tableauIds.includes(finalTargetPileId) || baseMoves.foundationIds.includes(finalTargetPileId);
 
     effects.forEach(eff => {
@@ -1665,16 +1676,12 @@ export default function SolitaireEngine({
                                 <button onClick={() => setSettings(s => ({...s, autoFlip: !s.autoFlip}))} className={`w-12 h-6 ${settings.autoFlip ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.autoFlip ? 'right-0.5' : 'left-0.5'}`}></div></button>
                              </div>
                              <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                                <div><div className="font-medium text-sm">Confirm Moves</div><div className="text-xs text-slate-400">Ask before making moves</div></div>
-                                <button onClick={() => setSettings(s => ({...s, confirmMoves: !s.confirmMoves}))} className={`w-12 h-6 ${settings.confirmMoves ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.confirmMoves ? 'right-0.5' : 'left-0.5'}`}></div></button>
-                             </div>
-                             <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
                                 <div><div className="font-medium text-sm">Confirm Resign</div><div className="text-xs text-slate-400">Ask before giving up a run</div></div>
                                 <button onClick={() => setSettings(s => ({...s, confirmResign: !s.confirmResign}))} className={`w-12 h-6 ${settings.confirmResign ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.confirmResign ? 'right-0.5' : 'left-0.5'}`}></div></button>
                              </div>
                              <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                                <div><div className="font-medium text-sm">Show Hints</div><div className="text-xs text-slate-400">Highlight valid moves</div></div>
-                                <button onClick={() => setSettings(s => ({...s, showHints: !s.showHints}))} className={`w-12 h-6 ${settings.showHints ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.showHints ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                <div><div className="font-medium text-sm">Support the Patriarchy</div><div className="text-xs text-slate-400">Kings are high instead of Queens</div></div>
+                                <button onClick={() => setSettings(s => ({...s, supportPatriarchy: !s.supportPatriarchy}))} className={`w-12 h-6 ${settings.supportPatriarchy ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.supportPatriarchy ? 'right-0.5' : 'left-0.5'}`}></div></button>
                              </div>
                           </div>
                        )}
@@ -1697,73 +1704,55 @@ export default function SolitaireEngine({
                              </div>
                              {/* Music Section */}
                              <div className="border-t border-slate-600 pt-3">
-                                <div className="text-xs text-slate-400 uppercase mb-2">Music</div>
-                                <div className="p-3 bg-slate-700/50 rounded-lg mb-2">
-                                   <div className="flex justify-between mb-2"><span className="text-sm">Music Volume</span><span className="text-slate-400 text-sm">{settings.musicVolume}%</span></div>
-                                   <input type="range" min="0" max="100" value={settings.musicVolume} onChange={(e) => setSettings(s => ({...s, musicVolume: Number(e.target.value)}))} className="w-full h-2 bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-emerald-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
+                                <div className="flex items-center justify-between mb-2">
+                                   <div className="text-xs text-slate-400 uppercase">Music</div>
+                                   <button onClick={() => setSettings(s => ({...s, musicEnabled: !s.musicEnabled}))} className={`w-10 h-5 ${settings.musicEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.musicEnabled ? 'right-0.5' : 'left-0.5'}`}></div></button>
                                 </div>
-                                <div className="space-y-1">
-                                   {[{key: 'menuMusic', label: 'Menu Music'}, {key: 'gameplayMusic', label: 'Gameplay Music'}, {key: 'shopMusic', label: 'Shop Music'}, {key: 'wanderMusic', label: 'Wander Music'}].map(item => (
-                                      <div key={item.key} className="flex items-center justify-between p-2 bg-slate-700/30 rounded">
-                                         <span className="text-xs">{item.label}</span>
-                                         <button onClick={() => setSettings(s => ({...s, [item.key]: !s[item.key as keyof typeof s]}))} className={`w-10 h-5 ${settings[item.key as keyof typeof settings] ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings[item.key as keyof typeof settings] ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                {settings.musicEnabled && (
+                                   <>
+                                      <div className="p-3 bg-slate-700/50 rounded-lg mb-2">
+                                         <div className="flex justify-between mb-2"><span className="text-sm">Music Volume</span><span className="text-slate-400 text-sm">{settings.musicVolume}%</span></div>
+                                         <input type="range" min="0" max="100" value={settings.musicVolume} onChange={(e) => setSettings(s => ({...s, musicVolume: Number(e.target.value)}))} className="w-full h-2 bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-emerald-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
                                       </div>
-                                   ))}
-                                </div>
+                                      <div className="space-y-1">
+                                         {[{key: 'menuMusic', label: 'Menu Music'}, {key: 'gameplayMusic', label: 'Gameplay Music'}, {key: 'shopMusic', label: 'Shop Music'}, {key: 'wanderMusic', label: 'Wander Music'}].map(item => (
+                                            <div key={item.key} className="flex items-center justify-between p-2 bg-slate-700/30 rounded">
+                                               <span className="text-xs">{item.label}</span>
+                                               <button onClick={() => setSettings(s => ({...s, [item.key]: !s[item.key as keyof typeof s]}))} className={`w-10 h-5 ${settings[item.key as keyof typeof settings] ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings[item.key as keyof typeof settings] ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                            </div>
+                                         ))}
+                                      </div>
+                                   </>
+                                )}
                              </div>
                              {/* SFX Section */}
                              <div className="border-t border-slate-600 pt-3">
-                                <div className="text-xs text-slate-400 uppercase mb-2">Sound Effects</div>
-                                <div className="p-3 bg-slate-700/50 rounded-lg mb-2">
-                                   <div className="flex justify-between mb-2"><span className="text-sm">SFX Volume</span><span className="text-slate-400 text-sm">{settings.sfxVolume}%</span></div>
-                                   <input type="range" min="0" max="100" value={settings.sfxVolume} onChange={(e) => setSettings(s => ({...s, sfxVolume: Number(e.target.value)}))} className="w-full h-2 bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-emerald-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
+                                <div className="flex items-center justify-between mb-2">
+                                   <div className="text-xs text-slate-400 uppercase">Sound Effects</div>
+                                   <button onClick={() => setSettings(s => ({...s, sfxEnabled: !s.sfxEnabled}))} className={`w-10 h-5 ${settings.sfxEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.sfxEnabled ? 'right-0.5' : 'left-0.5'}`}></div></button>
                                 </div>
-                                <div className="space-y-1">
-                                   {[{key: 'cardFlip', label: 'Card Flip'}, {key: 'cardPlace', label: 'Card Place'}, {key: 'invalidMove', label: 'Invalid Move'}, {key: 'scorePoints', label: 'Score Points'}, {key: 'levelComplete', label: 'Level Complete'}, {key: 'uiClicks', label: 'UI Clicks'}].map(item => (
-                                      <div key={item.key} className="flex items-center justify-between p-2 bg-slate-700/30 rounded">
-                                         <span className="text-xs">{item.label}</span>
-                                         <button onClick={() => setSettings(s => ({...s, [item.key]: !s[item.key as keyof typeof s]}))} className={`w-10 h-5 ${settings[item.key as keyof typeof settings] ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings[item.key as keyof typeof settings] ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                {settings.sfxEnabled && (
+                                   <>
+                                      <div className="p-3 bg-slate-700/50 rounded-lg mb-2">
+                                         <div className="flex justify-between mb-2"><span className="text-sm">SFX Volume</span><span className="text-slate-400 text-sm">{settings.sfxVolume}%</span></div>
+                                         <input type="range" min="0" max="100" value={settings.sfxVolume} onChange={(e) => setSettings(s => ({...s, sfxVolume: Number(e.target.value)}))} className="w-full h-2 bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-emerald-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
                                       </div>
-                                   ))}
-                                </div>
+                                      <div className="space-y-1">
+                                         {[{key: 'cardFlip', label: 'Card Flip'}, {key: 'cardPlace', label: 'Card Place'}, {key: 'invalidMove', label: 'Invalid Move'}, {key: 'scorePoints', label: 'Score Points'}, {key: 'levelComplete', label: 'Level Complete'}, {key: 'uiClicks', label: 'UI Clicks'}].map(item => (
+                                            <div key={item.key} className="flex items-center justify-between p-2 bg-slate-700/30 rounded">
+                                               <span className="text-xs">{item.label}</span>
+                                               <button onClick={() => setSettings(s => ({...s, [item.key]: !s[item.key as keyof typeof s]}))} className={`w-10 h-5 ${settings[item.key as keyof typeof settings] ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings[item.key as keyof typeof settings] ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                            </div>
+                                         ))}
+                                      </div>
+                                   </>
+                                )}
                              </div>
                           </div>
                        )}
                     </div>
 
-                    {/* Accessibility - Collapsible */}
-                    <div className="bg-slate-800/50 rounded-lg overflow-hidden">
-                       <button 
-                          onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'accessibility' ? null : 'accessibility')}
-                          className="w-full flex items-center justify-between p-3 hover:bg-slate-800">
-                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Accessibility</h3>
-                          <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'accessibility' ? 'rotate-180' : ''}`} />
-                       </button>
-                       {expandedSettingsSection === 'accessibility' && (
-                          <div className="space-y-2 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
-                             <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                                <div><div className="font-medium text-sm">Reduce Motion</div><div className="text-xs text-slate-400">Minimize animations throughout the app</div></div>
-                                <button onClick={() => setSettings(s => ({...s, reduceMotion: !s.reduceMotion}))} className={`w-12 h-6 ${settings.reduceMotion ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.reduceMotion ? 'right-0.5' : 'left-0.5'}`}></div></button>
-                             </div>
-                             <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                                <div><div className="font-medium text-sm">High Contrast</div><div className="text-xs text-slate-400">Increase contrast for better visibility</div></div>
-                                <button onClick={() => setSettings(s => ({...s, highContrast: !s.highContrast}))} className={`w-12 h-6 ${settings.highContrast ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.highContrast ? 'right-0.5' : 'left-0.5'}`}></div></button>
-                             </div>
-                             <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                                <div><div className="font-medium text-sm">Color Blind Mode</div><div className="text-xs text-slate-400">Adjust colors for color vision deficiency</div></div>
-                                <select value={settings.colorBlindMode} onChange={(e) => setSettings(s => ({...s, colorBlindMode: e.target.value}))} className="bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm">
-                                   <option value="off">Off</option>
-                                   <option value="deuteranopia">Deuteranopia (Green-weak)</option>
-                                   <option value="protanopia">Protanopia (Red-weak)</option>
-                                   <option value="tritanopia">Tritanopia (Blue-weak)</option>
-                                   <option value="achromatopsia">Achromatopsia (Monochrome)</option>
-                                </select>
-                             </div>
-                          </div>
-                       )}
-                    </div>
-
-                    {/* Display - Collapsible */}
+                    {/* Display - Collapsible (with Accessibility settings moved here) */}
                     <div className="bg-slate-800/50 rounded-lg overflow-hidden">
                        <button 
                           onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'display' ? null : 'display')}
@@ -1785,6 +1774,29 @@ export default function SolitaireEngine({
                              <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
                                 <div><div className="font-medium text-sm">Card Animations</div><div className="text-xs text-slate-400">Enable smooth card animations</div></div>
                                 <button onClick={() => setSettings(s => ({...s, cardAnimations: !s.cardAnimations}))} className={`w-12 h-6 ${settings.cardAnimations ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.cardAnimations ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                             </div>
+                             <div className="border-t border-slate-600 pt-2 mt-2">
+                                <div className="text-xs text-slate-400 uppercase mb-2">Accessibility</div>
+                                <div className="space-y-2">
+                                   <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                      <div><div className="font-medium text-sm">Reduce Motion</div><div className="text-xs text-slate-400">Minimize animations throughout the app</div></div>
+                                      <button onClick={() => setSettings(s => ({...s, reduceMotion: !s.reduceMotion}))} className={`w-12 h-6 ${settings.reduceMotion ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.reduceMotion ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                   </div>
+                                   <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                      <div><div className="font-medium text-sm">High Contrast</div><div className="text-xs text-slate-400">Increase contrast for better visibility</div></div>
+                                      <button onClick={() => setSettings(s => ({...s, highContrast: !s.highContrast}))} className={`w-12 h-6 ${settings.highContrast ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.highContrast ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                   </div>
+                                   <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                      <div><div className="font-medium text-sm">Color Blind Mode</div><div className="text-xs text-slate-400">Adjust colors for color vision deficiency</div></div>
+                                      <select value={settings.colorBlindMode} onChange={(e) => setSettings(s => ({...s, colorBlindMode: e.target.value}))} className="bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm">
+                                         <option value="off">Off</option>
+                                         <option value="deuteranopia">Deuteranopia (Green-weak)</option>
+                                         <option value="protanopia">Protanopia (Red-weak)</option>
+                                         <option value="tritanopia">Tritanopia (Blue-weak)</option>
+                                         <option value="achromatopsia">Achromatopsia (Monochrome)</option>
+                                      </select>
+                                   </div>
+                                </div>
                              </div>
                           </div>
                        )}
@@ -1808,13 +1820,109 @@ export default function SolitaireEngine({
                                 <span className="text-sm">Import Save Data</span>
                                 <span className="text-slate-500">→</span>
                              </button>
+                             <button 
+                                onClick={() => {
+                                   const newCount = callParentsCount + 1;
+                                   setCallParentsCount(newCount);
+                                   if (newCount >= 3) {
+                                      setShowParentsPopup(true);
+                                      setCallParentsCount(0);
+                                   }
+                                }}
+                                className="w-full p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
+                                <span className="text-sm">Call Your Parents</span>
+                                <span className="text-slate-500">📞</span>
+                             </button>
                              <button className="w-full p-3 bg-red-900/30 border border-red-800 rounded-lg text-left hover:bg-red-900/50 text-red-300 text-sm">
                                 Reset All Progress
                              </button>
                           </div>
                        )}
                     </div>
+
+                    {/* Advanced - Collapsible (joke settings) */}
+                    <div className="bg-slate-800/50 rounded-lg overflow-hidden">
+                       <button 
+                          onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'advanced' ? null : 'advanced')}
+                          className="w-full flex items-center justify-between p-3 hover:bg-slate-800">
+                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Advanced</h3>
+                          <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'advanced' ? 'rotate-180' : ''}`} />
+                       </button>
+                       {expandedSettingsSection === 'advanced' && (
+                          <div className="space-y-3 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
+                             <div className="p-3 bg-slate-700/50 rounded-lg">
+                                <div className="flex justify-between mb-2"><span className="text-sm">Sarcasm Level</span><span className="text-slate-400 text-sm">{settings.sarcasmLevel}%</span></div>
+                                <input type="range" min="0" max="100" value={settings.sarcasmLevel} onChange={(e) => setSettings(s => ({...s, sarcasmLevel: Number(e.target.value)}))} className="w-full h-2 bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-purple-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
+                                <div className="text-xs text-slate-500 mt-1 italic">
+                                   {settings.sarcasmLevel < 25 ? "Wow, so sincere." : 
+                                    settings.sarcasmLevel < 50 ? "Okay, moderately sarcastic." :
+                                    settings.sarcasmLevel < 75 ? "Now we're talking." :
+                                    "Oh, you're one of THOSE people."}
+                                </div>
+                             </div>
+                             <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                <div><div className="font-medium text-sm">Hogwarts House</div><div className="text-xs text-slate-400">Very important for gameplay</div></div>
+                                <select value={settings.hogwartsHouse} onChange={(e) => setSettings(s => ({...s, hogwartsHouse: e.target.value}))} className="bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm">
+                                   <option value="undecided">Undecided</option>
+                                   <option value="gryffindor">🦁 Gryffindor</option>
+                                   <option value="slytherin">🐍 Slytherin</option>
+                                   <option value="ravenclaw">🦅 Ravenclaw</option>
+                                   <option value="hufflepuff">🦡 Hufflepuff</option>
+                                </select>
+                             </div>
+                             <div className="p-3 bg-slate-700/50 rounded-lg">
+                                <div className="font-medium text-sm mb-1">Cheat Code</div>
+                                <div className="text-xs text-slate-400 mb-2">Enter secret codes for... something?</div>
+                                <div className="flex gap-2">
+                                   <input 
+                                      type="text" 
+                                      value={settings.cheatCode} 
+                                      onChange={(e) => setSettings(s => ({...s, cheatCode: e.target.value}))} 
+                                      placeholder="Enter cheat code..."
+                                      className="flex-1 bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm"
+                                   />
+                                   <button 
+                                      onClick={() => {
+                                         const code = settings.cheatCode.toLowerCase().trim();
+                                         const responses: Record<string, string> = {
+                                            'iddqd': "This isn't DOOM, but nice try.",
+                                            'hesoyam': "GTA doesn't work here either.",
+                                            'konami': "↑↑↓↓←→←→BA... nothing happened.",
+                                            'motherlode': "The Sims called, they want their cheat back.",
+                                            'rosebud': "Seriously? That's ancient.",
+                                            'money': "Wouldn't that be nice.",
+                                            'god': "You wish.",
+                                            'win': "That's not how this works.",
+                                            'help': "No.",
+                                            'please': "Manners won't help you here.",
+                                            '': "You have to actually type something.",
+                                         };
+                                         setCheatResponse(responses[code] || "Nice try, but that's not a real cheat code.");
+                                         setSettings(s => ({...s, cheatCode: ''}));
+                                      }}
+                                      className="bg-purple-600 hover:bg-purple-500 px-3 py-1 rounded text-sm font-bold"
+                                   >
+                                      Try
+                                   </button>
+                                </div>
+                                {cheatResponse && <div className="text-xs text-purple-400 mt-2 italic">{cheatResponse}</div>}
+                             </div>
+                          </div>
+                       )}
+                    </div>
                  </div>
+
+                 {/* Parents Popup */}
+                 {showParentsPopup && (
+                    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setShowParentsPopup(false)}>
+                       <div className="bg-slate-800 p-6 rounded-xl border border-slate-600 text-center max-w-xs" onClick={e => e.stopPropagation()}>
+                          <div className="text-4xl mb-4">💔</div>
+                          <div className="text-lg font-bold mb-2">They miss you.</div>
+                          <div className="text-sm text-slate-400 mb-4">Maybe give them an actual call sometime?</div>
+                          <button onClick={() => setShowParentsPopup(false)} className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded font-bold text-sm">Okay...</button>
+                       </div>
+                    </div>
+                 )}
               </div>
            )}
 
