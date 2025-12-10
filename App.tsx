@@ -2305,8 +2305,10 @@ export default function SolitaireEngine({
                                     const rarityColors = getRarityColor(item.rarity);
                                     return (
                                     <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3 cursor-pointer hover:brightness-110`} onClick={() => {
-                                         // Grant blessing
+                                         // Grant blessing and auto-activate it
                                          setGameState(p => ({ ...p, ownedEffects: [...p.ownedEffects, item.id] }));
+                                         // Auto-activate the blessing (passives are always on, charged effects start ready)
+                                         toggleEffect(item.id, true);
                                          setBlessingChoices([]);
                                          if (gameState.runIndex === 0) {
                                             // Closing initial blessing picker (allow choice to close)
@@ -2354,9 +2356,14 @@ export default function SolitaireEngine({
                                     <button
                                        key={effect.id}
                                        type="button"
-                                       onClick={() => { if ((effect as any).type !== 'blessing') toggleEffect(effect.id); }}
+                                       onClick={() => {
+                                          // Curses (curse/fear/danger) cannot be toggled off
+                                          const isCurseType = ['curse', 'fear', 'danger'].includes(effect.type);
+                                          if (isCurseType) return;
+                                          toggleEffect(effect.id);
+                                       }}
                                        aria-label={`Toggle effect ${effect.name}`}
-                                       className={`p-2 rounded border cursor-pointer text-xs flex items-center gap-3 transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : `${rarityColors.bg} ${rarityColors.border}`} ${isReady ? 'ring-1 ring-yellow-400' : ''}`}>
+                                       className={`p-2 rounded border text-xs flex items-center gap-3 transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : `${rarityColors.bg} ${rarityColors.border}`} ${isReady ? 'ring-1 ring-yellow-400' : ''} ${['curse', 'fear', 'danger'].includes(effect.type) ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                        <ResponsiveIcon name={effect.id || effect.name} fallbackType={effectType} size={32} className="w-8 h-8 rounded shrink-0" alt={effect.name} />
                                        <div className="flex-1 min-w-0 text-left">
                                            <div className="font-bold text-white flex gap-1 items-center flex-wrap">
