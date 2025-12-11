@@ -546,6 +546,7 @@ export default function SolitaireEngine({
       setActiveEffects(Array.from(new Set(newActive)));
   };
 
+  // Duplicate PLACEHOLDER_WANDERS declaration removed - using the one above
 
   const startWanderPhase = () => {
      setActiveDrawer(null);
@@ -731,7 +732,33 @@ export default function SolitaireEngine({
         // Update State
         setActiveEffects(nextActiveEffects);
         setGameState(nextState);
-     } else { alert("Run Complete!"); setCurrentView('home'); }
+     } else { 
+        // Run complete - record victory
+        if (runStartData) {
+           const duration = Math.floor((Date.now() - runStartData.startTime) / 1000);
+           const runEntry: RunHistoryEntry = {
+              id: `run_${Date.now()}`,
+              result: 'won',
+              score: gameState.score,
+              finalCoins: gameState.coins,
+              date: new Date().toISOString(),
+              mode: 'Coronata',
+              duration,
+              encountersCompleted: runPlan.filter(e => e.completed).length,
+              totalEncounters: runPlan.length,
+              exploits: gameState.ownedEffects.filter(id => effectsRegistry.find(e => e.id === id && (e.type === 'exploit' || e.type === 'epic' || e.type === 'legendary'))),
+              curses: gameState.ownedEffects.filter(id => effectsRegistry.find(e => e.id === id && e.type === 'curse')),
+              blessings: gameState.ownedEffects.filter(id => effectsRegistry.find(e => e.id === id && e.type === 'blessing')),
+              encounters: runStartData.encounterLog,
+              seed: gameState.seed,
+           };
+           const updatedStats = recordRunCompletion(playerStats, runEntry);
+           setPlayerStats(updatedStats);
+           savePlayerStats(updatedStats);
+        }
+        alert("Run Complete!"); 
+        setCurrentView('home'); 
+     }
   };
 
   const startRun = () => {
@@ -1559,19 +1586,19 @@ export default function SolitaireEngine({
                           {/* Stats Grid */}
                           <div className="grid grid-cols-2 gap-3 mb-6">
                              <div className="bg-slate-800 p-4 rounded-xl text-center">
-                                <div className="text-3xl font-bold text-emerald-400">12</div>
+                                <div className="text-3xl font-bold text-emerald-400">{playerStats.runsWon}</div>
                                 <div className="text-xs text-slate-400 uppercase">Runs Won</div>
                              </div>
                              <div className="bg-slate-800 p-4 rounded-xl text-center">
-                                <div className="text-3xl font-bold text-red-400">8</div>
+                                <div className="text-3xl font-bold text-red-400">{playerStats.runsLost}</div>
                                 <div className="text-xs text-slate-400 uppercase">Runs Lost</div>
                              </div>
                              <div className="bg-slate-800 p-4 rounded-xl text-center">
-                                <div className="text-3xl font-bold text-yellow-400">60%</div>
+                                <div className="text-3xl font-bold text-yellow-400">{getWinRate(playerStats)}%</div>
                                 <div className="text-xs text-slate-400 uppercase">Win Rate</div>
                              </div>
                              <div className="bg-slate-800 p-4 rounded-xl text-center">
-                                <div className="text-3xl font-bold text-purple-400">23</div>
+                                <div className="text-3xl font-bold text-purple-400">{playerStats.totalEffectsFound}</div>
                                 <div className="text-xs text-slate-400 uppercase">Effects Found</div>
                              </div>
                           </div>
@@ -1579,20 +1606,20 @@ export default function SolitaireEngine({
                           {/* Recent Runs Summary */}
                           <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-2">Recent Runs</h3>
                           <div className="space-y-2">
-                             {[
-                                { result: 'won', score: 4521, encounters: 15, date: '2 hours ago' },
-                                { result: 'lost', score: 2100, encounters: 9, date: 'Yesterday' },
-                                { result: 'won', score: 3890, encounters: 15, date: '3 days ago' },
-                             ].map((run, i) => (
-                                <div key={i} className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                                   <div className="flex items-center gap-2">
-                                      {run.result === 'won' ? <Trophy size={16} className="text-yellow-400" /> : <Skull size={16} className="text-red-400" />}
-                                      <span className="font-bold">{run.score}</span>
-                                      <span className="text-slate-500 text-xs">({run.encounters}/15)</span>
+                             {playerStats.runHistory.length === 0 ? (
+                                <div className="text-center text-slate-500 py-8">No runs yet. Start your first run!</div>
+                             ) : (
+                                playerStats.runHistory.slice(0, 3).map((run, i) => (
+                                   <div key={i} className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                                      <div className="flex items-center gap-2">
+                                         {run.result === 'won' ? <Trophy size={16} className="text-yellow-400" /> : <Skull size={16} className="text-red-400" />}
+                                         <span className="font-bold">{run.score}</span>
+                                         <span className="text-slate-500 text-xs">({run.encountersCompleted}/{run.totalEncounters})</span>
+                                      </div>
+                                      <span className="text-slate-500 text-xs">{getRelativeTime(run.date)}</span>
                                    </div>
-                                   <span className="text-slate-500 text-xs">{run.date}</span>
-                                </div>
-                             ))}
+                                ))
+                             )}
                           </div>
                        </>
                     )}
@@ -1697,86 +1724,10 @@ export default function SolitaireEngine({
                        <>
                           <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider mb-3">Run History</h3>
                           <div className="space-y-4">
-                             {[
-                                { 
-                                   id: 1, 
-                                   result: 'won', 
-                                   score: 4521, 
-                                   date: '2 hours ago',
-                                   mode: 'Coronata',
-                                   duration: '12:34',
-                                   exploits: ['Blacksmith', 'Jester', 'Switcheroo', 'Counting Cards'],
-                                   curses: ['Bad Omens', 'Broken Mirror'],
-                                   blessings: ['Maneki-Neko', 'Four Leaf Clover', 'Ladybug'],
-                                   encounters: [
-                                      { type: 'danger', name: 'Beggar', passed: true },
-                                      { type: 'wander', name: 'Wander', passed: true },
-                                      { type: 'danger', name: 'Thief', passed: true },
-                                      { type: 'wander', name: 'Wander', passed: true },
-                                      { type: 'shop', name: 'Shop', passed: true },
-                                      { type: 'danger', name: 'Gambler', passed: true },
-                                      { type: 'wander', name: 'Wander', passed: true },
-                                      { type: 'fear', name: 'Stagefright', passed: true },
-                                      { type: 'danger', name: 'Merchant', passed: true },
-                                      { type: 'wander', name: 'Wander', passed: true },
-                                      { type: 'shop', name: 'Shop', passed: true },
-                                      { type: 'danger', name: 'Diplomat', passed: true },
-                                      { type: 'fear', name: 'Insomnia', passed: true },
-                                      { type: 'wander', name: 'Wander', passed: true },
-                                      { type: 'boss', name: 'Oracle', passed: true },
-                                   ]
-                                },
-                                { 
-                                   id: 2, 
-                                   result: 'lost', 
-                                   score: 2100, 
-                                   date: 'Yesterday',
-                                   mode: 'Coronata',
-                                   duration: '08:22',
-                                   exploits: ['Scholar', 'Risk Management'],
-                                   curses: ['Crippling Doubt', 'Shadow Tax', 'Trembling Hands', 'Echoing Paranoia'],
-                                   blessings: ['Wishbone'],
-                                   encounters: [
-                                      { type: 'danger', name: 'Beggar', passed: true },
-                                      { type: 'wander', name: 'Wander', passed: true },
-                                      { type: 'danger', name: 'Thief', passed: true },
-                                      { type: 'shop', name: 'Shop', passed: true },
-                                      { type: 'danger', name: 'Gambler', passed: true },
-                                      { type: 'fear', name: 'Psychosis', passed: true },
-                                      { type: 'wander', name: 'Wander', passed: true },
-                                      { type: 'danger', name: 'Merchant', passed: false },
-                                      { type: 'danger', name: 'Diplomat', passed: false },
-                                   ]
-                                },
-                                { 
-                                   id: 3, 
-                                   result: 'won', 
-                                   score: 3890, 
-                                   date: '3 days ago',
-                                   mode: 'Coronata',
-                                   duration: '15:47',
-                                   exploits: ['Architect', 'Collector', 'Dreamcatcher', 'Fortune', 'Mulligan'],
-                                   curses: ['Gluttony'],
-                                   blessings: ['Rabbit\'s Foot', 'Knock on Wood'],
-                                   encounters: [
-                                      { type: 'danger', name: 'Beggar', passed: true },
-                                      { type: 'wander', name: 'Wander', passed: true },
-                                      { type: 'danger', name: 'Thief', passed: true },
-                                      { type: 'wander', name: 'Wander', passed: true },
-                                      { type: 'shop', name: 'Shop', passed: true },
-                                      { type: 'danger', name: 'Gambler', passed: true },
-                                      { type: 'wander', name: 'Wander', passed: true },
-                                      { type: 'fear', name: 'Ignorance', passed: true },
-                                      { type: 'danger', name: 'Merchant', passed: true },
-                                      { type: 'wander', name: 'Wander', passed: true },
-                                      { type: 'shop', name: 'Shop', passed: true },
-                                      { type: 'danger', name: 'Diplomat', passed: true },
-                                      { type: 'fear', name: 'Hyperfixation', passed: true },
-                                      { type: 'wander', name: 'Wander', passed: true },
-                                      { type: 'boss', name: 'Oracle', passed: true },
-                                   ]
-                                },
-                             ].map((run) => (
+                             {playerStats.runHistory.length === 0 ? (
+                                <div className="text-center text-slate-500 py-8">No run history yet. Complete a run to see it here!</div>
+                             ) : (
+                                playerStats.runHistory.map((run) => (
                                 <div key={run.id} className="bg-slate-800 rounded-xl p-4 space-y-3">
                                    {/* Run Header */}
                                    <div className="flex items-center justify-between">
@@ -1786,10 +1737,10 @@ export default function SolitaireEngine({
                                             : <Skull size={20} className="text-red-400" />}
                                          <div>
                                             <div className="font-bold text-lg">{run.score.toLocaleString()}</div>
-                                            <div className="text-xs text-slate-400">{run.mode} • {run.duration}</div>
+                                            <div className="text-xs text-slate-400">{run.mode} • {formatDuration(run.duration)}</div>
                                          </div>
                                       </div>
-                                      <div className="text-xs text-slate-500">{run.date}</div>
+                                      <div className="text-xs text-slate-500">{getRelativeTime(run.date)}</div>
                                    </div>
 
                                    {/* Effects Row */}
@@ -1801,8 +1752,8 @@ export default function SolitaireEngine({
                                             <span className="uppercase tracking-wider text-[10px]">Exploits</span>
                                          </div>
                                          <div className="flex flex-wrap gap-1">
-                                            {run.exploits.map((ex, i) => (
-                                               <ResponsiveIcon key={i} name={ex.id || ex.name} fallbackType="exploit" size={20} className="rounded" />
+                                            {run.exploits.map((effectId, i) => (
+                                               <ResponsiveIcon key={i} name={effectId} fallbackType="exploit" size={20} className="rounded" />
                                             ))}
                                          </div>
                                       </div>
@@ -1813,8 +1764,8 @@ export default function SolitaireEngine({
                                             <span className="uppercase tracking-wider text-[10px]">Curses</span>
                                          </div>
                                          <div className="flex flex-wrap gap-1">
-                                            {run.curses.map((c, i) => (
-                                               <ResponsiveIcon key={i} name={c.id || c.name} fallbackType="curse" size={20} className="rounded" />
+                                            {run.curses.map((effectId, i) => (
+                                               <ResponsiveIcon key={i} name={effectId} fallbackType="curse" size={20} className="rounded" />
                                             ))}
                                          </div>
                                       </div>
@@ -1825,8 +1776,8 @@ export default function SolitaireEngine({
                                             <span className="uppercase tracking-wider text-[10px]">Blessings</span>
                                          </div>
                                          <div className="flex flex-wrap gap-1">
-                                            {run.blessings.map((b, i) => (
-                                               <ResponsiveIcon key={i} name={b.id || b.name} fallbackType="blessing" size={20} className="w-5 h-5 rounded" alt={b.name} />
+                                            {run.blessings.map((effectId, i) => (
+                                               <ResponsiveIcon key={i} name={effectId} fallbackType="blessing" size={20} className="w-5 h-5 rounded" />
                                             ))}
                                          </div>
                                       </div>
@@ -1863,7 +1814,8 @@ export default function SolitaireEngine({
                                       </div>
                                    </div>
                                 </div>
-                             ))}
+                             ))
+                             )}
                           </div>
                        </>
                     )}
