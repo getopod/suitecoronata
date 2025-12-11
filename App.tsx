@@ -1583,6 +1583,14 @@ export default function SolitaireEngine({
                     {/* STATS TAB */}
                     {profileTab === 'stats' && (
                        <>
+                          {/* Debug: Show raw stats */}
+                          {process.env.NODE_ENV === 'development' && (
+                             <div className="mb-4 p-2 bg-slate-700/50 rounded text-xs">
+                                <div>Stats loaded: {playerStats ? 'Yes' : 'No'}</div>
+                                <div>Runs: {playerStats?.totalRuns || 0}</div>
+                                <div>History length: {playerStats?.runHistory?.length || 0}</div>
+                             </div>
+                          )}
                           {/* Stats Grid */}
                           <div className="grid grid-cols-2 gap-3 mb-6">
                              <div className="bg-slate-800 p-4 rounded-xl text-center">
@@ -2776,7 +2784,33 @@ export default function SolitaireEngine({
                               </div>
                               <div className="flex gap-3">
                                  <button className="flex-1 bg-slate-700 text-white py-3 rounded font-bold" onClick={() => setActiveDrawer('pause')}>Cancel</button>
-                                 <button className="flex-1 bg-red-600 text-white py-3 rounded font-bold" onClick={() => { setCurrentView('home'); setActiveDrawer(null); }}>Give Up</button>
+                                 <button className="flex-1 bg-red-600 text-white py-3 rounded font-bold" onClick={() => { 
+                                    // Record resignation
+                                    if (runStartData) {
+                                       const duration = Math.floor((Date.now() - runStartData.startTime) / 1000);
+                                       const runEntry: RunHistoryEntry = {
+                                          id: `run_${Date.now()}`,
+                                          result: 'lost',
+                                          score: gameState.score,
+                                          finalCoins: gameState.coins,
+                                          date: new Date().toISOString(),
+                                          mode: 'Coronata',
+                                          duration,
+                                          encountersCompleted: runPlan.filter(e => e.completed).length,
+                                          totalEncounters: runPlan.length,
+                                          exploits: gameState.ownedEffects.filter(id => effectsRegistry.find(e => e.id === id && (e.type === 'exploit' || e.type === 'epic' || e.type === 'legendary'))),
+                                          curses: gameState.ownedEffects.filter(id => effectsRegistry.find(e => e.id === id && e.type === 'curse')),
+                                          blessings: gameState.ownedEffects.filter(id => effectsRegistry.find(e => e.id === id && e.type === 'blessing')),
+                                          encounters: runStartData.encounterLog,
+                                          seed: gameState.seed,
+                                       };
+                                       const updatedStats = recordRunCompletion(playerStats, runEntry);
+                                       setPlayerStats(updatedStats);
+                                       savePlayerStats(updatedStats);
+                                    }
+                                    setCurrentView('home'); 
+                                    setActiveDrawer(null); 
+                                 }}>Give Up</button>
                               </div>
                            </div>
                         ) : activeDrawer === 'settings' ? (

@@ -151,9 +151,15 @@ export const ADDITIONAL_ICON_SYNONYMS: Record<string, string> = {
   wizard: 'wizard',
   
   // === Additional icon aliases (for UI elements) ===
+  annuit_coeptis: 'annuit-coeptis',
+  ascension: 'ascension',
+  banana_boat: 'Banana Boat',
   card_graveyard: 'Card Graveyard',
+  chain_reaction: 'Chain Reaction',
+  crackedrock: 'crackedrock',
   executive_order: 'executiveorder',
   five_finger_discount: 'fivefingerdiscount',
+  frozen_hearts: 'Frozen Hearts (variant)',
   kindness_of_strangers: 'kindnessofstrangers',
   legitimate_business: 'legitimatebusiness',
   liquid_assets: 'liquidassets',
@@ -161,6 +167,13 @@ export const ADDITIONAL_ICON_SYNONYMS: Record<string, string> = {
   master_debater: 'masterdebater',
   metro_card: 'metrocard',
   midas_touch: 'midastouch',
+  nicerock: 'nicerock',
+  prick_of_conscience: 'Prick of Conscience',
+  sleight_hand: 'sleightofhand',
+  smoke_and_mirrors: 'smokeandmirrors',
+  strangerock: 'strangerock',
+  street_smart: 'streetsmarts',
+  the_void: 'The Void',
 };
 
 export default ADDITIONAL_ICON_SYNONYMS;
