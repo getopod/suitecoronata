@@ -148,3 +148,67 @@ export interface GameEffect {
 
   transformCardVisual?: (card: Card, pile?: Pile) => Partial<Card>;
 }
+
+// Player Stats & Run History
+export interface RunEncounterRecord {
+  type: 'danger' | 'fear' | 'wander' | 'shop' | 'boss';
+  name: string;
+  passed: boolean;
+}
+
+export interface RunHistoryEntry {
+  id: string;
+  result: 'won' | 'lost';
+  score: number;
+  finalCoins: number;
+  date: string; // ISO timestamp
+  mode: string;
+  duration: number; // seconds
+  encountersCompleted: number;
+  totalEncounters: number;
+  exploits: string[]; // effect IDs
+  curses: string[]; // effect IDs
+  blessings: string[]; // effect IDs
+  encounters: RunEncounterRecord[];
+  seed?: string;
+}
+
+export interface PlayerStats {
+  runsWon: number;
+  runsLost: number;
+  totalRuns: number;
+  currentStreak: number; // consecutive wins
+  bestStreak: number;
+  totalEffectsFound: number;
+  uniqueEffectsFound: Set<string>; // effect IDs
+  dangersDefeated: number;
+  fearsCompleted: number;
+  wandersCompleted: number;
+  totalCoinsEarned: number;
+  totalScore: number;
+  bestScore: number;
+  fastestWinTime: number; // seconds, 0 = no win yet
+  runHistory: RunHistoryEntry[];
+  firstPlayDate: string; // ISO timestamp
+  lastPlayDate: string; // ISO timestamp
+}
+
+export interface SerializedPlayerStats {
+  runsWon: number;
+  runsLost: number;
+  totalRuns: number;
+  currentStreak: number;
+  bestStreak: number;
+  totalEffectsFound: number;
+  uniqueEffectsFound: string[]; // serialized as array
+  dangersDefeated: number;
+  fearsCompleted: number;
+  wandersCompleted: number;
+  totalCoinsEarned: number;
+  totalScore: number;
+  bestScore: number;
+  fastestWinTime: number;
+  runHistory: RunHistoryEntry[];
+  firstPlayDate: string;
+  lastPlayDate: string;
+}

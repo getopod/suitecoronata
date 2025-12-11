@@ -1,10 +1,12 @@
 import React, { useState, useCallback } from 'react';
 import { LayoutGrid, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, HelpCircle, RefreshCw, X, Gift, Trophy, ArrowLeftRight, SkipBack, SkipForward, MessageSquare, FlaskConical, Save, Flag, Settings, ChevronDown, Pause, ShoppingCart, User, Unlock, Map as MapIcon, BarChart3, Link as LinkIcon, Bug } from 'lucide-react';
-import { Card, GameState, Pile, Rank, Suit, MoveContext, Encounter, GameEffect, Wander, WanderChoice, MinigameResult } from './types';
+import { Card, GameState, Pile, Rank, Suit, MoveContext, Encounter, GameEffect, Wander, WanderChoice, MinigameResult, PlayerStats, RunHistoryEntry, RunEncounterRecord } from './types';
 import { getCardColor, generateNewBoard, EFFECTS_REGISTRY } from './data/effects';
 import { isHighestRank, isNextHigherInOrder, isNextLowerInOrder } from './utils/rankOrder';
 import { Minigames } from './utils/minigames';
+import { loadPlayerStats, savePlayerStats, recordRunCompletion, getWinRate, formatDuration, getRelativeTime } from './utils/playerStats';
 import ResponsiveIcon from './components/ResponsiveIcon';
+import { WANDER_REGISTRY } from './data/wanders';
 
 // ==========================================
 // INJECTABLE REGISTRIES (defaults to empty for decoupled UI)
@@ -295,7 +297,7 @@ const categoryIcons: Record<string, string> = {
 
 export default function SolitaireEngine({ 
   effectsRegistry = EFFECTS_REGISTRY, 
-  wanderRegistry = [] 
+  wanderRegistry = WANDER_REGISTRY 
 }: SolitaireEngineProps = {}) {
   const [currentView, setCurrentView] = useState<'home' | 'game'>('home');
   const [runPlan, setRunPlan] = useState<Encounter[]>([]);
@@ -306,6 +308,10 @@ export default function SolitaireEngine({
    const [hintTargets, setHintTargets] = useState<string[]>([]);
    const [selectionColor, setSelectionColor] = useState<'none' | 'green' | 'yellow' | 'red'>('none');
    const [highlightedMoves, setHighlightedMoves] = useState<{ tableauIds: string[]; foundationIds: string[] }>({ tableauIds: [], foundationIds: [] });
+  
+  // Player Stats
+  const [playerStats, setPlayerStats] = useState<PlayerStats>(() => loadPlayerStats());
+  const [runStartData, setRunStartData] = useState<{ startTime: number; startCoins: number; encounterLog: RunEncounterRecord[] } | null>(null);
   
   const [activeDrawer, setActiveDrawer] = useState<'pause' | 'exploit' | 'curse' | 'blessing' | 'shop' | 'feedback' | 'test' | 'settings' | 'resign' | 'blessing_select' | null>(null);
   const [shopInventory, setShopInventory] = useState<GameEffect[]>([]);
@@ -451,6 +457,40 @@ export default function SolitaireEngine({
      return true;
   };
 
+  // Placeholder wanders for when no wander registry is provided
+  const PLACEHOLDER_WANDERS: Wander[] = [
+    {
+      id: 'placeholder_wander_1',
+      label: 'The Crossroads',
+      description: 'Two paths diverge before you. Each seems to promise something different.',
+      type: 'wander',
+      choices: [
+        { label: 'Take the left path', result: 'You find a small cache of coins.', effects: [{ type: 'modify_coin', params: [15] }] },
+        { label: 'Take the right path', result: 'A shortcut! You feel invigorated.', effects: [{ type: 'modify_score', params: [25] }] },
+      ],
+    },
+    {
+      id: 'placeholder_wander_2',
+      label: 'The Merchant',
+      description: 'A traveling merchant offers you a deal.',
+      type: 'wander',
+      choices: [
+        { label: 'Trade coins for points (-20 coins)', result: 'A fair exchange.', effects: [{ type: 'modify_coin', params: [-20] }, { type: 'modify_score', params: [50] }] },
+        { label: 'Decline politely', result: 'The merchant nods and moves on.', effects: [] },
+      ],
+    },
+    {
+      id: 'placeholder_wander_3',
+      label: 'The Gamble',
+      description: 'A mysterious figure offers you a wager.',
+      type: 'wander',
+      choices: [
+        { label: 'Accept the bet', result: 'Fortune favors the bold!', effects: [{ type: 'modify_coin', params: [30] }] },
+        { label: 'Walk away', result: 'Sometimes caution is wise.', effects: [{ type: 'modify_score', params: [10] }] },
+      ],
+    },
+  ];
+
   const resolveWanderEffect = (effects: any[]) => {
     console.log('resolveWanderEffect called with:', effects);
     let updates: Partial<GameState> = {};
@@ -530,7 +570,87 @@ export default function SolitaireEngine({
   };
 
   const chooseWanderOption = (wander: any) => { setGameState(prev => ({ ...prev, wanderState: 'active', activeWander: wander })); };
-  const resolveWander = (choice: WanderChoice) => { resolveWanderEffect(choice.effects); setGameState(prev => ({ ...prev, wanderState: 'result', wanderResultText: choice.result })); };
+  
+  const resolveWander = (choice: WanderChoice) => {
+    // Handle both old-style effects array and new-style onChoose callback
+    if (choice.onChoose) {
+      // Adapt gameState to format expected by wanders (claudecoronata structure)
+      const adaptedState = {
+        resources: {
+          coins: gameState.coins || 0,
+          handSize: 5,
+          shuffles: 0,
+          discards: 0,
+        },
+        run: {
+          inventory: {
+            exploits: activeEffects.filter(id => {
+              const e = effectsRegistry.find(x => x.id === id);
+              return e?.type === 'exploit' || e?.type === 'epic' || e?.type === 'legendary';
+            }),
+            curses: activeEffects.filter(id => {
+              const e = effectsRegistry.find(x => x.id === id);
+              return e?.type === 'curse';
+            }),
+            blessings: gameState.ownedEffects.filter(id => {
+              const e = effectsRegistry.find(x => x.id === id);
+              return e?.type === 'blessing';
+            }),
+          },
+        },
+        activeExploits: activeEffects.filter(id => {
+          const e = effectsRegistry.find(x => x.id === id);
+          return e?.type === 'exploit' || e?.type === 'epic' || e?.type === 'legendary';
+        }),
+      };
+      
+      const result = choice.onChoose({ state: adaptedState, rng: Math.random });
+      
+      // Map the returned state back to gameState format
+      if (result && result.state) {
+        const newState = result.state;
+        const updates: Partial<GameState> = {};
+        
+        // Map resources back
+        if (newState.resources?.coins !== undefined) {
+          updates.coins = newState.resources.coins;
+        }
+        
+        // Map inventory back to ownedEffects and activeEffects
+        if (newState.run?.inventory) {
+          const inv = newState.run.inventory;
+          const newOwned = new Set(gameState.ownedEffects);
+          const newActive = new Set(activeEffects);
+          
+          if (inv.exploits) inv.exploits.forEach((id: string) => { newOwned.add(id); newActive.add(id); });
+          if (inv.curses) inv.curses.forEach((id: string) => { newOwned.add(id); newActive.add(id); });
+          if (inv.blessings) inv.blessings.forEach((id: string) => newOwned.add(id));
+          
+          updates.ownedEffects = Array.from(newOwned);
+          setActiveEffects(Array.from(newActive));
+        }
+        
+        // Apply updates and set result text
+        setGameState(prev => ({ 
+          ...prev, 
+          ...updates, 
+          wanderState: 'result', 
+          wanderResultText: result.message || choice.result 
+        }));
+      } else {
+        // Fallback if onChoose doesn't return proper result
+        setGameState(prev => ({ ...prev, wanderState: 'result', wanderResultText: choice.result }));
+      }
+    } else if (choice.effects) {
+      // Old-style effects array (for PLACEHOLDER_WANDERS)
+      resolveWanderEffect(choice.effects);
+      setGameState(prev => ({ ...prev, wanderState: 'result', wanderResultText: choice.result }));
+    } else {
+      // No effects or onChoose - just show result
+      setGameState(prev => ({ ...prev, wanderState: 'result', wanderResultText: choice.result }));
+    }
+  };
+  
   const finishWander = () => {
      if (gameState.wanderRound < 2) {
          setGameState(prev => ({ ...prev, wanderRound: 2 }));
@@ -647,6 +767,13 @@ export default function SolitaireEngine({
       // Auto-draw opening hand for the first encounter
       const initialEffectsList = effectsRegistry.filter(e => initialActive.includes(e.id));
       freshState = dealHand(freshState, initialEffectsList);
+
+      // Initialize run tracking
+      setRunStartData({
+         startTime: Date.now(),
+         startCoins: freshState.coins,
+         encounterLog: []
+      });
 
       setRunPlan(plan);
       setGameState(freshState);
@@ -1087,6 +1214,18 @@ export default function SolitaireEngine({
      setShowLevelComplete(false);
      const currentEncounter = runPlan[gameState.runIndex];
      if (!currentEncounter) return;
+     
+     // Track encounter completion
+     if (runStartData) {
+        const effectDef = effectsRegistry.find(e => e.id === currentEncounter.effectId);
+        const encounterRecord: RunEncounterRecord = {
+           type: currentEncounter.type === 'danger' ? 'danger' : 'fear',
+           name: effectDef?.name || `Level ${gameState.runIndex + 1}`,
+           passed: true
+        };
+        setRunStartData(prev => prev ? { ...prev, encounterLog: [...prev.encounterLog, encounterRecord] } : null);
+     }
+     
      const reward = currentEncounter.type === 'danger' ? 100 : currentEncounter.type === 'fear' ? 50 : 0;
      setGameState(prev => ({ ...prev, coins: prev.coins + reward, score: 0 }));
      if (currentEncounter.type === 'danger') {
