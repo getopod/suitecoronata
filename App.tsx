@@ -603,23 +603,35 @@ export default function SolitaireEngine({
           const e = effectsRegistry.find(x => x.id === id);
           return e?.type === 'exploit' || e?.type === 'epic' || e?.type === 'legendary';
         }),
+        score: { current: gameState.score || 0 },
+        effectState: {},
       };
       
-      const result = choice.onChoose({ state: adaptedState, rng: Math.random });
+      // Wanders expect ctx.gameState, not ctx.state, and return state directly, not { state, message }
+      const resultState = choice.onChoose({ gameState: adaptedState, rng: Math.random });
       
       // Map the returned state back to gameState format
-      if (result && result.state) {
-        const newState = result.state;
+      if (resultState) {
         const updates: Partial<GameState> = {};
         
         // Map resources back
-        if (newState.resources?.coins !== undefined) {
-          updates.coins = newState.resources.coins;
+        if (resultState.resources?.coins !== undefined) {
+          updates.coins = resultState.resources.coins;
+        }
+        
+        // Map score back
+        if (resultState.score?.current !== undefined) {
+          updates.score = resultState.score.current;
+        }
+        
+        // Map effectState back (e.g., nextScoreGoalModifier, discardBonus, shuffleBonus)
+        if (resultState.effectState) {
+          updates.effectState = { ...gameState.effectState, ...resultState.effectState };
         }
         
         // Map inventory back to ownedEffects and activeEffects
-        if (newState.run?.inventory) {
-          const inv = newState.run.inventory;
+        if (resultState.run?.inventory) {
+          const inv = resultState.run.inventory;
           const newOwned = new Set(gameState.ownedEffects);
           const newActive = new Set(activeEffects);
           
@@ -636,7 +648,7 @@ export default function SolitaireEngine({
           ...prev, 
           ...updates, 
           wanderState: 'result', 
-          wanderResultText: result.message || choice.result 
+          wanderResultText: choice.result 
         }));
       } else {
         // Fallback if onChoose doesn't return proper result
