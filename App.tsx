@@ -671,7 +671,73 @@ export default function SolitaireEngine({
 
   const getEffects = useCallback(() => { return effectsRegistry.filter(e => activeEffects.includes(e.id)); }, [activeEffects, effectsRegistry]);
 
-  
+  // Find valid move destinations for a card/stack
+  const findValidMoves = useCallback((movingCardIds: string[], sourcePileId: string): { tableauIds: string[]; foundationIds: string[] } => {
+    const sourcePile = gameState.piles[sourcePileId];
+    if (!sourcePile) return { tableauIds: [], foundationIds: [] };
+    const movingCards = sourcePile.cards.filter(c => movingCardIds.includes(c.id));
+    if (movingCards.length === 0) return { tableauIds: [], foundationIds: [] };
+
+    const effects = getEffects();
+    const tableauIds: string[] = [];
+    const foundationIds: string[] = [];
+
+    // Validate stack if moving from tableau
+    let stackValid = true;
+    if (sourcePile.type === 'tableau' && movingCards.length > 1) {
+      // Check alternating colors and descending order
+      for (let i = 0; i < movingCards.length - 1; i++) {
+        const current = movingCards[i];
+        const next = movingCards[i + 1];
+        const patriarchyMode = settings.supportPatriarchy || false;
+        if (getCardColor(current.suit) === getCardColor(next.suit) || getStackRank(current.rank, patriarchyMode) !== getStackRank(next.rank, patriarchyMode) + 1) {
+          stackValid = false;
+          break;
+        }
+      }
+    }
+
+    if (!stackValid) return { tableauIds: [], foundationIds: [] };
+
+    // Check tableau destinations
+    Object.entries(gameState.piles).forEach(([pileId, pile]) => {
+      if (pile.type === 'tableau' && pileId !== sourcePileId) {
+        if (!pile.locked) {
+          let valid = isStandardMoveValid(movingCards, pile, settings.supportPatriarchy);
+          // Apply effect canMove hooks
+          effects.forEach(eff => {
+            if (eff.canMove) {
+              try {
+                const res = eff.canMove(movingCards, sourcePile, pile, valid, gameState);
+                if (res !== undefined) valid = res;
+              } catch (e) { /* ignore */ }
+            }
+          });
+          if (valid) tableauIds.push(pileId);
+        }
+      }
+    });
+
+    // Check foundation destinations (only for single cards)
+    if (movingCards.length === 1) {
+      Object.entries(gameState.piles).forEach(([pileId, pile]) => {
+        if (pile.type === 'foundation') {
+          let valid = isStandardMoveValid(movingCards, pile, settings.supportPatriarchy);
+          effects.forEach(eff => {
+            if (eff.canMove) {
+              try {
+                const res = eff.canMove(movingCards, sourcePile, pile, valid, gameState);
+                if (res !== undefined) valid = res;
+              } catch (e) { /* ignore */ }
+            }
+          });
+          if (valid) foundationIds.push(pileId);
+        }
+      });
+    }
+
+    return { tableauIds, foundationIds };
+  }, [gameState, getEffects, settings.supportPatriarchy]);
 
   const runMinigame = () => {
      if (!gameState.activeMinigame) return;
