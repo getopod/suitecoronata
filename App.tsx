@@ -579,9 +579,9 @@ export default function SolitaireEngine({
       const adaptedState = {
         resources: {
           coins: gameState.coins || 0,
-          handSize: 5,
-          shuffles: 0,
-          discards: 0,
+          handSize: gameState.resources?.handSize || 5,
+          shuffles: gameState.resources?.shuffles || 0,
+          discards: gameState.resources?.discards || 0,
         },
         run: {
           inventory: {
@@ -597,14 +597,21 @@ export default function SolitaireEngine({
               const e = effectsRegistry.find(x => x.id === id);
               return e?.type === 'blessing';
             }),
+            items: gameState.run?.inventory?.items || [],
+            fortunes: gameState.run?.inventory?.fortunes || [],
           },
+          unlockedWanders: gameState.run?.unlockedWanders || [],
+          activeQuests: gameState.run?.activeQuests || [],
+          statuses: gameState.run?.statuses || [],
+          forcedDanger: gameState.run?.forcedDanger,
         },
         activeExploits: activeEffects.filter(id => {
           const e = effectsRegistry.find(x => x.id === id);
           return e?.type === 'exploit' || e?.type === 'epic' || e?.type === 'legendary';
         }),
         score: { current: gameState.score || 0 },
-        effectState: {},
+        effectState: { ...gameState.effectState },
+        rules: { ...gameState.rules },
       };
       
       // Wanders expect ctx.gameState, not ctx.state, and return state directly, not { state, message }
@@ -618,6 +625,13 @@ export default function SolitaireEngine({
         if (resultState.resources?.coins !== undefined) {
           updates.coins = resultState.resources.coins;
         }
+        if (resultState.resources) {
+          updates.resources = {
+            handSize: resultState.resources.handSize ?? gameState.resources?.handSize ?? 5,
+            shuffles: resultState.resources.shuffles ?? gameState.resources?.shuffles ?? 0,
+            discards: resultState.resources.discards ?? gameState.resources?.discards ?? 0,
+          };
+        }
         
         // Map score back
         if (resultState.score?.current !== undefined) {
@@ -627,6 +641,11 @@ export default function SolitaireEngine({
         // Map effectState back (e.g., nextScoreGoalModifier, discardBonus, shuffleBonus)
         if (resultState.effectState) {
           updates.effectState = { ...gameState.effectState, ...resultState.effectState };
+        }
+        
+        // Map rules back
+        if (resultState.rules) {
+          updates.rules = { ...gameState.rules, ...resultState.rules };
         }
         
         // Map inventory back to ownedEffects and activeEffects
@@ -641,6 +660,19 @@ export default function SolitaireEngine({
           
           updates.ownedEffects = Array.from(newOwned);
           setActiveEffects(Array.from(newActive));
+          
+          // Map items, fortunes, etc.
+          updates.run = {
+            ...gameState.run,
+            inventory: {
+              items: inv.items || gameState.run?.inventory?.items || [],
+              fortunes: inv.fortunes || gameState.run?.inventory?.fortunes || [],
+            },
+            unlockedWanders: resultState.run.unlockedWanders || gameState.run?.unlockedWanders || [],
+            activeQuests: resultState.run.activeQuests || gameState.run?.activeQuests || [],
+            statuses: resultState.run.statuses || gameState.run?.statuses || [],
+            forcedDanger: resultState.run.forcedDanger,
+          };
         }
         
         // Apply updates and set result text
@@ -678,7 +710,19 @@ export default function SolitaireEngine({
      effectsRegistry.forEach(e => { if (e.chargeReset === 'encounter' && e.maxCharges) newCharges[e.id] = e.maxCharges; });
      const nextIdx = gameState.runIndex + 1;
      if (nextIdx < runPlan.length) {
-        const nextEncounter = runPlan[nextIdx];
+        let nextEncounter = runPlan[nextIdx];
+        
+        // Check if a wander forced the next danger
+        if (gameState.run?.forcedDanger) {
+          const forcedEffect = effectsRegistry.find(e => e.id === gameState.run.forcedDanger);
+          if (forcedEffect && (forcedEffect.type === 'danger' || forcedEffect.type === 'epic' || forcedEffect.type === 'legendary')) {
+            nextEncounter = {
+              ...nextEncounter,
+              effectId: gameState.run.forcedDanger,
+              type: 'danger'
+            };
+          }
+        }
         
         // Retain only persistent effects (blessings now persist like exploits/curses)
         const keptEffects = activeEffects.filter(id => { 
@@ -709,7 +753,12 @@ export default function SolitaireEngine({
             isLevelComplete: false, 
             charges: newCharges, 
             wanderState: 'none',
-            lastActionType: 'none'
+            lastActionType: 'none',
+            // Clear forcedDanger after using it
+            run: {
+              ...gameState.run,
+              forcedDanger: undefined
+            }
         };
 
         // Apply onActivate for the new encounter effect

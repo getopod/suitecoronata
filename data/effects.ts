@@ -73,7 +73,16 @@ export const generateNewBoard = (currentScore: number, currentCoins: number, sco
     activeWander: null,
     wanderResultText: null,
     interactionMode: 'normal',
-    charges: {}
+    charges: {},
+    // Wander compatibility fields
+    resources: { handSize: 5, shuffles: 0, discards: 0 },
+    rules: {},
+    run: {
+      inventory: { items: [], fortunes: [] },
+      unlockedWanders: [],
+      activeQuests: [],
+      statuses: []
+    }
   };
 };
 

@@ -75,7 +75,18 @@ export interface GameState {
   activeMinigame: { type: string; title: string; context?: any } | null;
   minigameResult: MinigameResult | null;
   
-  interactionMode: 'normal' | 'discard_select'; 
+  interactionMode: 'normal' | 'discard_select';
+  
+  // Wander Compatibility Fields (for claudecoronata wander helpers)
+  resources?: { handSize?: number; shuffles?: number; discards?: number; };
+  rules?: Record<string, any>;
+  run?: {
+    inventory?: { items?: string[]; fortunes?: string[]; };
+    unlockedWanders?: string[];
+    activeQuests?: string[];
+    statuses?: Array<{ id: string; duration: number; }>;
+    forcedDanger?: string;
+  };
 }
 
 export interface Encounter {
