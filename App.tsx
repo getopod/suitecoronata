@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { LayoutGrid, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, HelpCircle, RefreshCw, X, Gift, Trophy, ArrowLeftRight, SkipBack, SkipForward, MessageSquare, FlaskConical, Save, Flag, Settings, ChevronDown, Pause, ShoppingCart, User, Unlock, Map as MapIcon, BarChart3, Link as LinkIcon, Bug } from 'lucide-react';
 import { Card, GameState, Pile, Rank, Suit, MoveContext, Encounter, GameEffect, Wander, WanderChoice, MinigameResult, PlayerStats, RunHistoryEntry, RunEncounterRecord } from './types';
-import { getCardColor, generateNewBoard, EFFECTS_REGISTRY } from './data/effects';
+import { getCardColor, generateNewBoard, EFFECTS_REGISTRY, setEffectsRng, resetEffectsRng } from './data/effects';
 import { isHighestRank, isNextHigherInOrder, isNextLowerInOrder } from './utils/rankOrder';
 import { Minigames } from './utils/minigames';
 import { loadPlayerStats, savePlayerStats, recordRunCompletion, getWinRate, formatDuration, getRelativeTime } from './utils/playerStats';
@@ -817,8 +817,10 @@ export default function SolitaireEngine({
            setPlayerStats(updatedStats);
            savePlayerStats(updatedStats);
         }
-        alert("Run Complete!"); 
-        setCurrentView('home'); 
+      // Restore RNG to original implementation to avoid leaking deterministic RNG
+      try { resetEffectsRng(); } catch {}
+      alert("Run Complete!"); 
+      setCurrentView('home'); 
      }
   };
 
@@ -827,6 +829,9 @@ export default function SolitaireEngine({
       const rawSeed = (() => { try { return localStorage.getItem('solitaire_seed_v1'); } catch { return null; } })();
       const seedNum = rawSeed ? Number(rawSeed) : null;
       const rng = seedNum ? createSeededRng(seedNum) : undefined;
+
+      // Inject deterministic RNG for effect logic when a seed is provided
+      if (rng) setEffectsRng(rng); else resetEffectsRng();
 
       const plan = generateRunPlan(effectsRegistry, rng);
       const firstEncounter = plan[0];

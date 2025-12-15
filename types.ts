@@ -2,7 +2,7 @@
 import { LucideIcon } from 'lucide-react';
 
 export type Suit = 'hearts' | 'diamonds' | 'clubs' | 'spades' | 'special'; 
-export type Rank = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13; 
+export type Rank = -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13; 
 export type PileType = 'deck' | 'hand' | 'foundation' | 'tableau'; 
 
 export interface Card {
@@ -129,12 +129,12 @@ export interface GameEffect {
     targetPile: Pile, 
     defaultAllowed: boolean,
     gameState: GameState
-  ) => boolean;
+  ) => boolean | undefined;
 
   interceptMove?: (
     context: MoveContext,
     gameState: GameState
-  ) => Partial<MoveContext>;
+  ) => Partial<MoveContext> | undefined;
 
   onMoveComplete?: (
     gameState: GameState,

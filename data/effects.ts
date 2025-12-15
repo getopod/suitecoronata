@@ -1,6 +1,11 @@
 import { GameEffect, Suit, Card, Rank, Pile, GameState, MoveContext } from '../types';
 import { getNextLowerRank, getOrderedRankValue, isHighestRank, isNextHigherInOrder, isNextLowerInOrder } from '../utils/rankOrder';
 
+// Effects RNG control — allows the app to inject a seeded RNG for deterministic runs.
+const __ORIG_MATH_RANDOM = Math.random;
+export const setEffectsRng = (fn: () => number) => { (Math as any).random = fn; };
+export const resetEffectsRng = () => { (Math as any).random = __ORIG_MATH_RANDOM; };
+
 export const getCardColor = (suit: Suit) => {
   if (suit === 'special') return 'purple';
   return (suit === 'hearts' || suit === 'diamonds' ? 'red' : 'black');
@@ -181,7 +186,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
         let cardIdx = 0;
         for (let i = 0; i < 7; i++) {
           const pileCards = allCards.slice(cardIdx, cardIdx + i + 1);
-          pileCards[pileCards.length - 1].faceUp = true;
+          if (pileCards.length > 0) pileCards[pileCards.length - 1].faceUp = true;
           newPiles[`tableau-${i}`] = { id: `tableau-${i}`, type: 'tableau', cards: pileCards };
           cardIdx += i + 1;
         }
