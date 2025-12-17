@@ -85,184 +85,168 @@ export const generateNewBoard = (currentScore: number, currentCoins: number, sco
 };
 
 export const EFFECTS_REGISTRY: GameEffect[] = [
-  // BLESSINGS
   {
     id: 'blacksmith',
     name: 'Blacksmith',
     type: 'blessing',
-    description: 'Tableau plays allow +-1 rank',
-    canMove: (cards, source, target, defaultAllowed, state) => {
-      if (target.type === 'tableau' && cards.length === 1) {
+    description: 'Tableau plays allow ±1 rank.',
+    canMove: (cards, source, target, defaultAllowed) => {
+      if (target.type === 'tableau' && target.cards.length > 0) {
         const moving = cards[0];
-        const targetCard = target.cards[target.cards.length - 1];
-        if (!targetCard) return isHighestRank(moving.rank);
-        const rankDiff = Math.abs(moving.rank - targetCard.rank);
-        return rankDiff <= 1 && getCardColor(moving.suit) !== getCardColor(targetCard.suit);
+        const top = target.cards[target.cards.length - 1];
+        const isAlt = getCardColor(moving.suit) !== getCardColor(top.suit);
+        const step = Math.abs(moving.rank - top.rank) === 1;
+        return isAlt && step;
       }
       return defaultAllowed;
-    },
-    calculateScore: (score, context, state) => score + 10, // Rank-based bonus
-    calculateCoinTransaction: (delta, context, state) => delta + 5 // Basic coin gain
+    }
   },
   {
     id: 'vagrant',
     name: 'Vagrant',
     type: 'blessing',
-    description: '+2 tableaus',
+    description: '+2 tableaus.',
     onActivate: (state) => {
       const newPiles = { ...state.piles };
-      const currentTableaus = Object.keys(newPiles).filter(k => k.startsWith('tableau')).length;
-      newPiles[`tableau-${currentTableaus}`] = { id: `tableau-${currentTableaus}`, type: 'tableau', cards: [] };
-      newPiles[`tableau-${currentTableaus + 1}`] = { id: `tableau-${currentTableaus + 1}`, type: 'tableau', cards: [] };
+      const next = Object.keys(newPiles).filter(k => k.startsWith('tableau')).length;
+      newPiles[`tableau-${next}`] = { id: `tableau-${next}`, type: 'tableau', cards: [] };
+      newPiles[`tableau-${next+1}`] = { id: `tableau-${next+1}`, type: 'tableau', cards: [] };
       return { piles: newPiles };
-    },
-    calculateScore: (score, context, state) => score * 1.1 // Achievement-based scaling
+    }
   },
   {
     id: 'maneki_neko',
     name: 'Maneki-Neko',
     type: 'blessing',
-    description: 'Tableau plays ignore suit, foundation plays ignore rank',
-    canMove: (cards, source, target, defaultAllowed, state) => {
+    description: 'Tableau plays ignore suit, foundation plays ignore rank.',
+    canMove: (cards, source, target, defaultAllowed) => {
+      const moving = cards[0];
+      const top = target.cards[target.cards.length - 1];
       if (target.type === 'tableau') {
-        const moving = cards[0];
-        const targetCard = target.cards[target.cards.length - 1];
-        if (!targetCard) return isHighestRank(moving.rank);
-        return isNextLowerInOrder(moving.rank, targetCard.rank);
+        if (!top) return isHighestRank(moving.rank);
+        return isNextLowerInOrder(moving.rank, top.rank);
       }
       if (target.type === 'foundation') {
-        const moving = cards[0];
-        const targetCard = target.cards[target.cards.length - 1];
-        if (!targetCard) return moving.rank === 1;
-        return moving.suit === targetCard.suit;
+        if (!top) return moving.rank === 1;
+        return moving.suit === top.suit;
       }
       return defaultAllowed;
-    },
-    calculateCoinTransaction: (delta, context, state) => delta * 1.15 // Multipliers
+    }
   },
   {
     id: 'tortoiseshell',
     name: 'Tortoiseshell',
     type: 'blessing',
-    description: 'Tableau plays ignore rank, foundation plays ignore suit',
-    canMove: (cards, source, target, defaultAllowed, state) => {
+    description: 'Tableau plays ignore rank, foundation plays ignore suit.',
+    canMove: (cards, source, target, defaultAllowed) => {
+      const moving = cards[0];
+      const top = target.cards[target.cards.length - 1];
       if (target.type === 'tableau') {
-        const moving = cards[0];
-        const targetCard = target.cards[target.cards.length - 1];
-        if (!targetCard) return isHighestRank(moving.rank);
-        return getCardColor(moving.suit) !== getCardColor(targetCard.suit);
+        if (!top) return isHighestRank(moving.rank);
+        return getCardColor(moving.suit) !== getCardColor(top.suit);
       }
       if (target.type === 'foundation') {
-        const moving = cards[0];
-        const targetCard = target.cards[target.cards.length - 1];
-        if (!targetCard) return moving.rank === 1;
-        return isNextHigherInOrder(moving.rank, targetCard.rank);
+        if (!top) return moving.rank === 1;
+        return isNextHigherInOrder(moving.rank, top.rank);
       }
       return defaultAllowed;
-    },
-    calculateScore: (score, context, state) => score + 15 // Conditional by suit
+    }
   },
   {
     id: 'schemer',
     name: 'Schemer',
     type: 'blessing',
-    description: 'Foundation cards can be played to tableaus',
-    canMove: (cards, source, target, defaultAllowed, state) => {
+    description: 'Foundation cards can be played to tableaus.',
+    canMove: (cards, source, target, defaultAllowed) => {
       if (source.type === 'foundation' && target.type === 'tableau') {
         const moving = cards[0];
-        const targetCard = target.cards[target.cards.length - 1];
-        if (!targetCard) return isHighestRank(moving.rank);
-        return getCardColor(moving.suit) !== getCardColor(targetCard.suit) && isNextLowerInOrder(moving.rank, targetCard.rank);
+        const top = target.cards[target.cards.length - 1];
+        if (!top) return isHighestRank(moving.rank);
+        return getCardColor(moving.suit) !== getCardColor(top.suit) &&
+               isNextLowerInOrder(moving.rank, top.rank);
       }
       return defaultAllowed;
-    },
-    calculateCoinTransaction: (delta, context, state) => delta + 10 // Conditional by action
+    }
   },
   {
     id: 'thief',
     name: 'Thief',
     type: 'blessing',
-    description: 'Play buried face-up cards without moving their stack',
-    canMove: (cards, source, target, defaultAllowed, state) => {
-      if (source.type === 'tableau' && target.type === 'foundation' && cards.length === 1) {
-        const cardIndex = source.cards.findIndex(c => c.id === cards[0].id);
-        return cardIndex >= 0 && source.cards[cardIndex].faceUp;
+    description: 'Play buried face-up cards without moving their stack.',
+    canMove: (cards, source, target, defaultAllowed) => {
+      if (source.type === 'tableau' && cards.length === 1) {
+        const card = cards[0];
+        const idx = source.cards.findIndex(c => c.id === card.id);
+        const isBuried = idx < source.cards.length - 1;
+        if (isBuried && card.faceUp) return true;
       }
       return defaultAllowed;
-    },
-    onMoveComplete: (state, context) => {
-      // Trigger events
-      return { score: state.score + 5 };
     }
   },
   {
     id: 'hoarder',
     name: 'Hoarder',
     type: 'blessing',
-    description: 'Consecutive same-suit plays stack +100% points each',
+    description: 'Consecutive same-suit plays stack +100% points each.',
     calculateScore: (score, context, state) => {
-      if (context.cards[0].suit === state.effectState.lastPlayedSuit) {
-        state.effectState.lastPlayedSuit = context.cards[0].suit;
-        return score * 2;
+      const suit = context.cards[0].suit;
+      const last = state.effectState.hoarderLastSuit;
+      const streak = state.effectState.hoarderStreak || 0;
+      if (last === suit) {
+        return score * (2 ** streak);
       }
-      state.effectState.lastPlayedSuit = context.cards[0].suit;
       return score;
     },
-    calculateCoinTransaction: (delta, context, state) => delta + 20 // Achievement-based
+    onMoveComplete: (state, context) => {
+      const suit = context.cards[0].suit;
+      const last = state.effectState.hoarderLastSuit;
+      const streak = state.effectState.hoarderStreak || 0;
+      const nextStreak = last === suit ? streak + 1 : 1;
+      return { effectState: { ...state.effectState, hoarderLastSuit: suit, hoarderStreak: nextStreak } };
+    }
   },
   {
     id: 'pedant',
     name: 'Pedant',
     type: 'blessing',
-    description: 'All tableau cards face-up',
-    onActivate: (state) => {
-      const newPiles = { ...state.piles };
-      Object.keys(newPiles).filter(k => k.startsWith('tableau')).forEach(key => {
-        newPiles[key].cards.forEach(card => card.faceUp = true);
-      });
-      return { piles: newPiles };
-    },
-    transformCardVisual: (card, pile) => ({ faceUp: true }) // Visual transformations
+    description: 'All tableau cards face-up.',
+    transformCardVisual: (card, pile) => pile?.type === 'tableau' ? { faceUp: true } : {}
   },
   {
     id: 'wizard',
     name: 'Wizard',
     type: 'blessing',
-    description: '+2 foundations',
+    description: '+2 foundations.',
     onActivate: (state) => {
       const newPiles = { ...state.piles };
-      const suits = ['hearts', 'diamonds', 'clubs', 'spades'];
-      const existingFoundations = Object.keys(newPiles).filter(k => k.startsWith('foundation'));
-      for (let i = 0; i < 2; i++) {
-        const suit = suits[(existingFoundations.length + i) % 4];
-        newPiles[`foundation-${suit}-${i}`] = { id: `foundation-${suit}-${i}`, type: 'foundation', cards: [] };
-      }
+      const count = Object.keys(newPiles).filter(k => k.startsWith('foundation')).length;
+      newPiles[`foundation-extra-${count}`] = { id: `foundation-extra-${count}`, type: 'foundation', cards: [] };
+      newPiles[`foundation-extra-${count+1}`] = { id: `foundation-extra-${count+1}`, type: 'foundation', cards: [] };
       return { piles: newPiles };
-    },
-    calculateScore: (score, context, state) => score * 1.05 // Progressive scaling
+    }
   },
   {
     id: 'alchemist',
     name: 'Alchemist',
     type: 'blessing',
-    description: '+20% coin from all sources',
-    calculateCoinTransaction: (delta, context, state) => delta * 1.2
+    description: '+20% coin from all sources.',
+    calculateCoinTransaction: (delta) => Math.floor(delta * 1.2)
   },
   {
     id: 'charlatan',
     name: 'Charlatan',
     type: 'blessing',
-    description: 'Build tableau up or down by rank',
-    canMove: (cards, source, target, defaultAllowed, state) => {
-      if (target.type === 'tableau' && cards.length === 1) {
+    description: 'Build tableau up or down by rank.',
+    canMove: (cards, source, target, defaultAllowed) => {
+      if (target.type === 'tableau' && target.cards.length > 0) {
         const moving = cards[0];
-        const targetCard = target.cards[target.cards.length - 1];
-        if (!targetCard) return isHighestRank(moving.rank);
-        return Math.abs(moving.rank - targetCard.rank) === 1 && getCardColor(moving.suit) !== getCardColor(targetCard.suit);
+        const top = target.cards[target.cards.length - 1];
+        const isAlt = getCardColor(moving.suit) !== getCardColor(top.suit);
+        const step = Math.abs(moving.rank - top.rank) === 1;
+        return isAlt && step;
       }
       return defaultAllowed;
-    },
-    calculateScore: (score, context, state) => score + 20 // Sequence-based
+    }
   },
   {
     id: 'martyr',
@@ -270,14 +254,20 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     type: 'blessing',
     description: 'Sacrifice 1 foundation. Return its cards to the deck.',
     onActivate: (state) => {
-      const foundations = Object.keys(state.piles).filter(k => k.startsWith('foundation'));
-      if (foundations.length > 0) {
-        const sacrifice = foundations[Math.floor(Math.random() * foundations.length)];
-        const cards = state.piles[sacrifice].cards;
-        state.piles['deck'].cards.push(...cards);
-        delete state.piles[sacrifice];
-      }
-      return { piles: state.piles };
+      const fids = Object.keys(state.piles).filter(k => k.startsWith('foundation') && state.piles[k].cards.length > 0);
+      if (fids.length === 0) return {};
+      const fid = fids[0];
+      const deck = state.piles['deck'];
+      const returned = state.piles[fid].cards.map(c => ({ ...c, faceUp: false }));
+      const newDeck = [...deck.cards, ...returned];
+      newDeck.sort(() => Math.random() - 0.5);
+      return {
+        piles: {
+          ...state.piles,
+          [fid]: { ...state.piles[fid], cards: [] },
+          deck: { ...deck, cards: newDeck }
+        }
+      };
     }
   },
   {
@@ -285,137 +275,216 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     name: 'Jester',
     type: 'blessing',
     description: 'Skip a fear encounter. 2 charges',
-    maxCharges: 2,
-    chargeReset: 'encounter'
+    onActivate: (state) => {
+      const charges = (state.effectState.jesterCharges ?? 2);
+      if (charges <= 0) return {};
+      return { effectState: { ...state.effectState, jesterCharges: charges - 1, skipFearEncounter: true } };
+    }
   },
   {
     id: 'trickster',
     name: 'Trickster',
     type: 'blessing',
     description: 'Add a key to your hand. 3 charges',
-    maxCharges: 3
+    onActivate: (state) => {
+      const charges = (state.effectState.tricksterCharges ?? 3);
+      if (charges <= 0) return {};
+      const hand = state.piles['hand'];
+      const keyCard: Card = { id: `key-${Date.now()}`, suit: 'special', rank: 0, faceUp: true, meta: { isKey: true } };
+      return {
+        effectState: { ...state.effectState, tricksterCharges: charges - 1 },
+        piles: { ...state.piles, hand: { ...hand, cards: [...hand.cards, keyCard] } }
+      };
+    }
   },
   {
     id: 'timekeeper',
     name: 'Timekeeper',
     type: 'blessing',
-    description: 'Return the last 5 cards you played to your hand (1 charge)',
-    maxCharges: 1
+    description: 'Return the last 5 cards you played to your hand (1 charge).',
+    onActivate: (state) => {
+      if (state.effectState.timekeeperUsed) return {};
+      const lastFive: Card[] = (state.effectState.lastPlayedCards || []).slice(-5);
+      const hand = state.piles['hand'];
+      const clean = lastFive.map(c => ({ ...c, faceUp: true }));
+      return {
+        effectState: { ...state.effectState, timekeeperUsed: true },
+        piles: { ...state.piles, hand: { ...hand, cards: [...hand.cards, ...clean] } }
+      };
+    },
+    onMoveComplete: (state, context) => {
+      const playedCards = [...(state.effectState.lastPlayedCards || [])];
+      playedCards.push(...context.cards);
+      return { effectState: { ...state.effectState, lastPlayedCards: playedCards.slice(-20) } };
+    }
   },
   {
     id: 'klabautermann',
     name: 'Klabautermann',
     type: 'blessing',
     description: 'Once per encounter, you may discard your hand to draw 5 cards.',
-    maxCharges: 1,
-    chargeReset: 'encounter'
+    onActivate: (state) => {
+      if (state.effectState.klabautermannUsed) return {};
+      const deck = state.piles['deck'];
+      const hand = state.piles['hand'];
+      const drawCount = Math.min(5, deck.cards.length);
+      const drawn = deck.cards.slice(-drawCount).map(c => ({ ...c, faceUp: true }));
+      const remainingDeck = deck.cards.slice(0, -drawCount);
+      return {
+        effectState: { ...state.effectState, klabautermannUsed: true },
+        piles: {
+          ...state.piles,
+          hand: { ...hand, cards: drawn },
+          deck: { ...deck, cards: remainingDeck },
+          deck: { ...state.piles['deck'], cards: [...state.piles['deck'].cards, ...hand.cards] }
+        }
+      };
+    }
   },
   {
     id: 'lobbyist',
     name: 'Lobbyist',
     type: 'blessing',
-    description: 'Combine black suits & red suits',
-    canMove: (cards, source, target, defaultAllowed, state) => {
-      if (target.type === 'tableau' && cards.length === 1) {
+    description: 'Combine black suits & red suits.',
+    canMove: (cards, source, target, defaultAllowed) => {
+      if (target.type === 'foundation') {
         const moving = cards[0];
-        const targetCard = target.cards[target.cards.length - 1];
-        if (!targetCard) return isHighestRank(moving.rank);
-        const movingColor = getCardColor(moving.suit);
-        const targetColor = getCardColor(targetCard.suit);
-        return movingColor === targetColor && isNextLowerInOrder(moving.rank, targetCard.rank);
+        const top = target.cards[target.cards.length - 1];
+        const color = getCardColor(moving.suit);
+        const topColor = top ? getCardColor(top.suit) : null;
+        if (!top) return moving.rank === 1;
+        return color === topColor && isNextHigherInOrder(moving.rank, top.rank);
+      }
+      if (target.type === 'tableau' && target.cards.length > 0) {
+        const moving = cards[0];
+        const top = target.cards[target.cards.length - 1];
+        const isOpp = getCardColor(moving.suit) !== getCardColor(top.suit);
+        return isOpp && isNextLowerInOrder(moving.rank, top.rank);
       }
       return defaultAllowed;
-    },
-    calculateCoinTransaction: (delta, context, state) => delta + 25 // Gambling: random win/loss
+    }
   },
   {
     id: 'impersonator',
     name: 'Impersonator',
     type: 'blessing',
-    description: 'Add a wild card to your hand (3 charges)',
-    maxCharges: 3
+    description: 'Add a wild card to your hand (3 charges).',
+    onActivate: (state) => {
+      const charges = (state.effectState.impersonatorCharges ?? 3);
+      if (charges <= 0) return {};
+      const hand = state.piles['hand'];
+      const wild: Card = { id: `wild-${Date.now()}`, suit: 'special', rank: 0, faceUp: true, meta: { isWild: true } };
+      return {
+        effectState: { ...state.effectState, impersonatorCharges: charges - 1 },
+        piles: { ...state.piles, hand: { ...hand, cards: [...hand.cards, wild] } }
+      };
+    },
+    canMove: (cards, source, target, defaultAllowed) => (cards.length === 1 && cards[0].meta?.isWild) ? true : defaultAllowed
   },
   {
     id: 'whore_of_galore',
     name: 'Whore of Galore',
     type: 'blessing',
-    description: '+1 wild foundation',
+    description: '+1 wild foundation.',
     onActivate: (state) => {
-      const newPiles = { ...state.piles };
-      newPiles['foundation-wild'] = { id: 'foundation-wild', type: 'foundation', cards: [] };
+      const fid = `foundation-wild-${Date.now()}`;
+      const newPiles = { ...state.piles, [fid]: { id: fid, type: 'foundation', cards: [], meta: { isWildFoundation: true } } };
       return { piles: newPiles };
+    },
+    canMove: (cards, source, target, defaultAllowed) => {
+      if (target.meta?.isWildFoundation) {
+        const top = target.cards[target.cards.length - 1];
+        if (!top) return cards[0].rank === 1 || cards[0].meta?.isWild;
+        return isNextHigherInOrder(cards[0].rank, top.rank);
+      }
+      return defaultAllowed;
     }
   },
   {
     id: 'merchant',
     name: 'Merchant',
     type: 'blessing',
-    description: 'Pay 2× goal with coin to skip encounter'
+    description: 'Pay 2× goal with coin to skip encounter.',
+    onActivate: (state) => {
+      const cost = state.currentScoreGoal * 2;
+      if (state.coins < cost) return {};
+      return { coins: state.coins - cost, effectState: { ...state.effectState, skipEncounter: true } };
+    }
   },
-  // EXPLOITS
   {
     id: 'mad_king',
     name: 'Mad King',
     type: 'exploit',
-    description: '+4 Ace of Crowns in deck. Move as Ace, Jack or King',
+    description: '+4 Ace of Crowns in deck. Move as Ace, Jack or King.',
     onActivate: (state) => {
-      const newPiles = { ...state.piles };
-      const deck = newPiles['deck'].cards;
-      for (let i = 0; i < 4; i++) {
-        deck.push({ id: `crown-ace-${i}`, suit: 'special', rank: 1, faceUp: false });
-      }
-      return { piles: newPiles };
+      const deck = state.piles['deck'];
+      const crowns: Card[] = Array.from({ length: 4 }).map((_, i) => ({
+        id: `crown-${i}-${Date.now()}`, suit: 'special', rank: 1, faceUp: false,
+        meta: { crown: true, virtualRanks: [1, 11, 13] }
+      }));
+      const newDeck = [...deck.cards, ...crowns];
+      newDeck.sort(() => Math.random() - 0.5);
+      return { piles: { ...state.piles, deck: { ...deck, cards: newDeck } } };
     },
-    canMove: (cards, source, target, defaultAllowed, state) => {
-      if (cards[0].suit === 'special' && cards[0].rank === 1) {
-        if (target.type === 'foundation') {
-          return true;
-        }
+    canMove: (cards, source, target, defaultAllowed) => {
+      const c = cards[0];
+      if (!c.meta?.crown) return defaultAllowed;
+      const top = target.cards[target.cards.length - 1];
+      const tryRanks: Rank[] = [1, 11, 13];
+      return tryRanks.some(r => {
+        const virtual = { ...c, rank: r };
         if (target.type === 'tableau') {
-          const targetCard = target.cards[target.cards.length - 1];
-          if (!targetCard) return true;
-          return isNextLowerInOrder(11, targetCard.rank) || isNextLowerInOrder(13, targetCard.rank) || isNextLowerInOrder(1, targetCard.rank);
+          if (!top) return isHighestRank(virtual.rank);
+          return getCardColor(virtual.suit) !== getCardColor(top.suit) &&
+                 isNextLowerInOrder(virtual.rank, top.rank);
         }
-      }
-      return defaultAllowed;
-    },
-    calculateScore: (score, context, state) => score * 1.5 // Special conditions
+        if (target.type === 'foundation') {
+          if (!top) return virtual.rank === 1;
+          return virtual.suit === top.suit && isNextHigherInOrder(virtual.rank, top.rank);
+        }
+        return false;
+      });
+    }
   },
   {
     id: 'high_society',
     name: 'High Society',
     type: 'exploit',
-    description: 'Hand to foundation plays x2 points',
-    calculateScore: (score, context, state) => {
-      if (context.source === 'hand' && context.target.startsWith('foundation')) {
-        return score * 2;
-      }
-      return score;
-    }
+    description: 'Hand to foundation plays x2 points.',
+    calculateScore: (score, context) =>
+      (context.source === 'hand' && context.target.includes('foundation')) ? score * 2 : score
   },
   {
     id: 'compound_interest',
     name: 'Compound Interest',
     type: 'exploit',
     description: 'Each foundation play gives +10% points gained. Each reveal gives +5% current coins.',
+    onEncounterStart: (state) => ({ effectState: { ...state.effectState, compoundPointMult: 1 } }),
     onMoveComplete: (state, context) => {
-      if (context.target.startsWith('foundation')) {
-        state.scoreMultiplier *= 1.1;
+      const updates: any = {};
+      if (context.target.includes('foundation')) {
+        updates.effectState = { ...state.effectState,
+          compoundPointMult: (state.effectState.compoundPointMult || 1) * 1.1 };
       }
-      if (context.cards.some(c => !c.faceUp)) {
-        state.coinMultiplier *= 1.05;
+      if (context.reveal) {
+        updates.coins = Math.floor(state.coins * 1.05);
       }
-      return { scoreMultiplier: state.scoreMultiplier, coinMultiplier: state.coinMultiplier };
-    }
+      return updates;
+    },
+    calculateScore: (score, context, state) =>
+      Math.floor(score * (state.effectState.compoundPointMult || 1))
   },
   {
-    id: 'anarchist_cookbook',
-    name: 'Anarchist\'s Cookbook',
+    id: 'anarchists_cookbook',
+    name: "Anarchist's Cookbook",
     type: 'exploit',
-    description: 'Build foundations in any order',
-    canMove: (cards, source, target, defaultAllowed, state) => {
+    description: 'Build foundations in any order.',
+    canMove: (cards, source, target, defaultAllowed) => {
       if (target.type === 'foundation') {
-        return true;
+        const moving = cards[0]; const top = target.cards[target.cards.length - 1];
+        if (!top) return true;
+        return isNextHigherInOrder(moving.rank, top.rank) ||
+               isNextLowerInOrder(moving.rank, top.rank);
       }
       return defaultAllowed;
     }
@@ -424,25 +493,49 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'switcheroo',
     name: 'Switcheroo',
     type: 'exploit',
-    description: 'Undo last 3 plays for -50 coins'
+    description: 'Undo last 3 plays for -50 coins.',
+    onActivate: (state) => {
+      if ((state.effectState.lastSnapshots || []).length < 3 || state.coins < 50) return {};
+      const snapshot = state.effectState.lastSnapshots[state.effectState.lastSnapshots.length - 3];
+      return { ...snapshot, coins: state.coins - 50 };
+    },
+    onMoveComplete: (state) => {
+      const snap = { piles: state.piles, score: state.score, coins: state.coins, effectState: state.effectState };
+      const prev = [...(state.effectState.lastSnapshots || []), snap].slice(-10);
+      return { effectState: { ...state.effectState, lastSnapshots: prev } };
+    }
   },
   {
     id: 'master_debater',
     name: 'Master Debater',
     type: 'exploit',
-    description: 'Disable a curse for 1 encounter'
+    description: 'Disable a curse for 1 encounter.',
+    onActivate: (state) => ({ effectState: { ...state.effectState, disabledCurseOnce: true } })
   },
   {
     id: 'insider_trading',
     name: 'Insider Trading',
     type: 'exploit',
-    description: 'All face cards visible → x3 encounter reward'
+    description: 'All face cards visible → x3 encounter reward.',
+    transformCardVisual: (card) => (card.rank === 1 || card.rank >= 11) ? { faceUp: true } : {},
+    onEncounterEnd: (state) => ({ score: state.score * 3 })
   },
   {
     id: 'liquid_assets',
     name: 'Liquid Assets',
     type: 'exploit',
-    description: 'Convert between points & coins (3:1 or 5:1)'
+    description: 'Convert between points & coins (3:1 or 5:1).',
+    onActivate: (state) => {
+      const mode = state.effectState.liquidMode || '3to1';
+      if (mode === '3to1' && state.score >= 3) {
+        const converted = Math.floor(state.score / 3);
+        return { score: state.score - converted * 3, coins: state.coins + converted };
+      } else if (mode === '5to1' && state.coins >= 5) {
+        const converted = Math.floor(state.coins / 5);
+        return { coins: state.coins - converted * 5, score: state.score + converted };
+      }
+      return {};
+    }
   },
   {
     id: 'keen_instincts',
@@ -450,14 +543,13 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     type: 'exploit',
     description: 'Revealed cards ignores rank & give +10 coin if played immediately.',
     canMove: (cards, source, target, defaultAllowed, state) => {
-      if (cards.some(c => !c.faceUp)) {
-        return true;
-      }
+      const c = cards[0];
+      if (c.id === state.effectState.justRevealedCardId && target.type === 'tableau') return true;
       return defaultAllowed;
     },
     onMoveComplete: (state, context) => {
-      if (context.cards.some(c => !c.faceUp)) {
-        return { coins: state.coins + 10 };
+      if (context.cards[0].id === state.effectState.justRevealedCardId) {
+        return { coins: state.coins + 10, effectState: { ...state.effectState, justRevealedCardId: null } };
       }
       return {};
     }
@@ -466,14 +558,12 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'venture_capitol',
     name: 'Venture Capitol',
     type: 'exploit',
-    description: 'Foundation plays give +20 coin. Foundation completions give +100 coin.',
+    description: 'Foundation plays +20 coin. Completions +100 coin.',
     calculateCoinTransaction: (delta, context, state) => {
-      if (context.target.startsWith('foundation')) {
-        delta += 20;
-        const targetPile = state.piles[context.target];
-        if (targetPile.cards.length === 13) {
-          delta += 100;
-        }
+      if (context.target.includes('foundation')) {
+        const pile = state.piles[context.target];
+        const willBe = pile.cards.length + context.cards.length;
+        return delta + 20 + (willBe === 13 ? 100 : 0);
       }
       return delta;
     }
@@ -482,24 +572,30 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'one_armed_bandit',
     name: 'One-Armed Bandit',
     type: 'exploit',
-    description: 'Have 3 sevens face up at once → Slots →',
-    onMoveComplete: (state, context) => {
-      const faceUpSevens = Object.values(state.piles).flatMap(p => p.cards.filter(c => c.faceUp && c.rank === 7)).length;
-      if (faceUpSevens >= 3) {
-        return { triggerMinigame: 'slots' };
+    description: 'Have 3 sevens face up at once → Slots minigame.',
+    onMoveComplete: (state) => {
+      let count = 0;
+      Object.values(state.piles).forEach(p =>
+        p.cards.forEach(c => { if (c.faceUp && c.rank === 7) count++; })
+      );
+      if (count >= 3 && !state.effectState.slotsTriggered) {
+        return { effectState: { ...state.effectState, slotsTriggered: true }, activeMinigame: 'slots' };
       }
       return {};
     }
   },
   {
-    id: 'fancy_8_ball',
+    id: 'fancy_8ball',
     name: 'Fancy 8-ball',
     type: 'exploit',
-    description: '4 eights face up at once → Pool →',
-    onMoveComplete: (state, context) => {
-      const faceUpEights = Object.values(state.piles).flatMap(p => p.cards.filter(c => c.faceUp && c.rank === 8)).length;
-      if (faceUpEights >= 4) {
-        return { triggerMinigame: 'pool' };
+    description: '4 eights face up at once → Pool minigame.',
+    onMoveComplete: (state) => {
+      let count = 0;
+      Object.values(state.piles).forEach(p =>
+        p.cards.forEach(c => { if (c.faceUp && c.rank === 8) count++; })
+      );
+      if (count >= 4 && !state.effectState.poolTriggered) {
+        return { effectState: { ...state.effectState, poolTriggered: true }, activeMinigame: 'pool' };
       }
       return {};
     }
@@ -508,24 +604,30 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'ricochet',
     name: 'Ricochet',
     type: 'exploit',
-    description: 'Have 4 nines → Pinball →',
-    onMoveComplete: (state, context) => {
-      const faceUpNines = Object.values(state.piles).flatMap(p => p.cards.filter(c => c.faceUp && c.rank === 9)).length;
-      if (faceUpNines >= 4) {
-        return { triggerMinigame: 'pinball' };
+    description: 'Have 4 nines face up at once → Pinball minigame.',
+    onMoveComplete: (state) => {
+      let count = 0;
+      Object.values(state.piles).forEach(p =>
+        p.cards.forEach(c => { if (c.faceUp && c.rank === 9) count++; })
+      );
+      if (count >= 4 && !state.effectState.pinballTriggered) {
+        return { effectState: { ...state.effectState, pinballTriggered: true }, activeMinigame: 'pinball' };
       }
       return {};
     }
   },
   {
-    id: 'panopticon',
+    id: 'panopticon_darts',
     name: 'Panopticon',
     type: 'exploit',
-    description: 'Have 4 tens face up at once → Darts',
-    onMoveComplete: (state, context) => {
-      const faceUpTens = Object.values(state.piles).flatMap(p => p.cards.filter(c => c.faceUp && c.rank === 10)).length;
-      if (faceUpTens >= 4) {
-        return { triggerMinigame: 'darts' };
+    description: 'Have 4 tens face up at once → Darts minigame.',
+    onMoveComplete: (state) => {
+      let count = 0;
+      Object.values(state.piles).forEach(p =>
+        p.cards.forEach(c => { if (c.faceUp && c.rank === 10) count++; })
+      );
+      if (count >= 4 && !state.effectState.dartsTriggered) {
+        return { effectState: { ...state.effectState, dartsTriggered: true }, activeMinigame: 'darts' };
       }
       return {};
     }
@@ -534,11 +636,14 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'counting_cards',
     name: 'Counting Cards',
     type: 'exploit',
-    description: '4 Jacks face up at once → Blackjack →',
-    onMoveComplete: (state, context) => {
-      const faceUpJacks = Object.values(state.piles).flatMap(p => p.cards.filter(c => c.faceUp && c.rank === 11)).length;
-      if (faceUpJacks >= 4) {
-        return { triggerMinigame: 'blackjack' };
+    description: '4 Jacks face up at once → Blackjack minigame.',
+    onMoveComplete: (state) => {
+      let count = 0;
+      Object.values(state.piles).forEach(p =>
+        p.cards.forEach(c => { if (c.faceUp && c.rank === 11) count++; })
+      );
+      if (count >= 4 && !state.effectState.blackjackTriggered) {
+        return { effectState: { ...state.effectState, blackjackTriggered: true }, activeMinigame: 'blackjack' };
       }
       return {};
     }
@@ -547,27 +652,33 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'russian_roulette',
     name: 'Russian Roulette',
     type: 'exploit',
-    description: 'Have 4 Kings face up at once → Roulette',
-    onMoveComplete: (state, context) => {
-      const faceUpKings = Object.values(state.piles).flatMap(p => p.cards.filter(c => c.faceUp && c.rank === 13)).length;
-      if (faceUpKings >= 4) {
-        return { triggerMinigame: 'roulette' };
+    description: '4 Kings face up at once → Roulette minigame.',
+    onMoveComplete: (state) => {
+      let count = 0;
+      Object.values(state.piles).forEach(p =>
+        p.cards.forEach(c => { if (c.faceUp && c.rank === 13) count++; })
+      );
+      if (count >= 4 && !state.effectState.rouletteTriggered) {
+        return { effectState: { ...state.effectState, rouletteTriggered: true }, activeMinigame: 'roulette' };
       }
       return {};
     }
   },
   {
-    id: 'rose_colored_glasses',
+    id: 'rose_glasses',
     name: 'Rose Colored Glasses',
     type: 'exploit',
-    description: 'Have 4 of a kind face up with 2, 3, 4, or 5 → Poker',
-    onMoveComplete: (state, context) => {
-      const ranks = [2,3,4,5];
-      for (const rank of ranks) {
-        const count = Object.values(state.piles).flatMap(p => p.cards.filter(c => c.faceUp && c.rank === rank)).length;
-        if (count >= 4) {
-          return { triggerMinigame: 'poker' };
-        }
+    description: 'Have 4 of a kind face up with 2,3,4,5 → Poker minigame.',
+    onMoveComplete: (state) => {
+      const counts: Record<number, number> = {};
+      Object.values(state.piles).forEach(p =>
+        p.cards.forEach(c => { if (c.faceUp) counts[c.rank] = (counts[c.rank] || 0) + 1; })
+      );
+      const has4Kind = Object.entries(counts).some(([r, cnt]) =>
+        [2,3,4,5].includes(Number(r)) && cnt >= 4
+      );
+      if (has4Kind && !state.effectState.pokerTriggered) {
+        return { effectState: { ...state.effectState, pokerTriggered: true }, activeMinigame: 'poker' };
       }
       return {};
     }
@@ -576,23 +687,28 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'weighted_dice',
     name: 'Weighted Dice',
     type: 'exploit',
-    description: '3 sixes in foundations but no sevens → Devil\'s Dice → Roll three dice, gain coins equal to the sum times 100, and then remove the sixes from foundations.',
-    onMoveComplete: (state, context) => {
-      const foundationSixes = Object.keys(state.piles).filter(k => k.startsWith('foundation')).reduce((count, key) => {
-        return count + state.piles[key].cards.filter(c => c.rank === 6).length;
-      }, 0);
-      const hasSevens = Object.values(state.piles).some(p => p.cards.some(c => c.rank === 7));
-      if (foundationSixes >= 3 && !hasSevens) {
-        const dice1 = Math.floor(Math.random() * 6) + 1;
-        const dice2 = Math.floor(Math.random() * 6) + 1;
-        const dice3 = Math.floor(Math.random() * 6) + 1;
-        const sum = dice1 + dice2 + dice3;
-        const reward = sum * 100;
+    description: '3 sixes in foundations but no sevens → Devil\'s Dice.',
+    onMoveComplete: (state) => {
+      const fids = Object.keys(state.piles).filter(k => k.startsWith('foundation'));
+      let sixes = 0; let sevens = 0;
+      fids.forEach(fid => state.piles[fid].cards.forEach(c => {
+        if (c.rank === 6) sixes++;
+        if (c.rank === 7) sevens++;
+      }));
+      if (sixes >= 3 && sevens === 0 && !state.effectState.devilsDicePlayed) {
+        const d1 = Math.ceil(Math.random() * 6),
+              d2 = Math.ceil(Math.random() * 6),
+              d3 = Math.ceil(Math.random() * 6);
+        const gain = (d1 + d2 + d3) * 100;
         const newPiles = { ...state.piles };
-        Object.keys(newPiles).filter(k => k.startsWith('foundation')).forEach(key => {
-          newPiles[key].cards = newPiles[key].cards.filter(c => c.rank !== 6);
+        fids.forEach(fid => {
+          newPiles[fid] = { ...newPiles[fid], cards: newPiles[fid].cards.filter(c => c.rank !== 6) };
         });
-        return { piles: newPiles, coins: state.coins + reward };
+        return {
+          coins: state.coins + gain,
+          piles: newPiles,
+          effectState: { ...state.effectState, devilsDicePlayed: true }
+        };
       }
       return {};
     }
@@ -601,38 +717,40 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'tax_loophole',
     name: 'Tax Loophole',
     type: 'exploit',
-    description: 'Buy a key for 25% of your coin. It works anywhere.'
+    description: 'Buy a key for 25% of your coin. It works anywhere.',
+    onActivate: (state) => {
+      if (state.coins <= 0) return {};
+      const cost = Math.floor(state.coins * 0.25);
+      const hand = state.piles['hand'];
+      const key: Card = { id: `key-${Date.now()}`, suit: 'special', rank: 0, faceUp: true,
+                          meta: { isKey: true, universal: true } };
+      return {
+        coins: state.coins - cost,
+        piles: { ...state.piles, hand: { ...hand, cards: [...hand.cards, key] } }
+      };
+    }
   },
-  // CURSES
   {
     id: 'reverse_psychology',
     name: 'Reverse Psychology',
     type: 'curse',
-    description: 'Every 5 moves, flip gameboard horizontally, then vertically, then horizontally, then vertically, & so on. Completed foundations remove 1 flip from 4 possible.',
-    onActivate: (state) => {
-      state.effectState.flipCount = 0;
-      state.effectState.maxFlips = 4;
+    description: 'Every 5 moves, flip board H/V alternating. Completed foundations remove 1 flip.',
+    onMoveComplete: (state) => {
+      const moves = state.moves + 1;
+      const flips = state.effectState.pendingFlips || [];
+      if (moves % 5 === 0) {
+        const next = (flips.length % 2 === 0) ? 'horizontal' : 'vertical';
+        return { effectState: { ...state.effectState, pendingFlips: [...flips, next] } };
+      }
       return {};
     },
-    onMoveComplete: (state, context) => {
-      if (state.moves % 5 === 0 && state.effectState.flipCount < state.effectState.maxFlips) {
-        // Implement board flipping: reverse tableau order
-        const tableaus = Object.keys(state.piles).filter(k => k.startsWith('tableau')).sort();
-        const reversed = tableaus.reverse();
-        const newPiles = { ...state.piles };
-        reversed.forEach((key, i) => {
-          newPiles[`tableau-${i}`] = state.piles[key];
-          newPiles[`tableau-${i}`].id = `tableau-${i}`;
-        });
-        tableaus.forEach(key => {
-          if (!reversed.includes(key)) delete newPiles[key];
-        });
-        state.effectState.flipCount++;
-        return { piles: newPiles };
+    onActivate: (state) => ({ effectState: { ...state.effectState, pendingFlips: [] } }),
+    onMoveCompletePost: (state, context) => {
+      if (context.target.includes('foundation')) {
+        const flips = [...(state.effectState.pendingFlips || [])];
+        if (flips.length > 0) flips.pop();
+        return { effectState: { ...state.effectState, pendingFlips: flips } };
       }
-      // Check completed foundations to reduce flips
-      const completed = Object.keys(state.piles).filter(k => k.startsWith('foundation') && state.piles[k].cards.length === 13).length;
-      state.effectState.maxFlips = Math.max(0, 4 - completed);
       return {};
     }
   },
@@ -640,84 +758,103 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'flesh_wound',
     name: 'Flesh Wound',
     type: 'curse',
-    description: 'Add a wound card to your hand that increases the score goal by 10% each cycle. Find 2 bandage cards hidden in random tableau to remove the wound.',
+    description: 'Wound in hand increases goal by 10% each cycle. Find 2 bandages in tableau to remove.',
     onActivate: (state) => {
-      const newPiles = { ...state.piles };
-      newPiles['hand'].cards.push({ id: 'wound', suit: 'special', rank: 0, faceUp: true });
-      const tableaus = Object.keys(newPiles).filter(k => k.startsWith('tableau'));
-      for (let i = 0; i < 2; i++) {
-        const tableau = tableaus[Math.floor(Math.random() * tableaus.length)];
-        const insertIndex = Math.floor(Math.random() * (newPiles[tableau].cards.length + 1));
-        newPiles[tableau].cards.splice(insertIndex, 0, { id: `bandage-${i}`, suit: 'special', rank: 0, faceUp: false });
+      const hand = state.piles['hand'];
+      const wound: Card = { id: 'wound-card', suit: 'special', rank: 0, faceUp: true, meta: { isWound: true } };
+      const newPiles = { ...state.piles, hand: { ...hand, cards: [...hand.cards, wound] } };
+      const tabKeys = Object.keys(newPiles).filter(k => k.startsWith('tableau'));
+      for (let i = 0; i < 2 && tabKeys.length > 0; i++) {
+        const key = tabKeys[Math.floor(Math.random() * tabKeys.length)];
+        const bandage: Card = { id: `bandage-${i}-${Date.now()}`, suit: 'special', rank: 0, faceUp: false, meta: { isBandage: true } };
+        newPiles[key] = { ...newPiles[key], cards: [...newPiles[key].cards, bandage] };
       }
-      state.effectState.woundCycles = 0;
-      return { piles: newPiles };
+      return { piles: newPiles, effectState: { ...state.effectState, woundActive: true } };
+    },
+    onDeckCycleComplete: (state) => {
+      if (state.effectState.woundActive) {
+        return { currentScoreGoal: Math.floor(state.currentScoreGoal * 1.1) };
+      }
+      return {};
     },
     onMoveComplete: (state, context) => {
-      if (context.cards.some(c => c.id.startsWith('bandage'))) {
-        state.piles['hand'].cards = state.piles['hand'].cards.filter(c => c.id !== 'wound');
-        state.effectState.woundCycles++;
-        state.currentScoreGoal *= 1.1; // Increase goal
+      const foundBandage = context.cards.find(c => c.meta?.isBandage);
+      if (foundBandage && context.cards[0].faceUp) {
+        const remaining = (state.effectState.bandagesFound || 0) + 1;
+        const clearWound = remaining >= 2;
+        return { effectState: { ...state.effectState, bandagesFound: remaining, woundActive: clearWound ? false : true } };
       }
-      return { currentScoreGoal: state.currentScoreGoal };
-    },
-    calculateScore: (score, context, state) => score * 0.9 // Negative score
+      return {};
+    }
   },
   {
-    id: 'schrondinger_deck',
-    name: 'Schrödinger\'s Deck',
+    id: 'schrondingers_deck',
+    name: "Schrondinger's Deck",
     type: 'curse',
-    description: 'Tableaus have a 50% chance of existing or not after each play. At least 3 tableau exist at any given moment.',
-    onMoveComplete: (state, context) => {
-      const tableaus = Object.keys(state.piles).filter(k => k.startsWith('tableau'));
-      if (tableaus.length > 3) {
-        tableaus.forEach(key => {
-          if (Math.random() < 0.5) {
-            delete state.piles[key];
-          }
-        });
+    description: 'Tableaus 50% exist after each play; at least 3 exist.',
+    onMoveComplete: (state) => {
+      const newPiles = { ...state.piles };
+      const tabs = Object.keys(newPiles).filter(k => k.startsWith('tableau'));
+      tabs.forEach(id => {
+        const pile = newPiles[id];
+        const exists = Math.random() < 0.5;
+        newPiles[id] = { ...pile, hidden: !exists };
+      });
+      const existent = tabs.filter(id => !newPiles[id].hidden);
+      if (existent.length < 3) {
+        const forceIds = tabs.slice(0, 3);
+        forceIds.forEach(id => { newPiles[id].hidden = false; });
       }
-      while (Object.keys(state.piles).filter(k => k.startsWith('tableau')).length < 3) {
-        const newId = `tableau-${Object.keys(state.piles).length}`;
-        state.piles[newId] = { id: newId, type: 'tableau', cards: [] };
-      }
-      return { piles: state.piles };
-    }
+      return { piles: newPiles };
+    },
+    canMove: (cards, source, target, defaultAllowed, state) =>
+      (source.hidden || target.hidden) ? false : defaultAllowed
   },
   {
     id: 'caged_bakeneko',
     name: 'Caged Bakeneko',
     type: 'curse',
-    description: '3 tableau locked. 4 keys hidden in other tableau. Unlock a random tableau at 50% of score goal.',
+    description: '3 tableau locked. 4 keys hidden. Unlock a random tableau at 50% of score goal.',
     onActivate: (state) => {
       const newPiles = { ...state.piles };
-      const tableaus = Object.keys(newPiles).filter(k => k.startsWith('tableau'));
-      for (let i = 0; i < 3; i++) {
-        newPiles[tableaus[i]].locked = true;
+      const tabIds = Object.keys(newPiles).filter(k => k.startsWith('tableau')).sort(() => Math.random() - 0.5).slice(0, 3);
+      tabIds.forEach(id => { newPiles[id] = { ...newPiles[id], locked: true }; });
+      const others = Object.keys(newPiles).filter(k => k.startsWith('tableau') && !tabIds.includes(k));
+      for (let i = 0; i < 4 && others.length > 0; i++) {
+        const id = others[Math.floor(Math.random() * others.length)];
+        const key: Card = { id: `bkey-${i}-${Date.now()}`, suit: 'special', rank: 0, faceUp: false, meta: { isKey: true } };
+        newPiles[id] = { ...newPiles[id], cards: [...newPiles[id].cards, key] };
       }
-      for (let i = 0; i < 4; i++) {
-        const tableau = tableaus[Math.floor(Math.random() * tableaus.length)];
-        const insertIndex = Math.floor(Math.random() * (newPiles[tableau].cards.length + 1));
-        newPiles[tableau].cards.splice(insertIndex, 0, { id: `key-${i}`, suit: 'special', rank: 0, faceUp: false });
-      }
-      return { piles: newPiles };
+      return { piles: newPiles, effectState: { ...state.effectState, bakenekoLocked: tabIds } };
     },
-    onMoveComplete: (state, context) => {
-      if (state.score >= state.currentScoreGoal * 0.5) {
-        const locked = Object.keys(state.piles).filter(k => k.startsWith('tableau') && state.piles[k].locked);
+    onMoveComplete: (state) => {
+      if (state.score >= Math.floor(state.currentScoreGoal * 0.5)) {
+        const locked = (state.effectState.bakenekoLocked || []).slice();
         if (locked.length > 0) {
-          const unlock = locked[Math.floor(Math.random() * locked.length)];
-          state.piles[unlock].locked = false;
+          const unlock = locked.shift();
+          const pile = state.piles[unlock];
+          const newPiles = { ...state.piles, [unlock]: { ...pile, locked: false } };
+          return { piles: newPiles, effectState: { ...state.effectState, bakenekoLocked: locked } };
         }
       }
-      return { piles: state.piles };
-    }
+      return {};
+    },
+    canMove: (cards, source, target, defaultAllowed) =>
+      (source.locked || target.locked) ? false : defaultAllowed
   },
   {
     id: 'street_smarts',
     name: 'Street Smarts',
     type: 'curse',
-    description: 'Complete encounter by gaining goal in coins, not points. x5 coins gained. Only keep 10% as a reward.'
+    description: 'Complete encounter by gaining goal in coins, not points. x5 coins gained. Only keep 10%.',
+    onEncounterEnd: (state) => {
+      if (state.coins >= state.currentScoreGoal) {
+        const reward = Math.floor(state.coins * 0.1);
+        return { isLevelComplete: true, coins: reward };
+      }
+      return {};
+    },
+    calculateCoinTransaction: (delta) => delta * 5
   },
   {
     id: 'counterfeiting',
@@ -725,43 +862,80 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     type: 'curse',
     description: 'Duplicate all cards before dealing. -50% points gained. Cards with same rank can be stacked.',
     onActivate: (state) => {
-      const newPiles = { ...state.piles };
-      const deck = newPiles['deck'].cards;
-      const duplicated = deck.map(c => ({ ...c, id: c.id + '-dup' }));
-      newPiles['deck'].cards = [...deck, ...duplicated];
-      return { piles: newPiles };
+      const deck = state.piles['deck'];
+      const duped = [...deck.cards, ...deck.cards.map(c => ({ ...c, id: `${c.id}-copy` }))];
+      return { piles: { ...state.piles, deck: { ...deck, cards: duped } } };
     },
-    calculateScore: (score, context, state) => score * 0.5,
-    canMove: (cards, source, target, defaultAllowed, state) => {
-      if (target.type === 'tableau' && cards.length === 1) {
-        const moving = cards[0];
-        const targetCard = target.cards[target.cards.length - 1];
-        if (!targetCard) return true;
-        return moving.rank === targetCard.rank;
+    calculateScore: (score) => Math.floor(score * 0.5),
+    canMove: (cards, source, target, defaultAllowed) => {
+      if (target.type === 'tableau' && target.cards.length > 0) {
+        const top = target.cards[target.cards.length - 1];
+        return cards[0].rank === top.rank;
       }
       return defaultAllowed;
     }
   },
   {
-    id: 'fog_of_war',
+    id: 'fog_of_war_variant',
     name: 'Fog of War',
     type: 'curse',
-    description: 'Only rank & color visible. Suit hidden. Every 10 moves, reduce score of faceup tableau cards ±1 rank.',
-    transformCardVisual: (card, pile) => {
-      if (pile?.type === 'tableau') {
-        return { suit: 'special' };
+    description: 'Only rank & color visible. Suit hidden. Every 10 moves, reduce score of face-up tableau cards ±1 rank.',
+    transformCardVisual: (card) => ({ suit: 'special' }),
+    onMoveComplete: (state) => {
+      if (state.moves > 0 && state.moves % 10 === 0) {
+        const newPiles = { ...state.piles };
+        Object.keys(newPiles).filter(k => k.startsWith('tableau')).forEach(id => {
+          const pile = newPiles[id];
+          if (pile.cards.length > 0) {
+            const top = pile.cards[pile.cards.length - 1];
+            if (top.faceUp) {
+              const adjust = Math.random() < 0.5 ? -1 : +1;
+              newPiles[id].cards[pile.cards.length - 1] =
+                { ...top, rank: Math.max(1, Math.min(13, top.rank + adjust)) };
       }
       return {};
-    },
+    }
+  },
+  {
+    id: 'tower_of_babel',
+    name: 'Tower of Babel',
+    type: 'curse',
+    description: '+4 empty tableau. No foundations. No score. Advance by stacking all 4 suits in tableau.',
+    onActivate: (state) => {
+      const newPiles = { ...state.piles };
+      for (let i = 0; i < 4; i++) {
+        newPiles[`babel-${i}`] = { id: `babel-${i}`, type: 'tableau', cards: [] };
+      }
+      Object.keys(newPiles).filter(k => k.startsWith('foundation')).forEach(fid => { delete newPiles[fid]; });
+      return { piles: newPiles, scoreMultiplier: 0 };
+    }
+  },
+  {
+    id: 'revolving_door',
+    name: 'Revolving Door',
+    type: 'curse',
+    description: 'Foundations only keep top card, return rest to deck. Rearrange tableau cards every discard.',
     onMoveComplete: (state, context) => {
-      if (state.moves % 10 === 0) {
+      if (context.target.includes('foundation')) {
+        const pile = state.piles[context.target];
+        const top = pile.cards[pile.cards.length - 1];
+        const returned = pile.cards.slice(0, -1).map(c => ({ ...c, faceUp: false }));
+        const deck = state.piles['deck'];
+        return {
+          piles: {
+            ...state.piles,
+            [context.target]: { ...pile, cards: [top] },
+            deck: { ...deck, cards: [...deck.cards, ...returned] }
+          }
+        };
+      }
+      if (context.target === 'deck') {
         const newPiles = { ...state.piles };
-        Object.keys(newPiles).filter(k => k.startsWith('tableau')).forEach(key => {
-          newPiles[key].cards.forEach(c => {
-            if (c.faceUp) {
-              c.rank = Math.max(1, Math.min(13, c.rank + (Math.random() < 0.5 ? -1 : 1))) as Rank;
-            }
-          });
+        Object.keys(newPiles).filter(k => k.startsWith('tableau')).forEach(id => {
+          const pile = newPiles[id];
+          const faceUp = pile.cards.filter(c => c.faceUp);
+          faceUp.sort(() => Math.random() - 0.5);
+          newPiles[id] = { ...pile, cards: [...pile.cards.filter(c => !c.faceUp), ...faceUp] };
         });
         return { piles: newPiles };
       }
@@ -769,29 +943,43 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     }
   },
   {
-    id: 'mood_swings',
-    name: 'Mood Swings',
+    id: 'executive_order',
+    name: 'Executive Order',
     type: 'curse',
-    description: 'Odd/even ranks alternate scoring 0 every 6/7 plays. x2 scoring. Shuffle face-up ranks every 5 plays.',
-    calculateScore: (score, context, state) => {
-      const cycle = Math.floor(state.moves / 13);
-      const position = state.moves % 13;
-      if ((position >= 6 && position <= 7) || (position >= 12)) {
-        return 0;
-      }
-      return score * 2;
-    },
+    description: 'All tableaus linked; must play 1 to each in order. Then rearrange freely for 7 moves.',
     onMoveComplete: (state, context) => {
-      if (state.moves % 5 === 0) {
-        const newPiles = { ...state.piles };
-        Object.values(newPiles).forEach(pile => {
-          pile.cards.forEach(c => {
-            if (c.faceUp) {
-              c.rank = Math.ceil(Math.random() * 13) as Rank;
-            }
-          });
+      const idx = parseInt(context.target.split('-')[1]);
+      const nextIdx = (idx + 1) % 7;
+      return { effectState: { ...state.effectState, nextTableauRequired: `tableau-${nextIdx}` } };
+    },
+    canMove: (cards, source, target, defaultAllowed, state) => {
+      if (state.effectState.nextTableauRequired && target.id !== state.effectState.nextTableauRequired) return false;
+      return defaultAllowed;
+    }
+  },
+  {
+    id: 'three_rules_of_three',
+    name: '3 Rules of 3',
+    type: 'curse',
+    description: 'Every 3rd play removes 3 cards from deck. Lowest face-up tableau card moved to deck.',
+    onMoveComplete: (state) => {
+      if (state.moves > 0 && state.moves % 3 === 0) {
+        const deck = state.piles['deck'];
+        const newDeck = [...deck.cards];
+        newDeck.splice(0, Math.min(3, newDeck.length));
+        let lowest: Card | null = null;
+        Object.values(state.piles).filter(p => p.type === 'tableau').forEach(p => {
+          const faceUps = p.cards.filter(c => c.faceUp);
+          faceUps.forEach(c => { if (!lowest || c.rank < lowest.rank) lowest = c; });
         });
-        return { piles: newPiles };
+        if (lowest) {
+          const newPiles = { ...state.piles };
+          Object.keys(newPiles).filter(k => k.startsWith('tableau')).forEach(id => {
+            newPiles[id].cards = newPiles[id].cards.filter(c => c.id !== lowest!.id);
+          });
+          newDeck.push({ ...lowest, faceUp: false });
+          return { piles: { ...newPiles, deck: { ...deck, cards: newDeck } } };
+        }
       }
       return {};
     }
@@ -802,210 +990,71 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     type: 'curse',
     description: 'Full deck dealt to equal tableaus at start. Coin gains disabled. 3× points gained.',
     onActivate: (state) => {
-      const newPiles = { ...state.piles };
-      const deck = newPiles['deck'].cards;
-      const tableaus = Object.keys(newPiles).filter(k => k.startsWith('tableau'));
-      const cardsPerTableau = Math.floor(deck.length / tableaus.length);
-      tableaus.forEach((key, i) => {
-        newPiles[key].cards = deck.slice(i * cardsPerTableau, (i + 1) * cardsPerTableau);
-      });
-      newPiles['deck'].cards = [];
-      return { piles: newPiles };
-    },
-    calculateCoinTransaction: (delta, context, state) => 0,
-    calculateScore: (score, context, state) => score * 3
-  },
-  {
-    id: 'tower_of_babel',
-    name: 'Tower of Babel',
-    type: 'curse',
-    description: ' +4 empty tableau. No foundations. No score. Advance by stacking all 4 suits in a the tableau.',
-    onActivate: (state) => {
-      const newPiles = { ...state.piles };
-      for (let i = 0; i < 4; i++) {
-        newPiles[`tableau-extra-${i}`] = { id: `tableau-extra-${i}`, type: 'tableau', cards: [] };
+      const deck = state.piles['deck'];
+      const allCards = [...deck.cards];
+      allCards.sort(() => Math.random() - 0.5);
+      const newPiles: Record<string, Pile> = {};
+      const tableauCount = 7;
+      const perPile = Math.floor(allCards.length / tableauCount);
+      for (let i = 0; i < tableauCount; i++) {
+        const pileCards = allCards.slice(i * perPile, (i + 1) * perPile);
+        if (pileCards.length > 0) pileCards[pileCards.length - 1].faceUp = true;
+        newPiles[`tableau-${i}`] = { id: `tableau-${i}`, type: 'tableau', cards: pileCards };
       }
-      Object.keys(newPiles).filter(k => k.startsWith('foundation')).forEach(key => delete newPiles[key]);
-      return { piles: newPiles };
-    },
-    calculateScore: (score, context, state) => 0,
-    onMoveComplete: (state, context) => {
-      const tableaus = Object.values(state.piles).filter(p => p.type === 'tableau');
-      for (const tableau of tableaus) {
-        const suits = new Set(tableau.cards.map(c => c.suit));
-        if (suits.size === 4) {
-          return { isLevelComplete: true };
-        }
-      }
-      return {};
-    }
-  },
-  {
-    id: 'revolving_door',
-    name: 'Revolving Door',
-    type: 'curse',
-    description: 'Foundations only keep their top card & return the rest to the deck. Rearrange face up tableau cards every discard, or play all 5 hand cards to instead shuffle face-down tableau cards with your deck the next 2 discards.',
-    onMoveComplete: (state, context) => {
-      if (context.target.startsWith('foundation')) {
-        const pile = state.piles[context.target];
-        if (pile.cards.length > 1) {
-          const toReturn = pile.cards.slice(0, -1);
-          state.piles['deck'].cards.push(...toReturn);
-          pile.cards = [pile.cards[pile.cards.length - 1]];
-        }
-      }
-      if (context.target === 'deck') {
-        const faceUpCards = Object.values(state.piles).filter(p => p.type === 'tableau').flatMap(p => p.cards.filter(c => c.faceUp));
-        faceUpCards.sort(() => Math.random() - 0.5);
-        // Redistribute to tableaus
-        const tableaus = Object.keys(state.piles).filter(k => k.startsWith('tableau'));
-        faceUpCards.forEach((card, i) => {
-          const tableau = tableaus[i % tableaus.length];
-          state.piles[tableau].cards.push(card);
-        });
-        // Remove from original
-        Object.values(state.piles).forEach(p => {
-          p.cards = p.cards.filter(c => !faceUpCards.includes(c));
-        });
-      }
-      return { piles: state.piles };
-    }
-  },
-  {
-    id: 'veil_of_uncertainty',
-    name: 'Veil of Uncertainty',
-    type: 'curse',
-    description: 'Only suit visible. +50% points gained. 33% to stumble to an adjacent tableau for negative score.',
-    transformCardVisual: (card, pile) => ({ rank: undefined }),
-    calculateScore: (score, context, state) => score * 1.5,
-    onMoveComplete: (state, context) => {
-      if (Math.random() < 0.33) {
-        return { score: state.score - 10 };
-      }
-      return {};
-    }
-  },
-  {
-    id: 'executive_order',
-    name: 'Executive Order',
-    type: 'curse',
-    description: 'All tableaus linked; Must play 1 to each in order, even if not valid. Then rearrange cards freely for 7 moves & score at end. Repeat.',
-    onActivate: (state) => {
-      state.effectState.currentTableauIndex = 0;
-      state.effectState.phase = 'ordered';
-      state.effectState.freeMovesLeft = 0;
-      return {};
-    },
-    canMove: (cards, source, target, defaultAllowed, state) => {
-      if (target.type === 'tableau') {
-        if (state.effectState.phase === 'ordered') {
-          const tableaus = Object.keys(state.piles).filter(k => k.startsWith('tableau')).sort();
-          const currentIndex = state.effectState.currentTableauIndex || 0;
-          if (target.id !== tableaus[currentIndex]) return false;
-          state.effectState.currentTableauIndex = (currentIndex + 1) % tableaus.length;
-          if (state.effectState.currentTableauIndex === 0) {
-            state.effectState.phase = 'free';
-            state.effectState.freeMovesLeft = 7;
-          }
-          return true;
-        } else if (state.effectState.phase === 'free') {
-          return defaultAllowed;
-        }
-      }
-      return defaultAllowed;
-    },
-    onMoveComplete: (state, context) => {
-      if (state.effectState.phase === 'free') {
-        state.effectState.freeMovesLeft--;
-        if (state.effectState.freeMovesLeft <= 0) {
-          // Score at end
-          state.effectState.phase = 'ordered';
-          state.effectState.currentTableauIndex = 0;
-        }
-      }
-      return {};
-    },
-    calculateScore: (score, context, state) => {
-      if (state.effectState.phase === 'ordered') return 0;
-      return score;
-    }
-  },
-  {
-    id: '3_rules_of_3',
-    name: '3 rules of 3',
-    type: 'curse',
-    description: 'Every 3rd play removes 3 cards from your deck for 3 plays. Lowest face-up tableau card moved to deck every 3 plays.',
-    onMoveComplete: (state, context) => {
-      if (state.moves % 3 === 0) {
-        state.piles['deck'].cards.splice(0, 3);
-        const faceUpCards = Object.values(state.piles).filter(p => p.type === 'tableau').flatMap(p => p.cards.filter(c => c.faceUp));
-        if (faceUpCards.length > 0) {
-          const lowest = faceUpCards.reduce((min, c) => c.rank < min.rank ? c : min);
-          Object.values(state.piles).forEach(p => {
-            p.cards = p.cards.filter(c => c.id !== lowest.id);
-          });
-          state.piles['deck'].cards.push(lowest);
-        }
-      }
-      return { piles: state.piles };
+      Object.keys(state.piles).filter(k => k.startsWith('foundation')).forEach(fid => { delete newPiles[fid]; });
+      return {
+        piles: { ...state.piles, ...newPiles, deck: { ...deck, cards: [] } },
+        coinMultiplier: 0,
+        scoreMultiplier: 3
+      };
     }
   },
   {
     id: 'entropy',
     name: 'Entropy',
     type: 'curse',
-    description: 'Every 10 plays, shuffle & redeal tableau & foundations from deck. Hand size is 10. Tableau plays from your hand swap places. No discards.',
-    onActivate: (state) => {
-      state.resources.handSize = 10;
+    description: 'Every 10 plays, shuffle & redeal tableau & foundations. Hand size is 10.',
+    onMoveComplete: (state) => {
+      if (state.moves > 0 && state.moves % 10 === 0) {
+        let allCards: Card[] = [];
+        Object.values(state.piles).forEach(p => { allCards = [...allCards, ...p.cards]; });
+        allCards.sort(() => Math.random() - 0.5);
+        const newPiles: Record<string, Pile> = {};
+        for (let i = 0; i < 7; i++) {
+          const pileCards = allCards.splice(0, i + 1);
+          if (pileCards.length > 0) pileCards[pileCards.length - 1].faceUp = true;
+          newPiles[`tableau-${i}`] = { id: `tableau-${i}`, type: 'tableau', cards: pileCards };
+        }
+        ['hearts','diamonds','clubs','spades'].forEach(suit => {
+          newPiles[`foundation-${suit}`] = { id: `foundation-${suit}`, type: 'foundation', cards: [] };
+        });
+        return { piles: newPiles };
+      }
       return {};
     },
-    onMoveComplete: (state, context) => {
-      if (state.moves % 10 === 0) {
-        const allCards = Object.values(state.piles).flatMap(p => p.cards);
-        allCards.sort(() => Math.random() - 0.5);
-        const tableaus = Object.keys(state.piles).filter(k => k.startsWith('tableau'));
-        const foundations = Object.keys(state.piles).filter(k => k.startsWith('foundation'));
-        const cardsPerTableau = Math.floor(allCards.length / tableaus.length);
-        tableaus.forEach((key, i) => {
-          state.piles[key].cards = allCards.slice(i * cardsPerTableau, (i + 1) * cardsPerTableau);
-        });
-        foundations.forEach(key => {
-          state.piles[key].cards = [];
-        });
-      }
-      return { piles: state.piles };
-    },
-    canMove: (cards, source, target, defaultAllowed, state) => {
-      if (source.type === 'hand' && target.type === 'tableau') {
-        const handIndex = state.piles['hand'].cards.findIndex(c => c.id === cards[0].id);
-        const targetCard = target.cards[target.cards.length - 1];
-        if (targetCard) {
-          state.piles['hand'].cards[handIndex] = targetCard;
-          target.cards[target.cards.length - 1] = cards[0];
-        }
-        return false;
-      }
-      if (target.type === 'deck') return false;
-      return defaultAllowed;
-    }
+    onActivate: (state) => ({ resources: { ...state.resources, handSize: 10 } })
   },
-  // PATTERN TRIGGERS
   {
     id: 'get_out_of_jail',
     name: 'Get Out of Jail',
     type: 'pattern_trigger',
     description: 'Have a royal flush face up in a tableau to add finish encounter.',
-    onMoveComplete: (state, context) => {
-      const tableaus = Object.values(state.piles).filter(p => p.type === 'tableau');
-      for (const tableau of tableaus) {
-        const faceUp = tableau.cards.filter(c => c.faceUp);
-        if (faceUp.length >= 5) {
-          const suits = faceUp.map(c => c.suit);
-          const ranks = faceUp.map(c => c.rank).sort((a,b) => a - b);
-          if (suits.every(s => s === suits[0]) && ranks.join(',') === '1,10,11,12,13') {
-            return { isLevelComplete: true };
-          }
-        }
+    onMoveComplete: (state) => {
+      const royalRanks = [10, 11, 12, 13, 1]; // Ten, Jack, Queen, King, Ace
+      const suits: Suit[] = ['hearts','diamonds','clubs','spades'];
+
+      const hasRoyalFlush = Object.values(state.piles)
+        .filter(p => p.type === 'tableau')
+        .some(pile => {
+          const faceUps = pile.cards.filter(c => c.faceUp);
+          return suits.some(suit => {
+            const ranksPresent = faceUps.filter(c => c.suit === suit).map(c => c.rank);
+            return royalRanks.every(r => ranksPresent.includes(r));
+          });
+        });
+
+      if (hasRoyalFlush && !state.effectState.jailTriggered) {
+        return { isLevelComplete: true, effectState: { ...state.effectState, jailTriggered: true } };
       }
       return {};
     }
@@ -1015,14 +1064,20 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     name: 'Loaded Deck',
     type: 'pattern_trigger',
     description: 'Have 4 Aces face up at once → Add 2 wild Aces to your deck for rest of run.',
-    onMoveComplete: (state, context) => {
-      const aceCount = Object.values(state.piles).flatMap(p => p.cards.filter(c => c.faceUp && c.rank === 1)).length;
-      if (aceCount >= 4) {
-        const deck = state.piles['deck'].cards;
-        for (let i = 0; i < 2; i++) {
-          deck.push({ id: `wild-ace-${i}`, suit: 'special', rank: 1, faceUp: false });
-        }
-        return { piles: state.piles };
+    onMoveComplete: (state) => {
+      let count = 0;
+      Object.values(state.piles).forEach(p =>
+        p.cards.forEach(c => { if (c.faceUp && c.rank === 1) count++; })
+      );
+      if (count >= 4 && !state.effectState.loadedDeckTriggered) {
+        const deck = state.piles['deck'];
+        const wildAces: Card[] = Array.from({ length: 2 }).map((_, i) => ({
+          id: `wild-ace-${i}-${Date.now()}`, suit: 'special', rank: 1, faceUp: false, meta: { isWild: true }
+        }));
+        return {
+          piles: { ...state.piles, deck: { ...deck, cards: [...deck.cards, ...wildAces] } },
+          effectState: { ...state.effectState, loadedDeckTriggered: true }
+        };
       }
       return {};
     }
@@ -1032,32 +1087,13 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     name: 'Nepotism',
     type: 'pattern_trigger',
     description: 'Have 4 Queens face up at once → 25% discount in next trade.',
-    onMoveComplete: (state, context) => {
-      const queenCount = Object.values(state.piles).flatMap(p => p.cards.filter(c => c.faceUp && c.rank === 12)).length;
-      if (queenCount >= 4) {
-        state.effectState.discount = 0.25;
-      }
-      return {};
-    }
-  },
-  {
-    id: 'breaking_entering',
-    name: 'Breaking & Entering',
-    type: 'pattern_trigger',
-    description: 'Have a Full House face up in a tableau → Unlock all tableau.',
-    onMoveComplete: (state, context) => {
-      const tableaus = Object.values(state.piles).filter(p => p.type === 'tableau');
-      for (const tableau of tableaus) {
-        const faceUp = tableau.cards.filter(c => c.faceUp);
-        const rankCounts = {};
-        faceUp.forEach(c => rankCounts[c.rank] = (rankCounts[c.rank] || 0) + 1);
-        const counts = Object.values(rankCounts);
-        if (counts.includes(3) && counts.includes(2)) {
-          Object.keys(state.piles).filter(k => k.startsWith('tableau')).forEach(key => {
-            state.piles[key].locked = false;
-          });
-          return { piles: state.piles };
-        }
+    onMoveComplete: (state) => {
+      let count = 0;
+      Object.values(state.piles).forEach(p =>
+        p.cards.forEach(c => { if (c.faceUp && c.rank === 12) count++; })
+      );
+      if (count >= 4 && !state.effectState.nepotismTriggered) {
+        return { effectState: { ...state.effectState, nepotismTriggered: true, tradeDiscount: 0.25 } };
       }
       return {};
     }
