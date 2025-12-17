@@ -55,10 +55,3 @@ export const GameDataProvider: React.FC<GameDataProviderProps> = ({
     </GameDataContext.Provider>
   );
 };
-
-// Empty/Stub provider for standalone UI testing
-export const StandaloneGameDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => (
-  <GameDataProvider effectsRegistry={[]} wanderRegistry={[]}>
-    {children}
-  </GameDataProvider>
-);
