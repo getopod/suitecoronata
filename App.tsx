@@ -1506,7 +1506,7 @@ export default function SolitaireEngine({
             ? 'ring-amber-300'
             : selectionColor === 'red'
                ? 'ring-rose-400'
-               : 'ring-yellow-300'
+               : 'ring-rose-400'
       : '';
     const color = getCardColor(visualCard.suit);
     
@@ -1606,7 +1606,7 @@ export default function SolitaireEngine({
 
      // How to play pages
      const howToPages = [
-        { title: 'Goal', content: 'Score points by moving cards to the Foundation piles. Build up from Ace to King, same suit. Reach the target score to clear each encounter!' },
+        { title: 'Goal', content: 'Score points by moving cards to the Foundation piles. Build up from Ace to Queen, same suit. Reach the target score to clear each encounter!' },
         { title: 'Moving Cards', content: 'Tap a card to select it, then tap a valid destination. In tableau, stack cards in descending order, alternating colors (red on black, black on red).' },
         { title: 'The Deck', content: 'Tap the deck to draw cards. You can move the top card of the draw pile to tableau or foundation piles.' },
         { title: 'Encounters', content: 'Each run has 10 encounters. All encounters are Curses that apply negative effects. Completing a curse lets you pick a blessing.' },
@@ -1618,10 +1618,10 @@ export default function SolitaireEngine({
 
      // Updates/changelog data
      const updates = [
-        { version: 'v0.4.0', date: 'Dec 7, 2024', changes: ['Added Modes menu', 'Added Profile screen', 'Full Settings UI', 'How To Play tutorial', 'Updates changelog'] },
-        { version: 'v0.3.0', date: 'Dec 5, 2024', changes: ['Decoupled UI from backend', 'Placeholder content for all phases', 'UI works without effects'] },
-        { version: 'v0.2.0', date: 'Dec 1, 2024', changes: ['Wander events system', 'Shop & trading', 'Blessing cards', 'Run planning'] },
-        { version: 'v0.1.0', date: 'Nov 15, 2024', changes: ['Initial prototype', 'Basic solitaire gameplay', 'Score system', 'Card rendering'] },
+        { version: 'v0.4.0', date: 'Dec 18, 2025', changes: ['Added Modes & profile screen', 'Wired up Settings UI', 'Trimmed more effects (155 to 57)'] },
+        { version: 'v0.3.0', date: 'Dec 11, 2025', changes: ['Decoupled UI', 'First stage of effect trimming', 'Logic & reporting tweaks'] },
+        { version: 'v0.2.0', date: 'Dec 8, 2025', changes: ['Wander events system', 'Shop & trading', 'Blessing refinement', 'Run planning'] },
+        { version: 'v0.1.0', date: 'Dec 1, 2025', changes: ['Initial prototype', 'Basic solitaire gameplay', 'Score system', 'Card rendering'] },
      ];
 
      return (
@@ -2218,7 +2218,11 @@ export default function SolitaireEngine({
                                    <option value="fr">Français</option>
                                    <option value="de">Deutsch</option>
                                    <option value="ja">日本語</option>
-                                   <option value="pirate">🏴‍☠️ Pirate</option>
+                                   <option value="Latin">Latin</option>
+                                   <option value="pirate">Pirate</option>
+                                   <option value="bird">Bird</option>
+                                   <option value="pirate">Pirate</option>
+                                   <option value="chooseforme">Choose for me</option>
                                 </select>
                              </div>
                              <div className="border-t border-slate-600 pt-2 mt-2">
@@ -2279,14 +2283,12 @@ export default function SolitaireEngine({
                                 </select>
                              </div>
                              <div className="p-3 bg-slate-700/50 rounded-lg">
-                                <div className="font-medium text-sm mb-1">Cheat Code</div>
-                                <div className="text-xs text-slate-400 mb-2">Enter secret codes for... something?</div>
-                                <div className="flex gap-2">
+                                <div className="font-medium text-sm mb-1">Feeling Lucky?</div>
                                    <input 
                                       type="text" 
                                       value={settings.cheatCode} 
                                       onChange={(e) => setSettings(s => ({...s, cheatCode: e.target.value}))} 
-                                      placeholder="Enter cheat code..."
+                                      placeholder=""
                                       className="flex-1 bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm"
                                    />
                                    <button 
@@ -2312,8 +2314,105 @@ export default function SolitaireEngine({
                                    >
                                       Try
                                    </button>
+                                                {cheatResponse && (
+                                                   <div className="text-xs text-purple-400 mt-2 italic">{cheatResponse}</div>
+                                                )}
+                                             </div>
+                                          </div>
+                                       )}
+                              </div>
+
+                    {/* Data - Collapsible */}
+                    <div className="bg-slate-800/50 rounded-lg overflow-hidden">
+                       <button 
+                          onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'data' ? null : 'data')}
+                          className="w-full flex items-center justify-between p-3 hover:bg-slate-800">
+                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Data</h3>
+                          <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'data' ? 'rotate-180' : ''}`} />
+                       </button>
+                       {expandedSettingsSection === 'data' && (
+                          <div className="space-y-2 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
+                             <button className="w-full p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
+                                <span className="text-sm">Export Save Data</span>
+                                <span className="text-slate-500">→</span>
+                             </button>
+                             <button className="w-full p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
+                                <span className="text-sm">Import Save Data</span>
+                                <span className="text-slate-500">→</span>
+                             </button>
+                             <button 
+                                onClick={() => {
+                                   const newCount = callParentsCount + 1;
+                                   setCallParentsCount(newCount);
+                                   if (newCount >= 3) {
+                                      setShowParentsPopup(true);
+                                      setCallParentsCount(0);
+                                   }
+                    {/* Advanced - Collapsible (joke settings) */}
+                    <div className="bg-slate-800/50 rounded-lg overflow-hidden">
+                       <button 
+                          onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'advanced' ? null : 'advanced')}
+                          className="w-full flex items-center justify-between p-3 hover:bg-slate-800">
+                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Advanced</h3>
+                          <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'advanced' ? 'rotate-180' : ''}`} />
+                       </button>
+                       {expandedSettingsSection === 'advanced' && (
+                          <div className="space-y-3 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
+                             <div className="p-3 bg-slate-700/50 rounded-lg">
+                                <div className="flex justify-between mb-2"><span className="text-sm">Sarcasm Level</span><span className="text-slate-400 text-sm">{settings.sarcasmLevel}%</span></div>
+                                <input type="range" min="0" max="100" value={settings.sarcasmLevel} onChange={(e) => setSettings(s => ({...s, sarcasmLevel: Number(e.target.value)}))} className="w-full h-2 bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-purple-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
+                                <div className="text-xs text-slate-500 mt-1 italic">
+                                   {settings.sarcasmLevel < 25 ? "Wow, so sincere." : 
+                                    settings.sarcasmLevel < 50 ? "Okay, moderately sarcastic." :
+                                    settings.sarcasmLevel < 75 ? "Now we're talking." :
+                                    "Oh, you're one of THOSE people."}
                                 </div>
-                                {cheatResponse && <div className="text-xs text-purple-400 mt-2 italic">{cheatResponse}</div>}
+                             </div>
+                             <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                <div><div className="font-medium text-sm">Hogwarts House</div><div className="text-xs text-slate-400">Very important for gameplay</div></div>
+                                <select value={settings.hogwartsHouse} onChange={(e) => setSettings(s => ({...s, hogwartsHouse: e.target.value}))} className="bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm">
+                                   <option value="undecided">Undecided</option>
+                                   <option value="gryffindor">🦁 Gryffindor</option>
+                                   <option value="slytherin">🐍 Slytherin</option>
+                                   <option value="ravenclaw">🦅 Ravenclaw</option>
+                                   <option value="hufflepuff">🦡 Hufflepuff</option>
+                                </select>
+                             </div>
+                             <div className="p-3 bg-slate-700/50 rounded-lg">
+                               <>
+                                 <div className="font-medium text-sm mb-1">Feeling Lucky?</div>
+                                 <input 
+                                    type="text" 
+                                    value={settings.cheatCode} 
+                                    onChange={(e) => setSettings(s => ({...s, cheatCode: e.target.value}))} 
+                                    placeholder=""
+                                    className="flex-1 bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm"
+                                 />
+                                 <button 
+                                    onClick={() => {
+                                       const code = settings.cheatCode.toLowerCase().trim();
+                                       const responses: Record<string, string> = {
+                                          'iddqd': "This isn't DOOM, but nice try.",
+                                          'hesoyam': "GTA doesn't work here either.",
+                                          'konami': "↑↑↓↓←→←→BA... nothing happened.",
+                                          'motherlode': "The Sims called, they want their cheat back.",
+                                          'rosebud': "Seriously? That's ancient.",
+                                          'money': "Wouldn't that be nice.",
+                                          'god': "You wish.",
+                                          'win': "That's not how this works.",
+                                          'help': "No.",
+                                          'please': "Manners won't help you here.",
+                                          '': "You have to actually type something.",
+                                       };
+                                       setCheatResponse(responses[code] || "Nice try, but that's not a real cheat code.");
+                                       setSettings(s => ({...s, cheatCode: ''}));
+                                    }}
+                                    className="bg-purple-600 hover:bg-purple-500 px-3 py-1 rounded text-sm font-bold"
+                                 >
+                                    Try
+                                 </button>
+                                 {cheatResponse && <div className="text-xs text-purple-400 mt-2 italic">{cheatResponse}</div>}
+                               </>
                              </div>
                           </div>
                        )}
@@ -2348,7 +2447,27 @@ export default function SolitaireEngine({
                                 }}
                                 className="w-full p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
                                 <span className="text-sm">Call Your Parents</span>
-                                <span className="text-slate-500">📞</span>
+                                <span className="text-slate-500"></span>
+                             </button>
+                             <div className="border-t border-slate-600 pt-2 mt-2">
+                                <div className="text-xs text-slate-400 uppercase mb-2">Danger Zone</div>
+                                <div className="space-y-2">
+                                   <button className="w-full p-3 bg-orange-900/30 border border-orange-800 rounded-lg text-left hover:bg-orange-900/50 text-orange-300 text-sm">
+                                      Reset Statistics Only
+                                   </button>
+                                   <button className="w-full p-3 bg-red-900/30 border border-red-800 rounded-lg text-left hover:bg-red-900/50 text-red-300 text-sm">
+                                      Reset All Progress
+                                   </button>
+                                </div>
+                             </div>
+                          </div>
+                       )}
+                    </div>
+
+                                }}
+                                className="w-full p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
+                                <span className="text-sm">Call Your Parents</span>
+                                <span className="text-slate-500"></span>
                              </button>
                              <div className="border-t border-slate-600 pt-2 mt-2">
                                 <div className="text-xs text-slate-400 uppercase mb-2">Danger Zone</div>
@@ -2377,11 +2496,11 @@ export default function SolitaireEngine({
                           <div className="space-y-3 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
                              <div className="text-center py-4">
                                 <div className="text-3xl mb-2">🃏</div>
-                                <div className="font-bold text-lg">Suite Coronata</div>
-                                <div className="text-xs text-slate-400">v0.5.0</div>
+                                <div className="font-bold text-lg">Coronata</div>
+                                <div className="text-xs text-slate-400">v2.5</div>
                              </div>
                              <div className="text-xs text-slate-400 text-center">
-                                A roguelike solitaire adventure with exploits, curses, and blessings.
+                                Rogue-like solitaire where you play for points, not completing the foundations.
                              </div>
                              <button 
                                 onClick={() => setShowCredits(true)}
@@ -2390,13 +2509,13 @@ export default function SolitaireEngine({
                              </button>
                              <div className="flex gap-2">
                                 <button className="flex-1 p-2 bg-slate-700/50 rounded-lg text-center hover:bg-slate-700 text-xs">
-                                   🐦 Twitter
+                                   Twitter
                                 </button>
                                 <button className="flex-1 p-2 bg-slate-700/50 rounded-lg text-center hover:bg-slate-700 text-xs">
-                                   💬 Discord
+                                   Discord
                                 </button>
                                 <button className="flex-1 p-2 bg-slate-700/50 rounded-lg text-center hover:bg-slate-700 text-xs">
-                                   🌐 Website
+                                   Website
                                 </button>
                              </div>
                              <div className="text-[10px] text-slate-500 text-center pt-2">
@@ -2424,30 +2543,30 @@ export default function SolitaireEngine({
                     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setShowCredits(false)}>
                        <div className="bg-slate-800 p-6 rounded-xl border border-slate-600 max-w-sm max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                           <div className="text-center mb-6">
-                             <div className="text-4xl mb-2">🃏</div>
-                             <div className="font-bold text-xl">Suite Coronata</div>
+                             <div className="text-4xl mb-2"></div>
+                             <div className="font-bold text-xl">Coronata</div>
                              <div className="text-xs text-slate-400">Credits</div>
                           </div>
                           <div className="space-y-4 text-sm">
                              <div>
                                 <div className="text-purple-400 font-bold text-xs uppercase mb-1">Design & Development</div>
-                                <div className="text-slate-300">You (and your AI assistant)</div>
+                                <div className="text-slate-300">Me</div>
                              </div>
                              <div>
                                 <div className="text-purple-400 font-bold text-xs uppercase mb-1">Art Direction</div>
-                                <div className="text-slate-300">The void, staring back</div>
+                                <div className="text-slate-300">Me</div>
                              </div>
                              <div>
                                 <div className="text-purple-400 font-bold text-xs uppercase mb-1">Music & Sound</div>
-                                <div className="text-slate-300">Coming soon™</div>
+                                <div className="text-slate-300">Not Yet</div>
                              </div>
                              <div>
                                 <div className="text-purple-400 font-bold text-xs uppercase mb-1">Special Thanks</div>
-                                <div className="text-slate-300">Coffee, late nights, and everyone who believed in card games with too many features</div>
+                                <div className="text-slate-300">Late nights turning into long days, everyone who doesn't know what a rogue-like is, & the love of games.</div>
                              </div>
                              <div>
                                 <div className="text-purple-400 font-bold text-xs uppercase mb-1">Beta Testers</div>
-                                <div className="text-slate-300">You, right now, reading this</div>
+                                <div className="text-slate-300">You</div>
                              </div>
                              <div className="border-t border-slate-700 pt-4 text-center">
                                 <div className="text-slate-500 text-xs">Made with React, TypeScript, Tailwind, and an unhealthy amount of determination</div>
@@ -2654,7 +2773,7 @@ export default function SolitaireEngine({
   return (
     <div className={`h-screen w-full font-sans flex flex-col overflow-hidden relative ${themeClasses[settings.theme as keyof typeof themeClasses] || themeClasses.dark} ${settings.reduceMotion ? '[&_*]:!transition-none [&_*]:!animate-none' : ''}`}>
       <div className="flex-1 w-full max-w-2xl mx-auto p-2 pb-40 overflow-hidden">
-        <div className="grid grid-cols-7 gap-1 mb-4">
+        <div className={`grid ${gameState.piles['shadow-realm'] ? 'grid-cols-6' : 'grid-cols-5'} gap-1 mb-4`}>
                 <div className="relative w-11 h-16">
                    <button type="button" className="w-full h-full bg-blue-900 border border-slate-600 rounded flex items-center justify-center" onClick={() => discardAndDrawHand()} aria-label="Draw from deck">
                         <div className="absolute -top-2 -left-1 bg-slate-700 text-[8px] px-1 rounded-full border border-slate-500 z-10">Draw</div>
@@ -2677,15 +2796,6 @@ export default function SolitaireEngine({
                    </div>
                 )}
 
-                <div className={`relative ${gameState.piles['shadow-realm'] ? 'col-span-1' : 'col-span-2'} h-16 flex items-center justify-center`}>
-                   {/* Threat button - current danger/fear */}
-                   {(currentThreat || currentEncounter) && (
-                      <button type="button" aria-label={`Threat: ${currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}`} className="w-full h-full bg-red-900/50 border-2 border-red-500/50 rounded flex flex-col items-center justify-center text-center p-1 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.4)]" onClick={() => alert(`${currentThreat?.type?.toUpperCase() || currentEncounter?.type?.toUpperCase() || 'CHALLENGE'}: ${currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}\n${currentThreat?.description || 'Score goal: ' + (currentEncounter?.goal || gameState.currentScoreGoal)}`)}>
-                         <Skull size={20} className="text-red-400 mb-1" />
-                         <div className="text-[8px] font-bold leading-tight text-red-200 line-clamp-2">{currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}</div>
-                      </button>
-                   )}
-                </div>
                 {foundationPiles.map(pile => {
                    const suitSymbol = pile.id.includes('hearts') ? '♥' : pile.id.includes('diamonds') ? '♦' : pile.id.includes('clubs') ? '♣' : '♠';
                    const suitColor = pile.id.includes('hearts') || pile.id.includes('diamonds') ? 'text-red-600' : 'text-white';
@@ -2730,7 +2840,7 @@ export default function SolitaireEngine({
            </div>
         )}
 
-        <div className="grid grid-cols-7 gap-1 h-full">
+        <div className={`grid gap-1 h-full ${activeEffects.includes('tower_of_babel') ? 'grid-cols-11' : 'grid-cols-7'}`}>
                {tableauPiles.map(pile => {
                   const isLinked = activeEffects.includes('linked_fates') && gameState.effectState?.linkedTableaus?.includes(pile.id);
                   const isLinkedTurn = isLinked && gameState.effectState?.lastLinkedPlayed !== pile.id;
@@ -2966,9 +3076,30 @@ export default function SolitaireEngine({
                            </div>
                         ) : activeDrawer === 'settings' ? (
                            <div className="flex flex-col gap-4">
-                              <label className="flex items-center justify-between text-sm text-slate-300"><span>Sound Effects</span><input type="checkbox" className="rounded bg-slate-700 border-slate-500" defaultChecked /></label>
-                              <label className="flex items-center justify-between text-sm text-slate-300"><span>Music</span><input type="checkbox" className="rounded bg-slate-700 border-slate-500" defaultChecked /></label>
-                              <label className="flex items-center justify-between text-sm text-slate-300"><span>Vibration</span><input type="checkbox" className="rounded bg-slate-700 border-slate-500" /></label>
+                              <label className="flex items-center justify-between text-sm text-slate-300">
+                                 <span>Sound Effects</span>
+                                 <button onClick={() => setSettings(s => ({...s, sfxEnabled: !s.sfxEnabled}))} className={`w-12 h-6 ${settings.sfxEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}>
+                                    <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.sfxEnabled ? 'right-0.5' : 'left-0.5'}`}></div>
+                                 </button>
+                              </label>
+                              <label className="flex items-center justify-between text-sm text-slate-300">
+                                 <span>Music</span>
+                                 <button onClick={() => setSettings(s => ({...s, musicEnabled: !s.musicEnabled}))} className={`w-12 h-6 ${settings.musicEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}>
+                                    <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.musicEnabled ? 'right-0.5' : 'left-0.5'}`}></div>
+                                 </button>
+                              </label>
+                              <label className="flex items-center justify-between text-sm text-slate-300">
+                                 <span>Card Animations</span>
+                                 <button onClick={() => setSettings(s => ({...s, cardAnimations: !s.cardAnimations}))} className={`w-12 h-6 ${settings.cardAnimations ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}>
+                                    <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.cardAnimations ? 'right-0.5' : 'left-0.5'}`}></div>
+                                 </button>
+                              </label>
+                              <div className="flex items-center justify-between text-sm text-slate-300">
+                                 <span>Card Back</span>
+                                 <select value={settings.cardBack} onChange={(e) => setSettings(s => ({...s, cardBack: e.target.value}))} className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs">
+                                    <option value="card-back">Classic</option>
+                                 </select>
+                              </div>
                               <button className="text-xs text-slate-500 underline mt-4" onClick={() => setActiveDrawer('pause')}>Back to Menu</button>
                            </div>
                         ) : activeDrawer === 'test' ? (
@@ -3114,6 +3245,13 @@ export default function SolitaireEngine({
                      </button>
                   );
                })}
+               {/* Curse area - moved from between deck and foundations */}
+               {(currentThreat || currentEncounter) && (
+                  <button type="button" aria-label={`Threat: ${currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}`} className="flex-1 py-1.5 bg-red-900/50 border-2 border-red-500/50 rounded text-[10px] font-bold flex flex-col items-center justify-center gap-0.5 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.4)]" onClick={() => alert(`${currentThreat?.type?.toUpperCase() || currentEncounter?.type?.toUpperCase() || 'CHALLENGE'}: ${currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}\n${currentThreat?.description || 'Score goal: ' + (currentEncounter?.goal || gameState.currentScoreGoal)}`)}>
+                     <Skull size={16} className="text-red-400" />
+                     <span className="leading-tight line-clamp-2">{currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}</span>
+                  </button>
+               )}
             </div>
          </div>
 
