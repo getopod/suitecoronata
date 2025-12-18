@@ -892,6 +892,10 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
               const adjust = Math.random() < 0.5 ? -1 : +1;
               newPiles[id].cards[pile.cards.length - 1] =
                 { ...top, rank: Math.max(1, Math.min(13, top.rank + adjust)) };
+            }
+          }
+        });
+        return { piles: newPiles };
       }
       return {};
     }
@@ -938,162 +942,6 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
           newPiles[id] = { ...pile, cards: [...pile.cards.filter(c => !c.faceUp), ...faceUp] };
         });
         return { piles: newPiles };
-      }
-      return {};
-    }
-  },
-  {
-    id: 'executive_order',
-    name: 'Executive Order',
-    type: 'curse',
-    description: 'All tableaus linked; must play 1 to each in order. Then rearrange freely for 7 moves.',
-    onMoveComplete: (state, context) => {
-      const idx = parseInt(context.target.split('-')[1]);
-      const nextIdx = (idx + 1) % 7;
-      return { effectState: { ...state.effectState, nextTableauRequired: `tableau-${nextIdx}` } };
-    },
-    canMove: (cards, source, target, defaultAllowed, state) => {
-      if (state.effectState.nextTableauRequired && target.id !== state.effectState.nextTableauRequired) return false;
-      return defaultAllowed;
-    }
-  },
-  {
-    id: 'three_rules_of_three',
-    name: '3 Rules of 3',
-    type: 'curse',
-    description: 'Every 3rd play removes 3 cards from deck. Lowest face-up tableau card moved to deck.',
-    onMoveComplete: (state) => {
-      if (state.moves > 0 && state.moves % 3 === 0) {
-        const deck = state.piles['deck'];
-        const newDeck = [...deck.cards];
-        newDeck.splice(0, Math.min(3, newDeck.length));
-        let lowest: Card | null = null;
-        Object.values(state.piles).filter(p => p.type === 'tableau').forEach(p => {
-          const faceUps = p.cards.filter(c => c.faceUp);
-          faceUps.forEach(c => { if (!lowest || c.rank < lowest.rank) lowest = c; });
-        });
-        if (lowest) {
-          const newPiles = { ...state.piles };
-          Object.keys(newPiles).filter(k => k.startsWith('tableau')).forEach(id => {
-            newPiles[id].cards = newPiles[id].cards.filter(c => c.id !== lowest!.id);
-          });
-          newDeck.push({ ...lowest, faceUp: false });
-          return { piles: { ...newPiles, deck: { ...deck, cards: newDeck } } };
-        }
-      }
-      return {};
-    }
-  },
-  {
-    id: 'eat_the_rich',
-    name: 'Eat the Rich',
-    type: 'curse',
-    description: 'Full deck dealt to equal tableaus at start. Coin gains disabled. 3× points gained.',
-    onActivate: (state) => {
-      const deck = state.piles['deck'];
-      const allCards = [...deck.cards];
-      allCards.sort(() => Math.random() - 0.5);
-      const newPiles: Record<string, Pile> = {};
-      const tableauCount = 7;
-      const perPile = Math.floor(allCards.length / tableauCount);
-      for (let i = 0; i < tableauCount; i++) {
-        const pileCards = allCards.slice(i * perPile, (i + 1) * perPile);
-        if (pileCards.length > 0) pileCards[pileCards.length - 1].faceUp = true;
-        newPiles[`tableau-${i}`] = { id: `tableau-${i}`, type: 'tableau', cards: pileCards };
-      }
-      Object.keys(state.piles).filter(k => k.startsWith('foundation')).forEach(fid => { delete newPiles[fid]; });
-      return {
-        piles: { ...state.piles, ...newPiles, deck: { ...deck, cards: [] } },
-        coinMultiplier: 0,
-        scoreMultiplier: 3
-      };
-    }
-  },
-  {
-    id: 'entropy',
-    name: 'Entropy',
-    type: 'curse',
-    description: 'Every 10 plays, shuffle & redeal tableau & foundations. Hand size is 10.',
-    onMoveComplete: (state) => {
-      if (state.moves > 0 && state.moves % 10 === 0) {
-        let allCards: Card[] = [];
-        Object.values(state.piles).forEach(p => { allCards = [...allCards, ...p.cards]; });
-        allCards.sort(() => Math.random() - 0.5);
-        const newPiles: Record<string, Pile> = {};
-        for (let i = 0; i < 7; i++) {
-          const pileCards = allCards.splice(0, i + 1);
-          if (pileCards.length > 0) pileCards[pileCards.length - 1].faceUp = true;
-          newPiles[`tableau-${i}`] = { id: `tableau-${i}`, type: 'tableau', cards: pileCards };
-        }
-        ['hearts','diamonds','clubs','spades'].forEach(suit => {
-          newPiles[`foundation-${suit}`] = { id: `foundation-${suit}`, type: 'foundation', cards: [] };
-        });
-        return { piles: newPiles };
-      }
-      return {};
-    },
-    onActivate: (state) => ({ resources: { ...state.resources, handSize: 10 } })
-  },
-  {
-    id: 'get_out_of_jail',
-    name: 'Get Out of Jail',
-    type: 'pattern_trigger',
-    description: 'Have a royal flush face up in a tableau to add finish encounter.',
-    onMoveComplete: (state) => {
-      const royalRanks = [10, 11, 12, 13, 1]; // Ten, Jack, Queen, King, Ace
-      const suits: Suit[] = ['hearts','diamonds','clubs','spades'];
-
-      const hasRoyalFlush = Object.values(state.piles)
-        .filter(p => p.type === 'tableau')
-        .some(pile => {
-          const faceUps = pile.cards.filter(c => c.faceUp);
-          return suits.some(suit => {
-            const ranksPresent = faceUps.filter(c => c.suit === suit).map(c => c.rank);
-            return royalRanks.every(r => ranksPresent.includes(r));
-          });
-        });
-
-      if (hasRoyalFlush && !state.effectState.jailTriggered) {
-        return { isLevelComplete: true, effectState: { ...state.effectState, jailTriggered: true } };
-      }
-      return {};
-    }
-  },
-  {
-    id: 'loaded_deck',
-    name: 'Loaded Deck',
-    type: 'pattern_trigger',
-    description: 'Have 4 Aces face up at once → Add 2 wild Aces to your deck for rest of run.',
-    onMoveComplete: (state) => {
-      let count = 0;
-      Object.values(state.piles).forEach(p =>
-        p.cards.forEach(c => { if (c.faceUp && c.rank === 1) count++; })
-      );
-      if (count >= 4 && !state.effectState.loadedDeckTriggered) {
-        const deck = state.piles['deck'];
-        const wildAces: Card[] = Array.from({ length: 2 }).map((_, i) => ({
-          id: `wild-ace-${i}-${Date.now()}`, suit: 'special', rank: 1, faceUp: false, meta: { isWild: true }
-        }));
-        return {
-          piles: { ...state.piles, deck: { ...deck, cards: [...deck.cards, ...wildAces] } },
-          effectState: { ...state.effectState, loadedDeckTriggered: true }
-        };
-      }
-      return {};
-    }
-  },
-  {
-    id: 'nepotism',
-    name: 'Nepotism',
-    type: 'pattern_trigger',
-    description: 'Have 4 Queens face up at once → 25% discount in next trade.',
-    onMoveComplete: (state) => {
-      let count = 0;
-      Object.values(state.piles).forEach(p =>
-        p.cards.forEach(c => { if (c.faceUp && c.rank === 12) count++; })
-      );
-      if (count >= 4 && !state.effectState.nepotismTriggered) {
-        return { effectState: { ...state.effectState, nepotismTriggered: true, tradeDiscount: 0.25 } };
       }
       return {};
     }
