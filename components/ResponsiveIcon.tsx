@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ADDITIONAL_ICON_SYNONYMS from './iconMappings';
 
-interface ResponsiveIconProps {
+interface ResponsiveIconProps extends React.HTMLAttributes<HTMLElement> {
   name: string; // basename or key, e.g. 'exploits' or 'coin' or category:item (ex: 'blessings:loaner')
   alt?: string;
   size?: number; // displayed size in px (width & height)
@@ -115,8 +115,8 @@ function slugWithUnderscores(s: string) {
   return s.replace(/[^a-z0-9-_]/gi, '_').toLowerCase();
 }
 
-export default function ResponsiveIcon(props: Readonly<ResponsiveIconProps>) {
-  const { name, alt, size = 36, className, emojiFallback, fallbackType } = props;
+export default function ResponsiveIcon(props: ResponsiveIconProps) {
+  const { name, alt, size = 36, className, emojiFallback, fallbackType, ...rest } = props;
   const [resolvedSrc, setResolvedSrc] = useState<string | null>(null);
 
   // Normalize category names to canonical folder names under /public/icons
@@ -249,7 +249,7 @@ export default function ResponsiveIcon(props: Readonly<ResponsiveIconProps>) {
 
     const debug = (...args: any[]) => {
       try {
-        if (typeof window !== 'undefined' && (window as any).__DEBUG_RESPONSIVE_ICON) {
+        if (typeof window !== 'undefined' && ((window as any).__DEBUG_RESPONSIVE_ICON || true)) { // Enable debug
           // eslint-disable-next-line no-console
           console.debug(...args);
         }
@@ -325,8 +325,28 @@ export default function ResponsiveIcon(props: Readonly<ResponsiveIconProps>) {
         }
       }
 
-      // 3) Generic fallback: try optimized webp first, then legacy flat icons (/icons/{name}.png|svg)
+      // 3) Generic fallback: try legacy flat icons first (/icons/{name}.png|svg), then optimized webp
       for (const cand of candidates) {
+        const pngPath = `/icons/${encodeURIComponent(cand)}.png`;
+        debug('[ResponsiveIcon] trying', pngPath);
+        // eslint-disable-next-line no-await-in-loop
+        if (await tryLoad(pngPath)) {
+          if (cancelled) return;
+          debug('[ResponsiveIcon] resolved', pngPath);
+          setResolvedSrc(pngPath);
+          return;
+        }
+
+        const svgPath = `/icons/${encodeURIComponent(cand)}.svg`;
+        debug('[ResponsiveIcon] trying', svgPath);
+        // eslint-disable-next-line no-await-in-loop
+        if (await tryLoad(svgPath)) {
+          if (cancelled) return;
+          debug('[ResponsiveIcon] resolved', svgPath);
+          setResolvedSrc(svgPath);
+          return;
+        }
+
         try {
           const optPath = `/icons/optimized/${optimizedBucket}/${encodeURIComponent(cand)}.webp`;
           debug('[ResponsiveIcon] trying optimized', optPath);
@@ -338,25 +358,6 @@ export default function ResponsiveIcon(props: Readonly<ResponsiveIconProps>) {
             return;
           }
         } catch {}
-
-        const pngPath = `/icons/${encodeURIComponent(cand)}.png`;
-        debug('[ResponsiveIcon] trying', pngPath);
-        // eslint-disable-next-line no-await-in-loop
-        if (await tryLoad(pngPath)) {
-          if (cancelled) return;
-          debug('[ResponsiveIcon] resolved', pngPath);
-          setResolvedSrc(pngPath);
-          return;
-        }
-        const svgPath = `/icons/${encodeURIComponent(cand)}.svg`;
-        debug('[ResponsiveIcon] trying', svgPath);
-        // eslint-disable-next-line no-await-in-loop
-        if (await tryLoad(svgPath)) {
-          if (cancelled) return;
-          debug('[ResponsiveIcon] resolved', svgPath);
-          setResolvedSrc(svgPath);
-          return;
-        }
       }
 
       // 4) Try common subdirectories: resources, menus
@@ -436,6 +437,7 @@ export default function ResponsiveIcon(props: Readonly<ResponsiveIconProps>) {
         decoding="async"
         fetchPriority="low"
         className={className}
+        {...rest}
       />
     );
   }
@@ -466,6 +468,7 @@ export default function ResponsiveIcon(props: Readonly<ResponsiveIconProps>) {
       title={label}
       style={fallbackStyle}
       className={className}
+      {...rest}
     >
       <span aria-hidden="true">{fallbackText}</span>
     </div>

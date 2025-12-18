@@ -89,11 +89,37 @@ export interface Pile {
   meta?: BasePileMeta;
 }
 
+export interface WanderState {
+  resources: {
+    coins: number;
+    handSize: number;
+    shuffles: number;
+    discards: number;
+  };
+  run: {
+    inventory: {
+      exploits: string[];
+      curses: string[];
+      blessings: string[];
+      items: string[];
+      fortunes: string[];
+    };
+    unlockedWanders: string[];
+    activeQuests: string[];
+    statuses: { id: string; duration: number }[];
+    forcedCurse?: string;
+  };
+  activeExploits: string[];
+  score: { current: number };
+  effectState: Record<string, any>;
+  rules: Record<string, any>;
+}
+
 export interface WanderChoice {
   label: string;
   result: string;
   effects?: { type: string; params: any[]; scaling?: string }[];
-  onChoose?: (ctx: { gameState: GameState, rng?: () => number }) => GameState;
+  onChoose?: (ctx: { gameState: WanderState, rng?: () => number }) => WanderState;
 }
 
 export interface Wander {
@@ -148,12 +174,14 @@ export interface GameState {
   resources?: { handSize?: number; shuffles?: number; discards?: number; };
   rules?: Record<string, any>;
   run?: {
-    inventory?: { items?: string[]; fortunes?: string[]; };
+    inventory?: { items?: string[]; fortunes?: string[]; curses?: string[]; };
     unlockedWanders?: string[];
     activeQuests?: string[];
     statuses?: Array<{ id: string; duration: number; }>;
     forcedCurse?: string;
   };
+  deck?: Card[];
+  hand?: Card[];
 }
 
 export interface Encounter {
@@ -168,6 +196,7 @@ export interface MoveContext {
   source: string;
   target: string;
   cards: Card[];
+  reveal?: boolean;
 }
 
 export type Outcome = "criticalWin" | "win" | "partialWin" | "draw" | "loss" | "criticalLoss";

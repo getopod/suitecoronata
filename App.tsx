@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { LayoutGrid, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, HelpCircle, RefreshCw, X, Gift, Trophy, ArrowLeftRight, SkipBack, SkipForward, MessageSquare, FlaskConical, Save, Flag, Settings, ChevronDown, Pause, ShoppingCart, User, Unlock, Map as MapIcon, BarChart3, Link as LinkIcon, Bug } from 'lucide-react';
-import { Card, GameState, Pile, Rank, Suit, MoveContext, Encounter, GameEffect, Wander, WanderChoice, MinigameResult, PlayerStats, RunHistoryEntry, RunEncounterRecord } from './types';
+import { Card, GameState, Pile, Rank, Suit, MoveContext, Encounter, GameEffect, Wander, WanderChoice, WanderState, MinigameResult, PlayerStats, RunHistoryEntry, RunEncounterRecord } from './types';
 import { getCardColor, generateNewBoard, EFFECTS_REGISTRY, setEffectsRng, resetEffectsRng } from './data/effects';
 import { isHighestRank, isNextHigherInOrder, isNextLowerInOrder } from './utils/rankOrder';
 import { Minigames } from './utils/minigames';
@@ -601,8 +601,8 @@ export default function SolitaireEngine({
   const resolveWander = (choice: WanderChoice) => {
     // Handle both old-style effects array and new-style onChoose callback
     if (choice.onChoose) {
-      // Adapt gameState to format expected by wanders (claudecoronata structure)
-      const adaptedState = {
+      // Create wander state from gameState
+      const wanderState: WanderState = {
         resources: {
           coins: gameState.coins || 0,
           handSize: gameState.resources?.handSize || 5,
@@ -640,10 +640,10 @@ export default function SolitaireEngine({
         rules: { ...gameState.rules },
       };
       
-      // Wanders expect ctx.gameState, not ctx.state, and return state directly, not { state, message }
-      const resultState = choice.onChoose({ gameState: adaptedState, rng: Math.random });
+      // Wanders expect ctx.gameState and return modified state
+      const resultState = choice.onChoose({ gameState: wanderState, rng: Math.random });
       
-      // Map the returned state back to gameState format
+      // Map the returned wander state back to gameState format
       if (resultState) {
         const updates: Partial<GameState> = {};
         
@@ -680,9 +680,9 @@ export default function SolitaireEngine({
           const newOwned = new Set(gameState.ownedEffects);
           const newActive = new Set(activeEffects);
           
-          if (inv.exploits) inv.exploits.forEach((id: string) => { newOwned.add(id); newActive.add(id); });
-          if (inv.curses) inv.curses.forEach((id: string) => { newOwned.add(id); newActive.add(id); });
-          if (inv.blessings) inv.blessings.forEach((id: string) => newOwned.add(id));
+          if (inv.exploits) inv.exploits.forEach((id) => { newOwned.add(id); newActive.add(id); });
+          if (inv.curses) inv.curses.forEach((id) => { newOwned.add(id); newActive.add(id); });
+          if (inv.blessings) inv.blessings.forEach((id) => newOwned.add(id));
           
           updates.ownedEffects = Array.from(newOwned);
           setActiveEffects(Array.from(newActive));
@@ -998,9 +998,8 @@ export default function SolitaireEngine({
 
     if (!stackValid) return { tableauIds: [], foundationIds: [] };
 
-    // Check tableau destinations
     Object.entries(gameState.piles).forEach(([pileId, pile]) => {
-      if (pile.type === 'tableau' && pileId !== sourcePileId) {
+      if (pile && pile.type === 'tableau' && pileId !== sourcePileId) {
         if (!pile.locked) {
           let valid = isStandardMoveValid(movingCards, pile, settings.supportPatriarchy);
           // Apply effect canMove hooks
@@ -1020,7 +1019,7 @@ export default function SolitaireEngine({
     // Check foundation destinations (only for single cards)
     if (movingCards.length === 1) {
       Object.entries(gameState.piles).forEach(([pileId, pile]) => {
-        if (pile.type === 'foundation') {
+        if (pile && pile.type === 'foundation') {
           let valid = isStandardMoveValid(movingCards, pile, settings.supportPatriarchy);
           effects.forEach(eff => {
             if (eff.canMove) {
@@ -1104,7 +1103,7 @@ export default function SolitaireEngine({
         }));
      } else if (type === 'unlock' && current >= 5) {
         // Unlock random tableau
-        const locked = Object.values(gameState.piles).filter(p => p.type === 'tableau' && p.locked);
+        const locked = Object.values(gameState.piles).filter((p): p is Pile => p && p.type === 'tableau' && p.locked);
         if (locked.length > 0) {
            const target = locked[Math.floor(Math.random() * locked.length)];
            setGameState(prev => ({
@@ -1916,7 +1915,7 @@ export default function SolitaireEngine({
                                          </div>
                                          <div className="flex flex-wrap gap-1">
                                             {run.exploits.map((effectId, i) => (
-                                               <ResponsiveIcon key={i} name={effectId} fallbackType="exploit" size={20} className="rounded" />
+                                               <ResponsiveIcon name={effectId} fallbackType="exploit" size={20} className="rounded" key={i} />
                                             ))}
                                          </div>
                                       </div>
@@ -1928,7 +1927,7 @@ export default function SolitaireEngine({
                                          </div>
                                          <div className="flex flex-wrap gap-1">
                                             {run.curses.map((effectId, i) => (
-                                               <ResponsiveIcon key={i} name={effectId} fallbackType="curse" size={20} className="rounded" />
+                                               <ResponsiveIcon name={effectId} fallbackType="curse" size={20} className="rounded" key={i} />
                                             ))}
                                          </div>
                                       </div>
@@ -1940,7 +1939,7 @@ export default function SolitaireEngine({
                                          </div>
                                          <div className="flex flex-wrap gap-1">
                                             {run.blessings.map((effectId, i) => (
-                                               <ResponsiveIcon key={i} name={effectId} fallbackType="blessing" size={20} className="w-5 h-5 rounded" />
+                                               <ResponsiveIcon name={effectId} fallbackType="blessing" size={20} className="w-5 h-5 rounded" key={i} />
                                             ))}
                                          </div>
                                       </div>
