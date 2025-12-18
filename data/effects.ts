@@ -42,6 +42,23 @@ export const generateNewBoard = (currentScore: number, currentCoins: number, sco
   ['hearts', 'diamonds', 'clubs', 'spades'].forEach(suit => {
     piles[`foundation-${suit}`] = { id: `foundation-${suit}`, type: 'foundation', cards: [] };
   });
+  
+  // Create and deal tableau piles (7 columns, 1-7 cards each, top cards face up)
+  for (let col = 0; col < 7; col++) {
+    piles[`tableau-${col}`] = { id: `tableau-${col}`, type: 'tableau', cards: [] };
+  }
+  
+  // Deal cards to tableaus
+  for (let col = 0; col < 7; col++) {
+    for (let row = 0; row <= col; row++) {
+      const card = deck.pop();
+      if (card) {
+        card.faceUp = (row === col); // Only top card is face up
+        piles[`tableau-${col}`].cards.push(card);
+      }
+    }
+  }
+  
   piles['deck'] = { id: 'deck', type: 'deck', cards: deck };
   piles['hand'] = { id: 'hand', type: 'hand', cards: [] };
 
@@ -89,14 +106,13 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'blacksmith',
     name: 'Blacksmith',
     type: 'blessing',
-    description: 'Tableau plays allow ±1 rank.',
+    description: 'Foundation plays allow ±1 rank.',
     canMove: (cards, source, target, defaultAllowed) => {
-      if (target.type === 'tableau' && target.cards.length > 0) {
+      if (target.type === 'foundation' && target.cards.length > 0) {
         const moving = cards[0];
         const top = target.cards[target.cards.length - 1];
-        const isAlt = getCardColor(moving.suit) !== getCardColor(top.suit);
         const step = Math.abs(moving.rank - top.rank) === 1;
-        return isAlt && step;
+        return moving.suit === top.suit && step;
       }
       return defaultAllowed;
     }
@@ -242,8 +258,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
         const moving = cards[0];
         const top = target.cards[target.cards.length - 1];
         const isAlt = getCardColor(moving.suit) !== getCardColor(top.suit);
-        const step = Math.abs(moving.rank - top.rank) === 1;
-        return isAlt && step;
+        return isAlt && (isNextHigherInOrder(moving.rank, top.rank) || isNextLowerInOrder(moving.rank, top.rank));
       }
       return defaultAllowed;
     }
@@ -274,25 +289,24 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'jester',
     name: 'Jester',
     type: 'blessing',
-    description: 'Skip a fear encounter. 2 charges',
+    description: 'Add a persistent fear skip card to your hand.',
     onActivate: (state) => {
-      const charges = (state.effectState.jesterCharges ?? 2);
-      if (charges <= 0) return {};
-      return { effectState: { ...state.effectState, jesterCharges: charges - 1, skipFearEncounter: true } };
+      const hand = state.piles['hand'];
+      const skipCard: Card = { id: `jester-skip-${Date.now()}`, suit: 'special', rank: 0, faceUp: true, meta: { isFearSkip: true, persistent: true } };
+      return {
+        piles: { ...state.piles, hand: { ...hand, cards: [...hand.cards, skipCard] } }
+      };
     }
   },
   {
     id: 'trickster',
     name: 'Trickster',
     type: 'blessing',
-    description: 'Add a key to your hand. 3 charges',
-    onActivate: (state) => {
-      const charges = (state.effectState.tricksterCharges ?? 3);
-      if (charges <= 0) return {};
+    description: 'Add a persistent key to your hand.',
+    onActivate: (state, activeEffects) => {
       const hand = state.piles['hand'];
-      const keyCard: Card = { id: `key-${Date.now()}`, suit: 'special', rank: 0, faceUp: true, meta: { isKey: true } };
+      const keyCard: Card = { id: `trickster-key-${Date.now()}`, suit: 'special', rank: 0, faceUp: true, meta: { isKey: true, persistent: true } };
       return {
-        effectState: { ...state.effectState, tricksterCharges: charges - 1 },
         piles: { ...state.piles, hand: { ...hand, cards: [...hand.cards, keyCard] } }
       };
     }
@@ -367,14 +381,11 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'impersonator',
     name: 'Impersonator',
     type: 'blessing',
-    description: 'Add a wild card to your hand (3 charges).',
+    description: 'Add a persistent wild card to your hand.',
     onActivate: (state) => {
-      const charges = (state.effectState.impersonatorCharges ?? 3);
-      if (charges <= 0) return {};
       const hand = state.piles['hand'];
-      const wild: Card = { id: `wild-${Date.now()}`, suit: 'special', rank: 0, faceUp: true, meta: { isWild: true } };
+      const wild: Card = { id: `impersonator-wild-${Date.now()}`, suit: 'special', rank: 0, faceUp: true, meta: { isWild: true, persistent: true } };
       return {
-        effectState: { ...state.effectState, impersonatorCharges: charges - 1 },
         piles: { ...state.piles, hand: { ...hand, cards: [...hand.cards, wild] } }
       };
     },
@@ -385,7 +396,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     name: 'Whore of Galore',
     type: 'blessing',
     description: '+1 wild foundation.',
-    onActivate: (state) => {
+    onActivate: (state, activeEffects) => {
       const fid = `foundation-wild-${Date.now()}`;
       const newPiles = { ...state.piles, [fid]: { id: fid, type: 'foundation', cards: [], meta: { isWildFoundation: true } } };
       return { piles: newPiles };
@@ -477,13 +488,13 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'anarchists_cookbook',
     name: "Anarchist's Cookbook",
     type: 'exploit',
-    description: 'Build foundations in any order.',
+    description: 'Build foundations in any order once aces are placed.',
     canMove: (cards, source, target, defaultAllowed) => {
       if (target.type === 'foundation') {
         const moving = cards[0]; const top = target.cards[target.cards.length - 1];
-        if (!top) return true;
-        return isNextHigherInOrder(moving.rank, top.rank) ||
-               isNextLowerInOrder(moving.rank, top.rank);
+        if (!top) return moving.rank === 1; // Only allow aces on empty foundations
+        return moving.suit === top.suit && (isNextHigherInOrder(moving.rank, top.rank) ||
+               isNextLowerInOrder(moving.rank, top.rank));
       }
       return defaultAllowed;
     }

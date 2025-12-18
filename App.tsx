@@ -50,8 +50,8 @@ const generateRunPlan = (effectsRegistry: GameEffect[], rng?: () => number): Enc
 
    // If no effects, generate simple encounters with no effect
    if (curses.length === 0) {
-      for (let i = 0; i < 15; i++) {
-         const goal = Math.floor(150 + (i / 14) * (4200 - 150));
+      for (let i = 0; i < 10; i++) {
+         const goal = Math.floor(150 + (i / 9) * (4200 - 150));
          encounters.push({
             index: i,
             type: 'curse',
@@ -65,8 +65,8 @@ const generateRunPlan = (effectsRegistry: GameEffect[], rng?: () => number): Enc
 
    const shuffledCurses = shuffleArray([...curses], rng);
 
-   for (let i = 0; i < 15; i++) {
-      const goal = Math.floor(150 + (i / 14) * (4200 - 150));
+   for (let i = 0; i < 10; i++) {
+      const goal = Math.floor(150 + (i / 9) * (4200 - 150));
       const effect = shuffledCurses[i % shuffledCurses.length];
 
       encounters.push({
@@ -315,6 +315,8 @@ export default function SolitaireEngine({
    const [nonClosableDrawer, setNonClosableDrawer] = useState<'blessing_select' | 'shop' | null>(null);
    // Shop tab state (buy / sell / continue)
    const [shopTab, setShopTab] = useState<'buy' | 'sell' | 'continue'>('buy');
+   // Whether blessing select is shown before starting an encounter
+   const [preEncounterBlessing, setPreEncounterBlessing] = useState(false);
 
    // Reset any non-closable lock when the drawer is closed by other means
    React.useEffect(() => {
@@ -704,6 +706,21 @@ export default function SolitaireEngine({
      effectsRegistry.forEach(e => { if (e.chargeReset === 'encounter' && e.maxCharges) newCharges[e.id] = e.maxCharges; });
      const nextIdx = gameState.runIndex + 1;
      if (nextIdx < runPlan.length) {
+        // Check if blessing select should be shown before this encounter
+        if (nextIdx > 0 && nextIdx % 3 === 0) {
+           const blessings = effectsRegistry.filter(e => e.type === 'blessing').sort(() => 0.5 - Math.random());
+           const blessingOptions = blessings.length > 0 ? blessings : [
+             { id: 'placeholder_blessing_1', name: 'Swift Hands', type: 'blessing', description: 'Draw an extra card each turn.', rarity: 'common', cost: 0 },
+             { id: 'placeholder_blessing_2', name: 'Lucky Draw', type: 'blessing', description: 'Increased chance of finding rare cards.', rarity: 'uncommon', cost: 0 },
+             { id: 'placeholder_blessing_3', name: 'Golden Touch', type: 'blessing', description: 'Earn bonus coins on foundation plays.', rarity: 'rare', cost: 0 },
+           ] as GameEffect[];
+           setBlessingChoices(blessingOptions);
+           setActiveDrawer('blessing_select');
+           setNonClosableDrawer('blessing_select');
+           setPreEncounterBlessing(true);
+           return;
+        }
+
         let nextEncounter = runPlan[nextIdx];
         
         // Check if a wander forced the next curse
@@ -730,7 +747,25 @@ export default function SolitaireEngine({
         // Calculate new active effects list
         let nextActiveEffects = [...keptEffects];
         if (nextEncounter.effectId) nextActiveEffects.push(nextEncounter.effectId);
-      nextActiveEffects = Array.from(new Set(nextActiveEffects));
+        // For final encounter, add a second curse
+        if (nextIdx === 9) {
+           const curses = effectsRegistry.filter(e => e.type === 'curse' && e.id !== nextEncounter.effectId);
+           if (curses.length > 0) {
+              const extraCurse = shuffleArray(curses)[0];
+              nextActiveEffects.push(extraCurse.id);
+           }
+        }
+        nextActiveEffects = Array.from(new Set(nextActiveEffects));
+
+        // Sort effects by application order: curse -> exploit -> blessing
+        nextActiveEffects.sort((a, b) => {
+           const effectA = effectsRegistry.find(e => e.id === a);
+           const effectB = effectsRegistry.find(e => e.id === b);
+           const typeOrder = { 'curse': 0, 'exploit': 1, 'blessing': 2 };
+           const orderA = typeOrder[effectA?.type as keyof typeof typeOrder] ?? 3;
+           const orderB = typeOrder[effectB?.type as keyof typeof typeOrder] ?? 3;
+           return orderA - orderB;
+        });
 
         // Prepare base state for the new encounter
         let nextState: GameState = { 
@@ -850,6 +885,16 @@ export default function SolitaireEngine({
             }
          }
       }
+
+      // Sort effects by application order: curse -> exploit -> blessing
+      initialActive.sort((a, b) => {
+         const effectA = effectsRegistry.find(e => e.id === a);
+         const effectB = effectsRegistry.find(e => e.id === b);
+         const typeOrder = { 'curse': 0, 'exploit': 1, 'blessing': 2 };
+         const orderA = typeOrder[effectA?.type as keyof typeof typeOrder] ?? 3;
+         const orderB = typeOrder[effectB?.type as keyof typeof typeOrder] ?? 3;
+         return orderA - orderB;
+      });
 
       // Auto-draw opening hand for the first encounter
       const initialEffectsList = effectsRegistry.filter(e => initialActive.includes(e.id));
@@ -1183,7 +1228,8 @@ export default function SolitaireEngine({
   const dealHand = (state: GameState, effects: GameEffect[]): GameState => {
     const deck = state.piles['deck'];
     const hand = state.piles['hand'];
-    const oldHand = hand.cards.map(c => ({ ...c, faceUp: false }));
+    const oldHand = hand.cards.filter(c => !c.meta?.persistent).map(c => ({ ...c, faceUp: false }));
+    const persistentCards = hand.cards.filter(c => c.meta?.persistent);
     let newDeckCards = [...deck.cards, ...oldHand];
     const drawCount = 5;
     const drawn = newDeckCards.splice(0, drawCount).map(c => ({ ...c, faceUp: true }));
@@ -1193,7 +1239,7 @@ export default function SolitaireEngine({
       piles: {
         ...state.piles,
         deck: { ...deck, cards: newDeckCards },
-        hand: { ...hand, cards: drawn }
+        hand: { ...hand, cards: [...persistentCards, ...drawn] }
       },
       lastActionType: 'shuffle'
     };
@@ -1315,37 +1361,20 @@ export default function SolitaireEngine({
      
      const reward = currentEncounter.type === 'curse' ? 75 : 0;
      setGameState(prev => ({ ...prev, coins: prev.coins + reward, score: 0 }));
-     if (currentEncounter.type === 'curse') {
-        // Always show blessing selection after curse (use placeholder if empty)
-        const blessings = effectsRegistry.filter(e => e.type === 'blessing').sort(() => 0.5 - Math.random());
-        const blessingOptions = blessings.length > 0 ? blessings : [
-          { id: 'placeholder_blessing_1', name: 'Swift Hands', type: 'blessing', description: 'Draw an extra card each turn.', rarity: 'common', cost: 0 },
-          { id: 'placeholder_blessing_2', name: 'Lucky Draw', type: 'blessing', description: 'Increased chance of finding rare cards.', rarity: 'uncommon', cost: 0 },
-          { id: 'placeholder_blessing_3', name: 'Golden Touch', type: 'blessing', description: 'Earn bonus coins on foundation plays.', rarity: 'rare', cost: 0 },
-        ] as GameEffect[];
-      setBlessingChoices(blessingOptions); 
-      setActiveDrawer('blessing_select');
-      // Lock the blessing selection so the player can't accidentally collapse it
-      setNonClosableDrawer('blessing_select');
-     } else {
-        // Open shop as post-encounter flow and lock it to prevent accidental collapse
-        openShop(true);
-     }
+     // Always open shop after encounter completion
+     openShop(true);
   };
   
    const openShop = (lock: boolean = false) => {
        const owned = gameState.ownedEffects || [];
        const exploits = effectsRegistry.filter(e => e.type === 'exploit' && !owned.includes(e.id)).sort(() => 0.5 - Math.random()).slice(0, 4);
-       const curses = effectsRegistry.filter(e => e.type === 'curse' && !owned.includes(e.id)).sort(() => 0.5 - Math.random()).slice(0, 4);
 
        // Always show shop (use placeholder items if empty)
-       let shopItems = [...exploits, ...curses];
+       let shopItems = [...exploits];
        if (shopItems.length === 0) {
           shopItems = [
              { id: 'placeholder_exploit_1', name: 'Card Counter', type: 'exploit', description: 'See the next card in the deck.', rarity: 'common', cost: 50 },
              { id: 'placeholder_exploit_2', name: 'Deep Pockets', type: 'exploit', description: 'Start with extra coins each encounter.', rarity: 'uncommon', cost: 75 },
-             { id: 'placeholder_curse_1', name: 'Heavy Hands', type: 'curse', description: 'Cards cost more to play.', rarity: 'common', cost: 0 },
-             { id: 'placeholder_curse_2', name: 'Bad Luck', type: 'curse', description: 'Reduced score from low cards.', rarity: 'uncommon', cost: 0 },
           ] as GameEffect[];
        }
        setShopInventory(shopItems);
@@ -1361,7 +1390,20 @@ export default function SolitaireEngine({
          if (forceState === false && !isActive) return prev;
          if (isActive) return prev.filter(e => e !== id);
          const effect = effectsRegistry.find(e => e.id === id);
-         if (effect?.onActivate) {
+         if (!effect) return prev;
+         
+         // Check curse limit
+         if (effect.type === 'curse') {
+            const activeCurses = prev.filter(eid => {
+               const e = effectsRegistry.find(ef => ef.id === eid);
+               return e?.type === 'curse';
+            });
+            const isEncounter10 = gameState.runIndex === 9;
+            const maxCurses = isEncounter10 ? 2 : 1;
+            if (activeCurses.length >= maxCurses) return prev;
+         }
+         
+         if (effect.onActivate) {
             const changes = effect.onActivate(gameState, prev);
             const anyChanges = changes as any;
             if (anyChanges && anyChanges.newActiveEffects && Array.isArray(anyChanges.newActiveEffects)) {
@@ -1504,7 +1546,7 @@ export default function SolitaireEngine({
   if (currentView === 'home') {
      // Game modes data
      const gameModes = [
-        { id: 'coronata', name: 'Coronata', desc: 'The original rogue-like experience. 15 encounters with effects, shops, and wanders.', unlocked: true, hasStars: true },
+        { id: 'coronata', name: 'Coronata', desc: 'The original rogue-like experience. 10 encounters with effects, shops, and wanders.', unlocked: true, hasStars: true },
         { id: 'klondike', name: 'Klondike', desc: 'Classic solitaire with a rogue-like twist. Draw 1 or 3 cards.', unlocked: true, hasStars: false },
         { id: 'spider', name: 'Spider', desc: 'Build sequences of the same suit. 1, 2, or 4 suit variants.', unlocked: true, hasStars: false },
         { id: 'freecell', name: 'FreeCell', desc: 'Strategic solitaire with free cells for temporary storage.', unlocked: true, hasStars: false },
@@ -1515,11 +1557,11 @@ export default function SolitaireEngine({
         { title: 'Goal', content: 'Score points by moving cards to the Foundation piles. Build up from Ace to King, same suit. Reach the target score to clear each encounter!' },
         { title: 'Moving Cards', content: 'Tap a card to select it, then tap a valid destination. In tableau, stack cards in descending order, alternating colors (red on black, black on red).' },
         { title: 'The Deck', content: 'Tap the deck to draw cards. You can move the top card of the draw pile to tableau or foundation piles.' },
-        { title: 'Encounters', content: 'Each run has 15 encounters. All encounters are Curses that apply negative effects. Completing a curse lets you pick a blessing.' },
+        { title: 'Encounters', content: 'Each run has 10 encounters. All encounters are Curses that apply negative effects. Completing a curse lets you pick a blessing.' },
         { title: 'Effects', content: 'Exploits help you. Curses hurt you. Blessings are powerful cards added to your deck. Collect them from the shop and wanders!' },
         { title: 'The Shop', content: 'After Fear encounters, visit the Trade. Spend coins on Exploits or take Curses for bonus coins. Choose wisely!' },
         { title: 'Wanders', content: 'Between encounters, you\'ll face random events. Make choices that can reward you with coins, effects, or... consequences.' },
-        { title: 'Winning', content: 'Beat all 15 encounters to complete a run. Your final score depends on coins, effects collected, and time taken. Good luck!' },
+        { title: 'Winning', content: 'Beat all 10 encounters to complete a run. Your final score depends on coins, effects collected, and time taken. Good luck!' },
      ];
 
      // Updates/changelog data
@@ -2897,7 +2939,13 @@ export default function SolitaireEngine({
                                          // Auto-activate the blessing (passives are always on, charged effects start ready)
                                          toggleEffect(item.id, true);
                                          setBlessingChoices([]);
-                                         if (gameState.runIndex === 0) {
+                                         if (preEncounterBlessing) {
+                                            // Pre-encounter blessing: start the encounter
+                                            setPreEncounterBlessing(false);
+                                            setActiveDrawer(null);
+                                            setNonClosableDrawer(null);
+                                            startNextEncounter();
+                                         } else if (gameState.runIndex === 0) {
                                             // Closing initial blessing picker (allow choice to close)
                                             setActiveDrawer(null);
                                             setNonClosableDrawer(null);

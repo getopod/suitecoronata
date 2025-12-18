@@ -1,25 +1,92 @@
 
 import { LucideIcon } from 'lucide-react';
 
-export type Suit = 'hearts' | 'diamonds' | 'clubs' | 'spades' | 'special'; 
-export type Rank = -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13; 
-export type PileType = 'deck' | 'hand' | 'foundation' | 'tableau'; 
+export type Suit = 'hearts' | 'diamonds' | 'clubs' | 'spades' | 'special';
+export type Rank = -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
+export type PileType = 'deck' | 'hand' | 'foundation' | 'tableau';
+
+// Typed meta properties for cards
+export interface BaseCardMeta {
+  // Special card types
+  isKey?: boolean;
+  isWild?: boolean;
+  isBandage?: boolean;
+  isWound?: boolean;
+  isFearSkip?: boolean;
+  isFake?: boolean;
+  isQuestItem?: boolean;
+
+  // Crown special (Mad King effect)
+  crown?: boolean;
+  virtualRanks?: Rank[];
+
+  // Card state
+  locked?: boolean;
+  persistent?: boolean; // Survives certain operations
+  stolen?: boolean;
+  summoned?: boolean;
+  cursed?: boolean;
+  blessed?: boolean;
+
+  // Visual properties
+  blurred?: boolean;
+  highlighted?: boolean;
+  animated?: 'pulse' | 'shake' | 'glow';
+  color?: string;
+  scale?: number;
+  glow?: 'gold' | 'purple' | 'red';
+  shadow?: string;
+  opacity?: number;
+  border?: string;
+  tier?: 'gold' | 'silver' | 'bronze';
+  phantom?: boolean;
+
+  // Quest/markers
+  questType?: 'blood' | 'coin' | 'score';
+  showKey?: boolean;
+  showWild?: boolean;
+  showLock?: boolean;
+  showFake?: boolean;
+  showWound?: boolean;
+  showBandage?: boolean;
+  isNextFoundationCard?: boolean;
+
+  // Dimensional
+  hiddenDimension?: boolean;
+
+  // Universal keys
+  universal?: boolean;
+
+  // Allow additional properties for extensibility
+  [key: string]: any;
+}
+
+// Typed meta properties for piles
+export interface BasePileMeta {
+  isWildFoundation?: boolean;
+  isPhantom?: boolean;
+  tier?: 'gold' | 'silver' | 'bronze';
+
+  // Allow additional properties for extensibility
+  [key: string]: any;
+}
 
 export interface Card {
   id: string;
   suit: Suit;
   rank: Rank;
   faceUp: boolean;
-  meta?: Record<string, any>;
+  meta?: BaseCardMeta;
 }
 
 export interface Pile {
   id: string;
   type: PileType;
   cards: Card[];
-  locked?: boolean; 
-  hidden?: boolean; 
-  acceptedSuits?: Suit[]; 
+  locked?: boolean;
+  hidden?: boolean;
+  acceptedSuits?: Suit[];
+  meta?: BasePileMeta;
 }
 
 export interface WanderChoice {
