@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { LayoutGrid, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, HelpCircle, RefreshCw, X, Gift, Trophy, ArrowLeftRight, SkipBack, SkipForward, MessageSquare, FlaskConical, Save, Flag, Settings, ChevronDown, Pause, ShoppingCart, User, Unlock, Map as MapIcon, BarChart3, Link as LinkIcon, Bug } from 'lucide-react';
 import { Card, GameState, Pile, Rank, Suit, MoveContext, Encounter, GameEffect, Wander, WanderChoice, MinigameResult, PlayerStats, RunHistoryEntry, RunEncounterRecord } from './types';
 import { getCardColor, generateNewBoard, EFFECTS_REGISTRY, setEffectsRng, resetEffectsRng } from './data/effects';
@@ -7,6 +7,8 @@ import { Minigames } from './utils/minigames';
 import { loadPlayerStats, savePlayerStats, recordRunCompletion, getWinRate, formatDuration, getRelativeTime } from './utils/playerStats';
 import ResponsiveIcon from './components/ResponsiveIcon';
 import { WANDER_REGISTRY } from './data/wanders';
+import { useEffectDebugger } from './hooks/useEffectDebugger';
+import { detectConflicts } from './utils/effectDebug';
 
 // ==========================================
 // INJECTABLE REGISTRIES (defaults to empty for decoupled UI)
@@ -333,6 +335,34 @@ export default function SolitaireEngine({
          setGameState(prev => ({ ...prev, ownedEffects: unique }));
       }
    }, [gameState.ownedEffects]);
+
+   // Enable effect debugger in development
+   const debug = useEffectDebugger(process.env.NODE_ENV === 'development');
+
+   // Validate effects on mount (development only)
+   useEffect(() => {
+      if (process.env.NODE_ENV === 'development') {
+         debug.printValidation(effectsRegistry);
+      }
+   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+   // Check for effect conflicts when activeEffects changes
+   useEffect(() => {
+      if (activeEffects.length > 1 && process.env.NODE_ENV === 'development') {
+         const effectDefs = effectsRegistry.filter(e => activeEffects.includes(e.id));
+         const conflicts = detectConflicts(effectDefs);
+
+         const blocking = conflicts.filter(c => c.severity === 'blocking');
+         if (blocking.length > 0) {
+            console.error('❌ BLOCKING EFFECT CONFLICTS:', blocking);
+         }
+
+         const warnings = conflicts.filter(c => c.severity === 'warning');
+         if (warnings.length > 0) {
+            console.warn('⚠️ Effect warnings:', warnings);
+         }
+      }
+   }, [activeEffects, effectsRegistry, debug]);
 
    // Helper to toggle drawers while respecting non-closable locks.
    // If a drawer is locked (e.g. blessing_select or shop after encounter), prevent
@@ -709,11 +739,7 @@ export default function SolitaireEngine({
         // Check if blessing select should be shown before this encounter
         if (nextIdx > 0 && nextIdx % 3 === 0) {
            const blessings = effectsRegistry.filter(e => e.type === 'blessing').sort(() => 0.5 - Math.random());
-           const blessingOptions = blessings.length > 0 ? blessings : [
-             { id: 'placeholder_blessing_1', name: 'Swift Hands', type: 'blessing', description: 'Draw an extra card each turn.', rarity: 'common', cost: 0 },
-             { id: 'placeholder_blessing_2', name: 'Lucky Draw', type: 'blessing', description: 'Increased chance of finding rare cards.', rarity: 'uncommon', cost: 0 },
-             { id: 'placeholder_blessing_3', name: 'Golden Touch', type: 'blessing', description: 'Earn bonus coins on foundation plays.', rarity: 'rare', cost: 0 },
-           ] as GameEffect[];
+           const blessingOptions = blessings.slice(0, 5);
            setBlessingChoices(blessingOptions);
            setActiveDrawer('blessing_select');
            setNonClosableDrawer('blessing_select');
@@ -783,7 +809,7 @@ export default function SolitaireEngine({
             charges: newCharges, 
             wanderState: 'none',
             lastActionType: 'none',
-            // Clear forcedDanger after using it
+            // Clear forcedCurse after using it
             run: {
               ...gameState.run,
               forcedCurse: undefined
@@ -917,18 +943,32 @@ export default function SolitaireEngine({
 
       // Always show blessing selection (use placeholder if no blessings available)
       const blessings = effectsRegistry.filter(e => e.type === 'blessing').sort(() => 0.5 - Math.random());
-      const blessingOptions = blessings.length > 0 ? blessings : [
-        { id: 'placeholder_blessing_1', name: 'Swift Hands', type: 'blessing', description: 'Draw an extra card each turn.', rarity: 'common', cost: 0 },
-        { id: 'placeholder_blessing_2', name: 'Lucky Draw', type: 'blessing', description: 'Increased chance of finding rare cards.', rarity: 'uncommon', cost: 0 },
-        { id: 'placeholder_blessing_3', name: 'Golden Touch', type: 'blessing', description: 'Earn bonus coins on foundation plays.', rarity: 'rare', cost: 0 },
-      ] as GameEffect[];
+      const blessingOptions = blessings.slice(0, 5);
       setBlessingChoices(blessingOptions);
       setActiveDrawer('blessing_select');
       // Prevent collapsing the blessing picker at run start
       setNonClosableDrawer('blessing_select');
   };
 
-  const getEffects = useCallback(() => { return effectsRegistry.filter(e => activeEffects.includes(e.id)); }, [activeEffects, effectsRegistry]);
+  // Sort effects by type: curse → exploit → blessing for predictable execution order
+  const getEffects = useCallback(() => {
+    const typeOrder: Record<string, number> = {
+      curse: 0,
+      exploit: 1,
+      blessing: 2,
+      epic: 3,
+      legendary: 4,
+      rare: 5,
+      uncommon: 6
+    };
+    return effectsRegistry
+      .filter(e => activeEffects.includes(e.id))
+      .sort((a, b) => {
+        const orderA = typeOrder[a.type] ?? 999;
+        const orderB = typeOrder[b.type] ?? 999;
+        return orderA - orderB;
+      });
+  }, [activeEffects, effectsRegistry]);
 
   // Find valid move destinations for a card/stack
   const findValidMoves = useCallback((movingCardIds: string[], sourcePileId: string): { tableauIds: string[]; foundationIds: string[] } => {
@@ -1228,8 +1268,8 @@ export default function SolitaireEngine({
   const dealHand = (state: GameState, effects: GameEffect[]): GameState => {
     const deck = state.piles['deck'];
     const hand = state.piles['hand'];
-    const oldHand = hand.cards.filter(c => !c.meta?.persistent).map(c => ({ ...c, faceUp: false }));
-    const persistentCards = hand.cards.filter(c => c.meta?.persistent);
+    const oldHand = hand.cards.filter(c => (!c.meta?.persistent && (!c.meta?.charges || c.meta.charges <= 0))).map(c => ({ ...c, faceUp: false }));
+    const persistentCards = hand.cards.filter(c => c.meta?.persistent || (c.meta?.charges && c.meta.charges > 0));
     let newDeckCards = [...deck.cards, ...oldHand];
     const drawCount = 5;
     const drawn = newDeckCards.splice(0, drawCount).map(c => ({ ...c, faceUp: true }));
@@ -1298,7 +1338,20 @@ export default function SolitaireEngine({
 
     if (!valid) return false;
 
-    const newSourceCards = sourcePile.cards.filter(c => !cardIds.includes(c.id));
+    // Handle charged cards
+    if (sourcePileId === 'hand') {
+      movingCards.forEach(card => {
+        if (card.meta?.charges > 0) {
+          const cardInHand = sourcePile.cards.find(c => c.id === card.id);
+          if (cardInHand) {
+            cardInHand.meta = { ...cardInHand.meta, charges: cardInHand.meta.charges - 1 };
+            card.meta = { ...card.meta, charges: card.meta.charges - 1 };
+          }
+        }
+      });
+    }
+
+    const newSourceCards = sourcePile.cards.filter(c => !cardIds.includes(c.id) || (c.meta?.charges && c.meta.charges > 0));
     // Auto-flip top card when exposed (standard solitaire behavior)
     if (sourcePile.type === 'tableau' && newSourceCards.length > 0) { const newTop = newSourceCards[newSourceCards.length - 1]; if (!newTop.faceUp) newSourceCards[newSourceCards.length - 1] = { ...newTop, faceUp: true }; }
     const newTargetCards = [...targetPile.cards, ...movingCards];
@@ -3050,7 +3103,7 @@ export default function SolitaireEngine({
             </div>
             <div className="flex w-full gap-1">
                <button onClick={() => toggleDrawer('pause')} className={`p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}><Pause size={16} /></button>
-               {(['exploit', 'curse', 'blessing'] as const).map((type) => {
+               {(['exploit', 'blessing'] as const).map((type) => {
                   const hasReady = effectsRegistry.some(e => e.type === type && isEffectReady(e.id, gameState) && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll));
                   return (
                                <button key={type} onClick={() => toggleDrawer(type as any)} 

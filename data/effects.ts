@@ -289,10 +289,10 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'jester',
     name: 'Jester',
     type: 'blessing',
-    description: 'Add a persistent fear skip card to your hand.',
-    onActivate: (state) => {
+    description: 'Add a fear skip card to your hand (2 charges).',
+    onActivate: (state, activeEffects) => {
       const hand = state.piles['hand'];
-      const skipCard: Card = { id: `jester-skip-${Date.now()}`, suit: 'special', rank: 0, faceUp: true, meta: { isFearSkip: true, persistent: true } };
+      const skipCard: Card = { id: `jester-skip-${Date.now()}`, suit: 'special', rank: 0, faceUp: true, meta: { isFearSkip: true, charges: 2 } };
       return {
         piles: { ...state.piles, hand: { ...hand, cards: [...hand.cards, skipCard] } }
       };
@@ -302,10 +302,10 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'trickster',
     name: 'Trickster',
     type: 'blessing',
-    description: 'Add a persistent key to your hand.',
+    description: 'Add a key to your hand (3 charges).',
     onActivate: (state, activeEffects) => {
       const hand = state.piles['hand'];
-      const keyCard: Card = { id: `trickster-key-${Date.now()}`, suit: 'special', rank: 0, faceUp: true, meta: { isKey: true, persistent: true } };
+      const keyCard: Card = { id: `trickster-key-${Date.now()}`, suit: 'special', rank: 0, faceUp: true, meta: { isKey: true, charges: 3 } };
       return {
         piles: { ...state.piles, hand: { ...hand, cards: [...hand.cards, keyCard] } }
       };
@@ -381,10 +381,10 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
     id: 'impersonator',
     name: 'Impersonator',
     type: 'blessing',
-    description: 'Add a persistent wild card to your hand.',
-    onActivate: (state) => {
+    description: 'Add a wild card to your hand (3 charges).',
+    onActivate: (state, activeEffects) => {
       const hand = state.piles['hand'];
-      const wild: Card = { id: `impersonator-wild-${Date.now()}`, suit: 'special', rank: 0, faceUp: true, meta: { isWild: true, persistent: true } };
+      const wild: Card = { id: `impersonator-wild-${Date.now()}`, suit: 'special', rank: 0, faceUp: true, meta: { isWild: true, charges: 3 } };
       return {
         piles: { ...state.piles, hand: { ...hand, cards: [...hand.cards, wild] } }
       };
