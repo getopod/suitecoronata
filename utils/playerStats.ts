@@ -10,8 +10,7 @@ export const createEmptyStats = (): PlayerStats => ({
   bestStreak: 0,
   totalEffectsFound: 0,
   uniqueEffectsFound: new Set(),
-  dangersDefeated: 0,
-  fearsCompleted: 0,
+  cursesCompleted: 0,
   wandersCompleted: 0,
   totalCoinsEarned: 0,
   totalScore: 0,
@@ -85,8 +84,7 @@ export const recordRunCompletion = (
   // Track encounters completed
   runData.encounters.forEach(enc => {
     if (enc.passed) {
-      if (enc.type === 'danger' || enc.type === 'boss') newStats.dangersDefeated++;
-      if (enc.type === 'fear') newStats.fearsCompleted++;
+      if (enc.type === 'curse' || enc.type === 'boss') newStats.cursesCompleted++;
       if (enc.type === 'wander') newStats.wandersCompleted++;
     }
   });

@@ -245,7 +245,7 @@ function unlockWander(state: any, wanderId: string) {
 
 function forceNextDanger(state: any, dangerId: string) {
   if (!state?.run) return state;
-  return { ...state, run: { ...state.run, forcedDanger: dangerId } };
+  return { ...state, run: { ...state.run, forcedCurse: curseId } };
 }
 
 // Additional missing helper functions

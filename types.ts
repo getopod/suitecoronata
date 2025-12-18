@@ -85,13 +85,13 @@ export interface GameState {
     unlockedWanders?: string[];
     activeQuests?: string[];
     statuses?: Array<{ id: string; duration: number; }>;
-    forcedDanger?: string;
+    forcedCurse?: string;
   };
 }
 
 export interface Encounter {
   index: number;
-  type: 'fear' | 'danger' | 'normal';
+  type: 'curse' | 'normal';
   effectId: string;
   goal: number;
   completed: boolean;
@@ -115,7 +115,7 @@ export interface GameEffect {
   id: string;
   name: string;
   description: string;
-  type: 'danger' | 'fear' | 'blessing' | 'exploit' | 'curse' | 'epic' | 'legendary' | 'rare' | 'uncommon' | string;
+  type: 'blessing' | 'exploit' | 'curse' | 'epic' | 'legendary' | 'rare' | 'uncommon' | string;
   rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
   cost?: number; 
   maxCharges?: number;
@@ -162,7 +162,7 @@ export interface GameEffect {
 
 // Player Stats & Run History
 export interface RunEncounterRecord {
-  type: 'danger' | 'fear' | 'wander' | 'shop' | 'boss';
+  type: 'curse' | 'wander' | 'shop' | 'boss';
   name: string;
   passed: boolean;
 }
@@ -192,8 +192,7 @@ export interface PlayerStats {
   bestStreak: number;
   totalEffectsFound: number;
   uniqueEffectsFound: Set<string>; // effect IDs
-  dangersDefeated: number;
-  fearsCompleted: number;
+  cursesCompleted: number;
   wandersCompleted: number;
   totalCoinsEarned: number;
   totalScore: number;
@@ -212,8 +211,7 @@ export interface SerializedPlayerStats {
   bestStreak: number;
   totalEffectsFound: number;
   uniqueEffectsFound: string[]; // serialized as array
-  dangersDefeated: number;
-  fearsCompleted: number;
+  cursesCompleted: number;
   wandersCompleted: number;
   totalCoinsEarned: number;
   totalScore: number;

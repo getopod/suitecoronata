@@ -46,7 +46,7 @@ export interface EffectDisplay {
 
 export interface EncounterDisplay {
   index: number;
-  type: 'fear' | 'danger' | 'normal';
+  type: 'curse' | 'normal';
   name?: string;
   description?: string;
   goal: number;

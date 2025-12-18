@@ -46,17 +46,15 @@ const shuffleArray = <T,>(arr: T[], rng?: () => number): T[] => {
 
 const generateRunPlan = (effectsRegistry: GameEffect[], rng?: () => number): Encounter[] => {
    const encounters: Encounter[] = [];
-   const fears = effectsRegistry.filter(e => e.type === 'fear');
-   const dangers = effectsRegistry.filter(e => e.type === 'danger');
+   const curses = effectsRegistry.filter(e => e.type === 'curse');
 
    // If no effects, generate simple encounters with no effect
-   if (fears.length === 0 && dangers.length === 0) {
+   if (curses.length === 0) {
       for (let i = 0; i < 15; i++) {
-         const isDanger = (i + 1) % 3 === 0;
          const goal = Math.floor(150 + (i / 14) * (4200 - 150));
          encounters.push({
             index: i,
-            type: isDanger ? 'danger' : 'fear',
+            type: 'curse',
             effectId: '', // No effect
             goal: goal,
             completed: false
@@ -65,19 +63,15 @@ const generateRunPlan = (effectsRegistry: GameEffect[], rng?: () => number): Enc
       return encounters;
    }
 
-   const shuffledFears = shuffleArray([...fears], rng);
-   const shuffledDangers = shuffleArray([...dangers], rng);
+   const shuffledCurses = shuffleArray([...curses], rng);
 
    for (let i = 0; i < 15; i++) {
-      const isDanger = (i + 1) % 3 === 0;
       const goal = Math.floor(150 + (i / 14) * (4200 - 150));
-      const effect = isDanger 
-         ? (shuffledDangers[i % shuffledDangers.length] || shuffledFears[0]) 
-         : (shuffledFears[i % shuffledFears.length] || shuffledDangers[0]);
+      const effect = shuffledCurses[i % shuffledCurses.length];
 
       encounters.push({
          index: i,
-         type: isDanger ? 'danger' : 'fear',
+         type: 'curse',
          effectId: effect?.id || '',
          goal: goal,
          completed: false
@@ -252,7 +246,7 @@ const ICON_SYNONYMS: Record<string, string> = {
 };
 
 // Icon helper - converts effect name to icon path with type fallback
-const getEffectIcon = (nameOrId: string, type: 'exploit' | 'curse' | 'blessing' | 'danger' | 'fear') => {
+const getEffectIcon = (nameOrId: string, type: 'exploit' | 'curse' | 'blessing') => {
    const lower = (nameOrId || '').toLowerCase();
    
    // 1. Check synonyms (using ID-like keys)
@@ -367,7 +361,7 @@ export default function SolitaireEngine({
             const isOwned = gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll;
             if (!isOwned) return false;
             if (activeDrawer === 'exploit') return ['exploit', 'epic', 'legendary', 'rare', 'uncommon'].includes(e.type);
-            if (activeDrawer === 'curse') return ['curse', 'fear', 'danger'].includes(e.type);
+            if (activeDrawer === 'curse') return ['curse'].includes(e.type);
             if (activeDrawer === 'blessing') return ['blessing'].includes(e.type);
             return false;
          });
@@ -389,7 +383,7 @@ export default function SolitaireEngine({
   const [showHowTo, setShowHowTo] = useState(false);
   const [howToPage, setHowToPage] = useState(0);
   const [selectedMode, setSelectedMode] = useState('coronata');
-  const [glossaryTab, setGlossaryTab] = useState<'dangers'|'fears'|'blessings'|'exploits'|'curses'>('dangers');
+  const [glossaryTab, setGlossaryTab] = useState<'blessings'|'exploits'|'curses'>('curses');
   const [profileTab, setProfileTab] = useState<'stats'|'feats'|'recaps'>('stats');
   const [expandedAchievement, setExpandedAchievement] = useState<number | null>(null);
   const [expandedSettingsSection, setExpandedSettingsSection] = useState<string | null>(null);
@@ -603,7 +597,7 @@ export default function SolitaireEngine({
           unlockedWanders: gameState.run?.unlockedWanders || [],
           activeQuests: gameState.run?.activeQuests || [],
           statuses: gameState.run?.statuses || [],
-          forcedDanger: gameState.run?.forcedDanger,
+          forcedCurse: gameState.run?.forcedCurse,
         },
         activeExploits: activeEffects.filter(id => {
           const e = effectsRegistry.find(x => x.id === id);
@@ -671,7 +665,7 @@ export default function SolitaireEngine({
             unlockedWanders: resultState.run.unlockedWanders || gameState.run?.unlockedWanders || [],
             activeQuests: resultState.run.activeQuests || gameState.run?.activeQuests || [],
             statuses: resultState.run.statuses || gameState.run?.statuses || [],
-            forcedDanger: resultState.run.forcedDanger,
+            forcedCurse: resultState.run.forcedCurse,
           };
         }
         
@@ -712,14 +706,14 @@ export default function SolitaireEngine({
      if (nextIdx < runPlan.length) {
         let nextEncounter = runPlan[nextIdx];
         
-        // Check if a wander forced the next danger
-        if (gameState.run?.forcedDanger) {
-          const forcedEffect = effectsRegistry.find(e => e.id === gameState.run.forcedDanger);
-          if (forcedEffect && (forcedEffect.type === 'danger' || forcedEffect.type === 'epic' || forcedEffect.type === 'legendary')) {
+        // Check if a wander forced the next curse
+        if (gameState.run?.forcedCurse) {
+          const forcedEffect = effectsRegistry.find(e => e.id === gameState.run.forcedCurse);
+          if (forcedEffect && (forcedEffect.type === 'curse' || forcedEffect.type === 'epic' || forcedEffect.type === 'legendary')) {
             nextEncounter = {
               ...nextEncounter,
-              effectId: gameState.run.forcedDanger,
-              type: 'danger'
+              effectId: gameState.run.forcedCurse,
+              type: 'curse'
             };
           }
         }
@@ -757,7 +751,7 @@ export default function SolitaireEngine({
             // Clear forcedDanger after using it
             run: {
               ...gameState.run,
-              forcedDanger: undefined
+              forcedCurse: undefined
             }
         };
 
@@ -1312,17 +1306,17 @@ export default function SolitaireEngine({
      if (runStartData) {
         const effectDef = effectsRegistry.find(e => e.id === currentEncounter.effectId);
         const encounterRecord: RunEncounterRecord = {
-           type: currentEncounter.type === 'danger' ? 'danger' : 'fear',
+           type: 'curse',
            name: effectDef?.name || `Level ${gameState.runIndex + 1}`,
            passed: true
         };
         setRunStartData(prev => prev ? { ...prev, encounterLog: [...prev.encounterLog, encounterRecord] } : null);
      }
      
-     const reward = currentEncounter.type === 'danger' ? 100 : currentEncounter.type === 'fear' ? 50 : 0;
+     const reward = currentEncounter.type === 'curse' ? 75 : 0;
      setGameState(prev => ({ ...prev, coins: prev.coins + reward, score: 0 }));
-     if (currentEncounter.type === 'danger') {
-        // Always show blessing selection after danger (use placeholder if empty)
+     if (currentEncounter.type === 'curse') {
+        // Always show blessing selection after curse (use placeholder if empty)
         const blessings = effectsRegistry.filter(e => e.type === 'blessing').sort(() => 0.5 - Math.random());
         const blessingOptions = blessings.length > 0 ? blessings : [
           { id: 'placeholder_blessing_1', name: 'Swift Hands', type: 'blessing', description: 'Draw an extra card each turn.', rarity: 'common', cost: 0 },
@@ -1521,7 +1515,7 @@ export default function SolitaireEngine({
         { title: 'Goal', content: 'Score points by moving cards to the Foundation piles. Build up from Ace to King, same suit. Reach the target score to clear each encounter!' },
         { title: 'Moving Cards', content: 'Tap a card to select it, then tap a valid destination. In tableau, stack cards in descending order, alternating colors (red on black, black on red).' },
         { title: 'The Deck', content: 'Tap the deck to draw cards. You can move the top card of the draw pile to tableau or foundation piles.' },
-        { title: 'Encounters', content: 'Each run has 15 encounters. Every 3rd encounter is a Danger (harder). Fears give you access to the shop. Dangers let you pick a blessing.' },
+        { title: 'Encounters', content: 'Each run has 15 encounters. All encounters are Curses that apply negative effects. Completing a curse lets you pick a blessing.' },
         { title: 'Effects', content: 'Exploits help you. Curses hurt you. Blessings are powerful cards added to your deck. Collect them from the shop and wanders!' },
         { title: 'The Shop', content: 'After Fear encounters, visit the Trade. Spend coins on Exploits or take Curses for bonus coins. Choose wisely!' },
         { title: 'Wanders', content: 'Between encounters, you\'ll face random events. Make choices that can reward you with coins, effects, or... consequences.' },
@@ -1756,9 +1750,9 @@ export default function SolitaireEngine({
                                 { emoji: '🏃', name: 'Wanderer 100', req: '100 wanders completed', reward: 'Wanderer trophy', unlocked: false },
                                 { emoji: '🌍', name: 'Wanderer 500', req: '500 wanders completed', reward: 'Wanderer crown', unlocked: false },
                                 // Combat feats
-                                { emoji: '⚔️', name: 'Danger Seeker I', req: '25 dangers defeated', reward: 'Danger Seeker I', unlocked: false },
-                                { emoji: '🗡️', name: 'Danger Seeker II', req: '50 dangers defeated', reward: 'Danger Seeker II', unlocked: false },
-                                { emoji: '🔱', name: 'Danger Seeker III', req: '100 dangers defeated', reward: 'Danger Seeker III', unlocked: false },
+                                { emoji: '⚔️', name: 'Curse Breaker I', req: '25 curses completed', reward: 'Curse Breaker I', unlocked: false },
+                                { emoji: '🗡️', name: 'Curse Breaker II', req: '50 curses completed', reward: 'Curse Breaker II', unlocked: false },
+                                { emoji: '🔱', name: 'Curse Breaker III', req: '100 curses completed', reward: 'Curse Breaker III', unlocked: false },
                                 // Win milestones
                                 { emoji: '🎖️', name: 'Veteran', req: '10 wins', reward: 'Veteran badge', unlocked: false },
                                 { emoji: '🏅', name: 'Champion', req: '25 wins', reward: 'Champion crest', unlocked: false },
@@ -1866,11 +1860,10 @@ export default function SolitaireEngine({
                                       <div className="flex gap-0.5">
                                          {run.encounters.map((enc, i) => {
                                             const iconMap: Record<string, string> = {
-                                               danger: categoryIcons.danger,
-                                               fear: categoryIcons.fear,
+                                               curse: categoryIcons.curse,
                                                wander: '/icons/wander.png',
                                                shop: '/icons/coin.png',
-                                               boss: categoryIcons.danger,
+                                               boss: categoryIcons.curse,
                                             };
                                             return (
                                                <div 
@@ -1881,7 +1874,7 @@ export default function SolitaireEngine({
                                                         : 'bg-red-600/80'
                                                   }`}
                                                   title={`${enc.name}${enc.passed ? '' : ' (Failed)'}`}>
-                                                  <img src={iconMap[enc.type] || categoryIcons.danger} alt="" className="w-3 h-3 opacity-80" />
+                                                  <img src={iconMap[enc.type] || categoryIcons.curse} alt="" className="w-3 h-3 opacity-80" />
                                                </div>
                                             );
                                          })}
@@ -2466,7 +2459,7 @@ export default function SolitaireEngine({
                     <button onClick={() => setShowGlossary(false)}><X /></button>
                  </div>
                  <div className="flex gap-1 overflow-x-auto pb-2 mb-2">
-                    {(['dangers', 'fears', 'blessings', 'exploits', 'curses'] as const).map(cat => (
+                    {(['blessings', 'exploits', 'curses'] as const).map(cat => (
                        <button 
                           key={cat} 
                           onClick={() => setGlossaryTab(cat)} 
@@ -2484,15 +2477,13 @@ export default function SolitaireEngine({
                     {effectsRegistry.length === 0 ? (
                        <div className="text-center text-slate-500 py-8">No effects loaded</div>
                     ) : effectsRegistry.filter(e => {
-                       if (glossaryTab === 'dangers') return e.type === 'danger';
-                       if (glossaryTab === 'fears') return e.type === 'fear';
                        if (glossaryTab === 'blessings') return e.type === 'blessing';
                        if (glossaryTab === 'exploits') return ['exploit', 'epic', 'legendary', 'rare', 'uncommon'].includes(e.type);
                        if (glossaryTab === 'curses') return e.type === 'curse';
                        return false;
                     }).map(e => {
                        const rarityColors = getRarityColor(e.rarity);
-                       const effectType = e.type === 'danger' ? 'danger' : e.type === 'fear' ? 'fear' : e.type === 'blessing' ? 'blessing' : e.type === 'curse' ? 'curse' : 'exploit';
+                       const effectType = e.type === 'blessing' ? 'blessing' : e.type === 'curse' ? 'curse' : 'exploit';
                        return (
                        <div key={e.id} className={`p-3 rounded border ${rarityColors.bg} ${rarityColors.border} flex gap-3`}>
                           <ResponsiveIcon name={e.id || e.name} fallbackType={effectType} size={40} className="w-10 h-10 rounded shrink-0" alt={e.name} />
@@ -2986,7 +2977,7 @@ export default function SolitaireEngine({
             <div className="flex justify-between px-2 mb-2 relative group">
                {runPlan.map((enc, i) => {
                   const eff = effectsRegistry.find(e => e.id === enc.effectId);
-                  const cls = `w-2 h-2 rounded-full ${i < gameState.runIndex ? 'bg-green-500' : i === gameState.runIndex ? 'bg-white animate-pulse' : enc.type === 'danger' ? 'bg-red-900' : 'bg-slate-700'}`;
+                  const cls = `w-2 h-2 rounded-full ${i < gameState.runIndex ? 'bg-green-500' : i === gameState.runIndex ? 'bg-white animate-pulse' : 'bg-purple-700'}`;
                   return (
                      <button
                         key={i}

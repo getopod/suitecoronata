@@ -335,8 +335,7 @@ export const EFFECTS_REGISTRY: GameEffect[] = [
         piles: {
           ...state.piles,
           hand: { ...hand, cards: drawn },
-          deck: { ...deck, cards: remainingDeck },
-          deck: { ...state.piles['deck'], cards: [...state.piles['deck'].cards, ...hand.cards] }
+          deck: { ...deck, cards: remainingDeck }
         }
       };
     }
