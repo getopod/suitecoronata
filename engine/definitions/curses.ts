@@ -24,7 +24,7 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'reverse_psychology',
     name: 'Reverse Psychology',
     type: 'curse',
-    description: 'Every 5 moves, flip board H/V alternating. Completed foundations remove 1 flip.',
+    description: 'Every 5 moves, flip gameboard horizontally, then vertically, then horizontally, then vertically, & so on. Completed foundations remove 1 flip from 4 possible.',
     effectState: { pendingFlips: [] },
     custom: {
       onMoveComplete: (state) => {
@@ -126,22 +126,28 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'caged_bakeneko',
     name: 'Caged Bakeneko',
     type: 'curse',
-    description: '3 tableau locked. 4 keys hidden. Unlock a random tableau at 50% of score goal.',
-    effectState: { bakenekoLocked: [] },
+    description: '3 tableau locked. 4 keys hidden in other tableau. Unlock a random tableau at 50% of score goal.',
+    effectState: { bakenekoLocked: [], bakenekoKeys: [] },
     custom: {
       onActivate: (state) => {
         const newPiles = { ...state.piles };
         const tabIds = Object.keys(newPiles).filter(k => k.startsWith('tableau')).sort(() => Math.random() - 0.5).slice(0, 3);
         tabIds.forEach(id => { newPiles[id] = { ...newPiles[id], locked: true }; });
+
+        // Place keys as face-down cards in random unlocked tableaus
         const others = Object.keys(newPiles).filter(k => k.startsWith('tableau') && !tabIds.includes(k));
+        const keyLocations: string[] = [];
         for (let i = 0; i < 4 && others.length > 0; i++) {
           const id = others[Math.floor(Math.random() * others.length)];
           const key: Card = { id: `bkey-${i}-${Date.now()}`, suit: 'special', rank: 0 as Rank, faceUp: false, meta: { isKey: true } };
           newPiles[id] = { ...newPiles[id], cards: [...newPiles[id].cards, key] };
+          keyLocations.push(id);
         }
-        return { piles: newPiles, effectState: { ...state.effectState, bakenekoLocked: tabIds } };
+
+        return { piles: newPiles, effectState: { ...state.effectState, bakenekoLocked: tabIds, bakenekoKeys: keyLocations } };
       },
       onMoveComplete: (state) => {
+        // Auto-unlock at 50% goal
         if (state.score >= Math.floor(state.currentScoreGoal * 0.5)) {
           const locked = (state.effectState.bakenekoLocked || []).slice();
           if (locked.length > 0) {
@@ -302,76 +308,162 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
   },
 
   {
-    id: '3_rules_of_3',
+    id: 'three_rules_of_three',
     name: '3 Rules of 3',
     type: 'curse',
-    description: 'Only 3s can move to foundations. Only 3 tableau moves per turn. Only 3 cards can be in hand.',
-    custom: {
-      canMove: (cards, source, target, defaultAllowed, state) => {
-        if (target.type === 'foundation' && cards[0].rank !== 3) {
-          return false;
+    description: 'Every 3rd play removes 3 cards from deck. Lowest face-up tableau card moved to deck.',
+    onMoveComplete: (state) => {
+      if (state.moves > 0 && state.moves % 3 === 0) {
+        const deck = state.piles['deck'];
+        const newDeck = [...deck.cards];
+        newDeck.splice(0, Math.min(3, newDeck.length));
+        let lowest: Card | null = null;
+        Object.values(state.piles).filter(p => p.type === 'tableau').forEach(p => {
+          const faceUps = p.cards.filter(c => c.faceUp);
+          faceUps.forEach(c => { if (!lowest || c.rank < lowest.rank) lowest = c; });
+        });
+        if (lowest) {
+          const newPiles = { ...state.piles };
+          Object.keys(newPiles).filter(k => k.startsWith('tableau')).forEach(id => {
+            newPiles[id].cards = newPiles[id].cards.filter(c => c.id !== lowest!.id);
+          });
+          newDeck.push({ ...lowest, faceUp: false });
+          return { piles: { ...newPiles, deck: { ...deck, cards: newDeck } } };
         }
-        return defaultAllowed;
       }
+      return {};
     }
   },
-
-  {
+   {
     id: 'eat_the_rich',
     name: 'Eat the Rich',
     type: 'curse',
-    description: 'Face cards (J/Q/K) cannot be played. Must be discarded to continue. -5 coins per face card discarded.',
-    custom: {
-      canMove: (cards, source, target, defaultAllowed) => {
-        const isFaceCard = cards[0].rank >= 11; // J=11, Q=12, K=13
-        if (isFaceCard && target.type !== 'deck') {
-          return false;
-        }
-        return defaultAllowed;
+    description: 'Full deck dealt to equal tableaus at start. Coin gains disabled. 3× points gained.',
+    onActivate: (state) => {
+      const deck = state.piles['deck'];
+      const allCards = [...deck.cards];
+      allCards.sort(() => Math.random() - 0.5);
+      const newPiles: Record<string, Pile> = {};
+      const tableauCount = 7;
+      const perPile = Math.floor(allCards.length / tableauCount);
+      for (let i = 0; i < tableauCount; i++) {
+        const pileCards = allCards.slice(i * perPile, (i + 1) * perPile);
+        if (pileCards.length > 0) pileCards[pileCards.length - 1].faceUp = true;
+        newPiles[`tableau-${i}`] = { id: `tableau-${i}`, type: 'tableau', cards: pileCards };
       }
+      Object.keys(state.piles).filter(k => k.startsWith('foundation')).forEach(fid => { delete newPiles[fid]; });
+      return {
+        piles: { ...state.piles, ...newPiles, deck: { ...deck, cards: [] } },
+        coinMultiplier: 0,
+        scoreMultiplier: 3
+      };
     }
   },
+
 
   {
     id: 'entropy',
     name: 'Entropy',
     type: 'curse',
-    description: 'After each move, flip a random face-up card face-down in tableau.',
+    description: 'Every 10 plays, shuffle & redeal tableau & foundations from deck. Hand size is 10. Tableau plays from your hand swap places.',
     custom: {
-      onMoveComplete: (state) => {
-        const newPiles = { ...state.piles };
-        const tableaus = Object.keys(newPiles).filter(k => k.startsWith('tableau'));
-        const faceUpCards: {pileId: string, index: number}[] = [];
+      onMoveComplete: (state, context) => {
+        let updates: any = {};
 
-        tableaus.forEach(id => {
-          newPiles[id].cards.forEach((card, idx) => {
-            if (card.faceUp) {
-              faceUpCards.push({ pileId: id, index: idx });
+        // Handle hand-to-tableau swaps
+        if (context.source === 'hand' && context.target.startsWith('tableau')) {
+          const targetPile = state.piles[context.target];
+          const handPile = state.piles['hand'];
+
+          if (targetPile.cards.length > 0) {
+            const newPiles = { ...state.piles };
+            const swapCard = targetPile.cards.pop();
+            if (swapCard) {
+              newPiles['hand'].cards.push(swapCard);
+              updates.piles = newPiles;
             }
-          });
-        });
-
-        if (faceUpCards.length > 0) {
-          const target = faceUpCards[Math.floor(Math.random() * faceUpCards.length)];
-          newPiles[target.pileId].cards[target.index] = { ...newPiles[target.pileId].cards[target.index], faceUp: false };
+          }
         }
 
-        return { piles: newPiles };
-      }
+        // Every 10 plays, shuffle and redeal
+        if (state.moves > 0 && state.moves % 10 === 0) {
+          let allCards: Card[] = [];
+          ['tableau-0','tableau-1','tableau-2','tableau-3','tableau-4','tableau-5','tableau-6'].forEach(id => {
+            if (state.piles[id]) allCards = [...allCards, ...state.piles[id].cards];
+          });
+          ['foundation-hearts','foundation-diamonds','foundation-clubs','foundation-spades'].forEach(id => {
+            if (state.piles[id]) allCards = [...allCards, ...state.piles[id].cards];
+          });
+          if (state.piles['deck']) allCards = [...allCards, ...state.piles['deck'].cards];
+
+          allCards.sort(() => Math.random() - 0.5);
+          const newPiles: Record<string, Pile> = { ...(updates.piles || state.piles) };
+
+          for (let i = 0; i < 7; i++) {
+            const pileCards = allCards.splice(0, i + 1);
+            if (pileCards.length > 0) pileCards[pileCards.length - 1].faceUp = true;
+            newPiles[`tableau-${i}`] = { id: `tableau-${i}`, type: 'tableau', cards: pileCards };
+          }
+          ['hearts','diamonds','clubs','spades'].forEach(suit => {
+            newPiles[`foundation-${suit}`] = { id: `foundation-${suit}`, type: 'foundation', cards: [] };
+          });
+          newPiles['deck'] = { id: 'deck', type: 'deck', cards: allCards };
+          updates.piles = newPiles;
+        }
+
+        return updates;
+      },
+      onActivate: (state) => ({ resources: { ...state.resources, handSize: 10 } })
     }
   },
+
 
   {
     id: 'executive_order',
     name: 'Executive Order',
     type: 'curse',
-    description: 'Kings cannot be moved. They must remain in their starting position.',
+    description: 'All tableaus linked; Must play 1 to each in order, even if not valid. Then rearrange cards freely for 7 moves & score at end. Repeat.',
+    effectState: { executivePhase: 'play', executiveTableauIndex: 0, executiveFreeMovesLeft: 0 },
     custom: {
-      canMove: (cards, source, target, defaultAllowed) => {
-        if (cards[0].rank === 13) { // King
-          return false;
+      onActivate: (state) => ({
+        effectState: { ...state.effectState, executivePhase: 'play', executiveTableauIndex: 0, executiveFreeMovesLeft: 0 }
+      }),
+      canMove: (cards, source, target, defaultAllowed, state) => {
+        const phase = state.effectState.executivePhase || 'play';
+        if (phase === 'free') return true; // Allow any move during free phase
+
+        // During play phase, must play to current tableau in order
+        if (target.type === 'tableau') {
+          const targetNum = parseInt(target.id.split('-')[1]);
+          const expectedNum = state.effectState.executiveTableauIndex || 0;
+          return targetNum === expectedNum;
         }
         return defaultAllowed;
+      },
+      onMoveComplete: (state) => {
+        const phase = state.effectState.executivePhase || 'play';
+        const currentIndex = state.effectState.executiveTableauIndex || 0;
+
+        if (phase === 'play') {
+          const nextIndex = (currentIndex + 1) % 7;
+          if (nextIndex === 0) {
+            // Completed cycle, enter free phase
+            return {
+              effectState: { ...state.effectState, executivePhase: 'free', executiveFreeMovesLeft: 7 }
+            };
+          }
+          return { effectState: { ...state.effectState, executiveTableauIndex: nextIndex } };
+        } else {
+          // Free phase
+          const movesLeft = (state.effectState.executiveFreeMovesLeft || 0) - 1;
+          if (movesLeft <= 0) {
+            // Return to play phase
+            return {
+              effectState: { ...state.effectState, executivePhase: 'play', executiveTableauIndex: 0 }
+            };
+          }
+          return { effectState: { ...state.effectState, executiveFreeMovesLeft: movesLeft } };
+        }
       }
     }
   },
@@ -380,31 +472,27 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'mood_swings',
     name: 'Mood Swings',
     type: 'curse',
-    description: 'Every 7 moves, randomly swap red/black stacking rules.',
-    effectState: { redBlackSwapped: false },
+    description: 'Odd/even ranks alternate scoring 0 every 6/7 plays. x2 scoring.',
+    effectState: { moodSwingCycle: 0 },
     custom: {
-      onActivate: (state) => ({ effectState: { ...state.effectState, redBlackSwapped: false } }),
-      onMoveComplete: (state) => {
-        if (state.moves > 0 && state.moves % 7 === 0) {
-          const swapped = !(state.effectState.redBlackSwapped || false);
-          return { effectState: { ...state.effectState, redBlackSwapped: swapped } };
-        }
-        return {};
-      },
-      canMove: (cards, source, target, defaultAllowed, state) => {
-        if (target.type === 'tableau' && target.cards.length > 0 && state.effectState.redBlackSwapped) {
-          const topCard = target.cards[target.cards.length - 1];
-          const movingCard = cards[0];
-          const topColor = getCardColor(topCard.suit);
-          const movingColor = getCardColor(movingCard.suit);
+      onActivate: (state) => ({
+        effectState: { ...state.effectState, moodSwingCycle: 0 },
+        scoreMultiplier: state.scoreMultiplier * 2
+      }),
+      calculateScore: (scoreDelta, context, state) => {
+        const cycle = (state.effectState.moodSwingCycle || 0);
+        const card = context.cards[0];
+        const isOddRank = card.rank % 2 === 1;
 
-          // If swapped, allow same color instead of alternating
-          if (topColor === movingColor && movingCard.rank === topCard.rank - 1) {
-            return true;
-          }
-          return false;
-        }
-        return defaultAllowed;
+        // Every 6 plays for odd ranks, every 7 plays for even ranks
+        if (isOddRank && cycle % 6 === 5) return 0;
+        if (!isOddRank && cycle % 7 === 6) return 0;
+
+        return scoreDelta;
+      },
+      onMoveComplete: (state) => {
+        const cycle = (state.effectState.moodSwingCycle || 0) + 1;
+        return { effectState: { ...state.effectState, moodSwingCycle: cycle } };
       }
     }
   },
@@ -413,9 +501,33 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'veil_of_uncertainty',
     name: 'Veil of Uncertainty',
     type: 'curse',
-    description: 'All face-down cards show question marks. Cannot see what will be revealed until flipped.',
+    description: 'Only suit visible. +50% points gained. 33% to stumble to an adjacent tableau for negative score.',
     visuals: [
-      { pattern: 'hide_facedown_ranks' }
-    ]
+      { pattern: 'hide_rank' }
+    ],
+    custom: {
+      onActivate: (state) => ({
+        scoreMultiplier: state.scoreMultiplier * 1.5
+      }),
+      onMoveComplete: (state, context) => {
+        // 33% chance to stumble to adjacent tableau
+        if (Math.random() < 0.33 && context.target.startsWith('tableau')) {
+          const tableauNum = parseInt(context.target.split('-')[1]);
+          const adjacentLeft = tableauNum > 0 ? `tableau-${tableauNum - 1}` : null;
+          const adjacentRight = tableauNum < 6 ? `tableau-${tableauNum + 1}` : null;
+          const adjacent = Math.random() < 0.5 ? adjacentLeft : adjacentRight;
+
+          if (adjacent && state.piles[adjacent]) {
+            const newPiles = { ...state.piles };
+            const movedCard = newPiles[context.target].cards.pop();
+            if (movedCard) {
+              newPiles[adjacent].cards.push(movedCard);
+              return { piles: newPiles, score: state.score - movedCard.rank };
+            }
+          }
+        }
+        return {};
+      }
+    }
   },
 ];

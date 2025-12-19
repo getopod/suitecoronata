@@ -1,7 +1,7 @@
-import { ClassicGameRules, ClassicPileConfig, ClassicCardData, ClassicGameState, ClassicMoveAttempt } from '../types';
+import { ClassicGameRules as GameRules, ClassicPileConfig as PileConfig, ClassicCardData as CardData } from '../types';
 import { createDeck, isRed, isConsecutiveDescending, isAlternatingColor, isConsecutiveAscending, isSameSuit, isRunDescendingAltColor } from '../utils/cards';
 
-export const FreeCell: ClassicGameRules = {
+export const FreeCell: GameRules = {
   name: "FreeCell",
   description: "Use four free cells to move cards and build foundations.",
   details: {
@@ -14,21 +14,21 @@ export const FreeCell: ClassicGameRules = {
           "You can only move a stack of cards if you have enough open spaces (Free Cells + Empty Tableaus) to temporarily hold them."
       ]
   },
-
+  
   layout: (w, h) => {
     const width = w || 360;
     const numCols = 8;
     const margin = Math.max(5, Math.floor(width * 0.02));
     const gap = Math.max(2, Math.floor(width * 0.01));
-
+    
     let cardW = Math.floor((width - (2 * margin) - ((numCols - 1) * gap)) / numCols);
     if (cardW > 110) cardW = 110;
     const cardH = Math.floor(cardW * 1.5);
-
+    
     const contentWidth = (numCols * cardW) + ((numCols - 1) * gap);
     const startX = Math.floor((width - contentWidth) / 2);
-
-    const configs: ClassicPileConfig[] = [];
+    
+    const configs: PileConfig[] = [];
     const topRowY = 60;
     const tableauY = topRowY + cardH + Math.max(15, h * 0.03);
 
@@ -72,8 +72,8 @@ export const FreeCell: ClassicGameRules = {
 
   deal: () => {
     const deck = createDeck(); // 52 cards
-    const piles: Record<string, ClassicCardData[]> = {};
-
+    const piles: Record<string, CardData[]> = {};
+    
     for(let i=0; i<4; i++) piles[`cell-${i}`] = [];
     for(let i=0; i<4; i++) piles[`foundation-${i}`] = [];
     for(let i=0; i<8; i++) piles[`tableau-${i}`] = [];
@@ -90,7 +90,7 @@ export const FreeCell: ClassicGameRules = {
   canDrag: (pileId, cardIndex, cards) => {
     // Cells: Can always drag the single card
     if (pileId.startsWith('cell')) return true;
-
+    
     // Foundations: Usually not allowed in strict FreeCell, but we'll allow dragging back
     if (pileId.startsWith('foundation')) return cardIndex === cards.length - 1;
 
@@ -113,12 +113,12 @@ export const FreeCell: ClassicGameRules = {
     if (movingCards.length > 1) {
         let emptyCells = 0;
         let emptyCols = 0;
-
+        
         for(const k in gameState.piles) {
             if (k.startsWith('cell') && gameState.piles[k].length === 0) emptyCells++;
             if (k.startsWith('tableau') && gameState.piles[k].length === 0 && k !== move.targetPileId) emptyCols++;
         }
-
+        
         const limit = (1 + emptyCells) * Math.pow(2, emptyCols);
         if (movingCards.length > limit) return false;
     }

@@ -147,6 +147,9 @@ export interface GameState {
   coinMultiplier: number; 
   lastActionType?: 'draw' | 'play-tableau' | 'play-foundation' | 'shuffle' | 'none';
   
+  // History for undo functionality
+  history: GameState[];
+  
   // Run State
   runIndex: number;
   currentScoreGoal: number;

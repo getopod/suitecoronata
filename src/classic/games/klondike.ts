@@ -1,7 +1,7 @@
-import { ClassicGameRules, ClassicPileConfig, ClassicCardData, ClassicGameState, ClassicMoveAttempt, ClassicGameSettings } from '../types';
+import { ClassicGameRules as GameRules, ClassicPileConfig as PileConfig, ClassicCardData as CardData } from '../types';
 import { createDeck, isSameSuit, isConsecutiveAscending, isConsecutiveDescending, isAlternatingColor, isRunDescendingAltColor } from '../utils/cards';
 
-const createKlondike = (drawCount: number): ClassicGameRules => {
+const createKlondike = (drawCount: number): GameRules => {
     return {
         name: `Klondike (Draw ${drawCount})`,
         description: `Classic Solitaire, drawing ${drawCount} card${drawCount > 1 ? 's' : ''} at a time.`,
@@ -16,7 +16,7 @@ const createKlondike = (drawCount: number): ClassicGameRules => {
                 "You can cycle through the stock pile indefinitely (unless strict mode is on)."
             ]
         },
-
+        
         layout: (w, h) => {
             const width = w || 360;
             const numCols = 7;
@@ -25,44 +25,44 @@ const createKlondike = (drawCount: number): ClassicGameRules => {
             let cardW = Math.floor((width - (2 * margin) - ((numCols - 1) * gap)) / numCols);
             if (cardW > 120) cardW = 120;
             const cardH = Math.floor(cardW * 1.5);
-
+            
             const contentWidth = (numCols * cardW) + ((numCols - 1) * gap);
             const startX = Math.floor((width - contentWidth) / 2);
-
-            const configs: ClassicPileConfig[] = [];
+            
+            const configs: PileConfig[] = [];
             const topRowY = 60;
             const tableauY = topRowY + cardH + Math.max(10, h * 0.02);
-
+            
             configs.push({ id: 'stock', type: 'stock', x: startX, y: topRowY, fan: 'none' });
-            configs.push({ id: 'waste', type: 'waste', x: startX + cardW + gap, y: topRowY, fan: 'none' });
-
+            configs.push({ id: 'waste', type: 'waste', x: startX + cardW + gap, y: topRowY, fan: 'none' }); 
+        
             for (let i = 0; i < 4; i++) {
-            configs.push({
-                id: `foundation-${i}`,
-                type: 'foundation',
-                x: startX + ((3 + i) * (cardW + gap)),
-                y: topRowY,
-                fan: 'none'
+            configs.push({ 
+                id: `foundation-${i}`, 
+                type: 'foundation', 
+                x: startX + ((3 + i) * (cardW + gap)), 
+                y: topRowY, 
+                fan: 'none' 
             });
             }
-
+        
             for (let i = 0; i < 7; i++) {
-            configs.push({
-                id: `tableau-${i}`,
-                type: 'tableau',
-                x: startX + (i * (cardW + gap)),
-                y: tableauY,
-                fan: 'down',
+            configs.push({ 
+                id: `tableau-${i}`, 
+                type: 'tableau', 
+                x: startX + (i * (cardW + gap)), 
+                y: tableauY, 
+                fan: 'down', 
                 fanSpacing: Math.max(15, cardH * 0.22)
             });
             }
-
+        
             return { piles: configs, cardWidth: cardW, cardHeight: cardH };
         },
 
         deal: () => {
             const deck = createDeck();
-            const piles: Record<string, ClassicCardData[]> = {
+            const piles: Record<string, CardData[]> = {
             stock: [],
             waste: [],
             'foundation-0': [], 'foundation-1': [], 'foundation-2': [], 'foundation-3': [],
@@ -98,7 +98,7 @@ const createKlondike = (drawCount: number): ClassicGameRules => {
                 if (settings?.strictSolitaire) {
                     const currentPass = gameState.customData?.passCount || 1;
                     const maxPasses = drawCount === 1 ? 1 : 3;
-
+                    
                     if (currentPass >= maxPasses) {
                         return null; // Limit reached
                     }
@@ -107,17 +107,17 @@ const createKlondike = (drawCount: number): ClassicGameRules => {
                 const newStock = [...wastePile].reverse().map(c => ({ ...c, faceUp: false }));
                 return {
                     piles: { ...gameState.piles, stock: newStock, waste: [] },
-                    customData: {
-                        ...gameState.customData,
-                        passCount: (gameState.customData?.passCount || 1) + 1
+                    customData: { 
+                        ...gameState.customData, 
+                        passCount: (gameState.customData?.passCount || 1) + 1 
                     }
                 };
             }
 
             // Draw
             const newStock = [...stockPile];
-            const movedCards: ClassicCardData[] = [];
-
+            const movedCards: CardData[] = [];
+            
             for(let i=0; i<drawCount; i++) {
                 if (newStock.length > 0) {
                     const c = newStock.pop()!;
@@ -125,7 +125,7 @@ const createKlondike = (drawCount: number): ClassicGameRules => {
                     movedCards.push(c);
                 }
             }
-
+            
             const newWaste = [...(wastePile || []), ...movedCards];
             return {
                 piles: { ...gameState.piles, stock: newStock, waste: newWaste }
@@ -133,7 +133,7 @@ const createKlondike = (drawCount: number): ClassicGameRules => {
         },
 
         canDrag: (pileId, cardIndex, cards) => {
-            if (pileId === 'stock') return true;
+            if (pileId === 'stock') return true; 
             const card = cards[cardIndex];
             if (!card.faceUp) return false;
 

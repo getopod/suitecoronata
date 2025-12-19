@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { LayoutGrid, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, HelpCircle, RefreshCw, X, Gift, Trophy, ArrowLeftRight, SkipBack, SkipForward, MessageSquare, FlaskConical, Save, Flag, Settings, ChevronDown, Pause, ShoppingCart, User, Unlock, Map as MapIcon, BarChart3, Link as LinkIcon, Bug } from 'lucide-react';
+import { LayoutGrid, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, HelpCircle, RefreshCw, X, Gift, Trophy, ArrowLeftRight, SkipBack, SkipForward, MessageSquare, FlaskConical, Save, Flag, Settings, ChevronDown, Pause, ShoppingCart, User, Unlock, Map as MapIcon, BarChart3, Link as LinkIcon, Bug, Clock, Menu } from 'lucide-react';
 import { Card, GameState, Pile, Rank, Suit, MoveContext, Encounter, GameEffect, Wander, WanderChoice, WanderState, MinigameResult, PlayerStats, RunHistoryEntry, RunEncounterRecord } from './types';
 import { getCardColor, generateNewBoard, EFFECTS_REGISTRY, setEffectsRng, resetEffectsRng } from './data/effects';
 import { isHighestRank, isNextHigherInOrder, isNextLowerInOrder } from './utils/rankOrder';
@@ -46,6 +46,13 @@ const shuffleArray = <T,>(arr: T[], rng?: () => number): T[] => {
       [out[i], out[j]] = [out[j], out[i]];
    }
    return out;
+};
+
+// Format time for classic mode timer
+const formatTime = (seconds: number): string => {
+   const mins = Math.floor(seconds / 60);
+   const secs = seconds % 60;
+   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
 const generateRunPlan = (effectsRegistry: GameEffect[], rng?: () => number): Encounter[] => {
@@ -277,6 +284,10 @@ export default function SolitaireEngine({
    const [hintTargets, setHintTargets] = useState<string[]>([]);
    const [selectionColor, setSelectionColor] = useState<'none' | 'green' | 'yellow' | 'red'>('none');
    const [highlightedMoves, setHighlightedMoves] = useState<{ tableauIds: string[]; foundationIds: string[] }>({ tableauIds: [], foundationIds: [] });
+  
+  // Classic mode state
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
   
   // Player Stats
   const [playerStats, setPlayerStats] = useState<PlayerStats>(() => loadPlayerStats());
@@ -525,6 +536,27 @@ export default function SolitaireEngine({
       }
     }
   }, [gameState.score, gameState.currentScoreGoal, gameState.isLevelComplete, gameState.piles, gameState.moves, currentView, showLevelComplete, selectedMode]);
+
+  // Timer for classic modes
+  React.useEffect(() => {
+    const classicGame = CLASSIC_GAMES[selectedMode];
+    if (classicGame && currentView === 'game' && !gameState.isLevelComplete && !showLevelComplete) {
+      setIsTimerRunning(true);
+      const interval = setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+      return () => clearInterval(interval);
+    } else {
+      setIsTimerRunning(false);
+    }
+  }, [selectedMode, currentView, gameState.isLevelComplete, showLevelComplete]);
+
+  // Reset timer when starting a new game
+  React.useEffect(() => {
+    if (currentView === 'game') {
+      setElapsedTime(0);
+    }
+  }, [currentView]);
 
   const isEffectReady = (id: string, state: GameState) => {
      if (id === 'lobbyist') return state.coins >= 100;
@@ -1246,6 +1278,45 @@ export default function SolitaireEngine({
     if (!pile) return;
     const clickedCard = cardIndex >= 0 ? pile.cards[cardIndex] : null;
 
+    // Key unlock flow - if a key is selected and user clicks a locked pile/card
+    if (gameState.selectedCardIds && gameState.selectedCardIds.length === 1) {
+       const selectedPile = gameState.piles[selectedPileId!];
+       const selectedCard = selectedPile?.cards.find(c => c.id === gameState.selectedCardIds![0]);
+
+       if (selectedCard?.meta?.isKey) {
+          // Check if clicked on a locked pile
+          if (pile.locked) {
+             const newPiles = { ...gameState.piles };
+             newPiles[pileId] = { ...pile, locked: false };
+
+             // Remove the key card from its pile
+             const keyPile = newPiles[selectedPileId!];
+             newPiles[selectedPileId!] = { ...keyPile, cards: keyPile.cards.filter(c => c.id !== selectedCard.id) };
+
+             setGameState(prev => ({ ...prev, piles: newPiles, selectedCardIds: null }));
+             setSelectedPileId(null);
+             setSelectedCardIndex(-1);
+             return;
+          }
+          // Check if clicked on a locked card
+          if (clickedCard?.meta?.locked) {
+             const newPiles = { ...gameState.piles };
+             const newCards = [...pile.cards];
+             newCards[cardIndex] = { ...clickedCard, meta: { ...clickedCard.meta, locked: false } };
+             newPiles[pileId] = { ...pile, cards: newCards };
+
+             // Remove the key card from its pile
+             const keyPile = newPiles[selectedPileId!];
+             newPiles[selectedPileId!] = { ...keyPile, cards: keyPile.cards.filter(c => c.id !== selectedCard.id) };
+
+             setGameState(prev => ({ ...prev, piles: newPiles, selectedCardIds: null }));
+             setSelectedPileId(null);
+             setSelectedCardIndex(-1);
+             return;
+          }
+       }
+    }
+
     // Locked card unlock flow (Panopticon minigame or pay coins)
     if (clickedCard && clickedCard.meta?.locked) {
        const hasPanopticon = activeEffects.includes('panopticon');
@@ -1260,7 +1331,7 @@ export default function SolitaireEngine({
        }
        return;
     }
-    
+
     if (pile.locked) {
         return;
     }
@@ -1287,7 +1358,8 @@ export default function SolitaireEngine({
             piles: newCoronataPiles,
             score: result.score ?? prev.score,
             moves: result.moves ?? prev.moves,
-            customData: result.customData ?? prev.customData
+            customData: result.customData ?? prev.customData,
+            history: [...prev.history, prev]
           }));
         }
         return;
@@ -1460,6 +1532,7 @@ export default function SolitaireEngine({
     let finalTargetPileId = targetPileId;
     const effects = getEffects();
     const sourcePile = gameState.piles[sourcePileId];
+    let targetPile = gameState.piles[targetPileId];
     const movingCards = sourcePile.cards.filter(c => cardIds.includes(c.id));
     if (movingCards.length === 0) return false;
 
@@ -1510,7 +1583,8 @@ export default function SolitaireEngine({
       setGameState(prev => ({
         ...prev,
         piles: newPiles,
-        moves: prev.moves + 1
+        moves: prev.moves + 1,
+        history: [...prev.history, prev]
       }));
 
       return true;
@@ -1524,7 +1598,7 @@ export default function SolitaireEngine({
        }
     });
     
-    const targetPile = gameState.piles[finalTargetPileId];
+    targetPile = gameState.piles[finalTargetPileId];
 
     const baseMoves = findValidMoves(cardIds, sourcePileId);
     let valid = baseMoves.tableauIds.includes(finalTargetPileId) || baseMoves.foundationIds.includes(finalTargetPileId);
@@ -1683,6 +1757,28 @@ export default function SolitaireEngine({
 
   const canAfford = (cost: number) => gameState.coins >= cost;
 
+  // Trust Fund conversion functions
+  const convertScoreToCoin = () => {
+    if (!activeEffects.includes('trust_fund')) return;
+    if (gameState.score < 5) return; // Need at least 5 score
+    const converted = Math.floor(gameState.score / 5);
+    setGameState(prev => ({
+      ...prev,
+      score: prev.score - converted * 5,
+      coins: prev.coins + converted
+    }));
+  };
+
+  const convertCoinToScore = () => {
+    if (!activeEffects.includes('trust_fund')) return;
+    if (gameState.coins < 1) return; // Need at least 1 coin
+    setGameState(prev => ({
+      ...prev,
+      coins: prev.coins - 1,
+      score: prev.score + 4
+    }));
+  };
+
   const buyEffect = (effect: GameEffect) => {
      const cost = effect.cost || 50;
      if (gameState.coins < cost) return; // Can't afford
@@ -1752,12 +1848,41 @@ export default function SolitaireEngine({
           </button>
        );
     }
+    // Special rendering for keys - just the icon, no card face
+    if (visualCard.meta?.isKey && visualCard.faceUp) {
+      const charges = visualCard.meta?.charges;
+      const isTricksterKey = visualCard.meta?.isTricksterKey;
+      return (
+         <button
+            key={`${card.id}-${pileId}-${index}`}
+            type="button"
+            className={`absolute w-11 max-w-[44px] h-16 max-h-[64px] bg-transparent select-none flex items-center justify-center ${isSelected ? 'ring-4 ring-yellow-400' : ''} relative`}
+            style={pileId === 'hand' ? handStyle : { top: `${pileId.includes('tableau') ? index * 12 : 0}px`, zIndex: index }}
+            onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
+            aria-label={isTricksterKey ? `Trickster Key (${charges} charges)` : "Key - Click to select, then click locked tableau to unlock"}
+         >
+            <img src="/icons/key.png" alt="Key" className="w-8 h-8 drop-shadow-lg" />
+            {isTricksterKey && charges !== undefined && (
+              <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-purple-400">
+                {charges}
+              </span>
+            )}
+         </button>
+      );
+    }
+
+    // For classic games, don't apply positioning here (handled by parent container)
+    const isClassicGame = CLASSIC_GAMES[selectedMode];
+    const cardStyle = pileId === 'hand' ? handStyle :
+                      isClassicGame ? { zIndex: index } :
+                      { top: `${pileId.includes('tableau') ? index * 12 : 0}px`, zIndex: index };
+
     return (
          <button
             key={`${card.id}-${pileId}-${index}`}
             type="button"
-            className={`absolute w-11 max-w-[44px] h-16 max-h-[64px] bg-transparent perspective-1000 select-none`}
-            style={pileId === 'hand' ? handStyle : { top: `${pileId.includes('tableau') ? index * 12 : 0}px`, zIndex: index }}
+            className={`${isClassicGame ? 'relative' : 'absolute'} w-11 max-w-[44px] h-16 max-h-[64px] bg-transparent perspective-1000 select-none transition-transform hover:scale-105 hover:brightness-110 cursor-pointer`}
+            style={cardStyle}
             onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
             onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick(pileId, index); }}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); handleDoubleClick(pileId, index); } }}
@@ -1777,11 +1902,6 @@ export default function SolitaireEngine({
                  <div className="flex flex-col items-center justify-center h-full text-center bg-gradient-to-b from-blue-100 to-blue-200 rounded">
                      <div className="text-xl">🃏</div>
                      <div className="text-[6px] font-bold text-blue-800">WILD</div>
-                 </div>
-             ) : visualCard.meta?.isKey ? (
-                 <div className="flex flex-col items-center justify-center h-full text-center bg-gradient-to-b from-yellow-100 to-yellow-200 rounded">
-                     <img src="/icons/key.png" alt="Key" className="w-6 h-6" />
-                     <div className="text-[6px] font-bold text-yellow-800">KEY</div>
                  </div>
              ) : (
                  <>
@@ -1827,9 +1947,21 @@ export default function SolitaireEngine({
   const visibleTableauCount = tableauPiles.filter(p => !p.hidden).length;
   const foundationCount = foundationPiles.length + (gameState.piles['shadow-realm'] ? 1 : 0);
   const maxItems = Math.max(tableauCount, foundationCount);
-  // Apply zoom when more than 7 items (7 * 44px + 6 * 3px = 326px fits comfortably)
-  // For 8+ items, scale down to fit
-  const zoomScale = maxItems > 7 ? 7 / maxItems : 1;
+
+  // Different zoom logic for classic vs coronata
+  let zoomScale = 1;
+  if (CLASSIC_GAMES[selectedMode]) {
+    // Classic mode: Calculate zoom to fit tableaus with 3px gaps and 3px margins
+    const cardWidth = 44; // px
+    const gap = 3; // px
+    const margin = 3; // px per side = 6px total
+    const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 360;
+    const requiredWidth = (tableauCount * cardWidth) + ((tableauCount - 1) * gap) + (margin * 2);
+    zoomScale = Math.min(1, (screenWidth - 8) / requiredWidth); // -8 for some breathing room
+  } else {
+    // Coronata mode: Apply zoom when more than 7 items
+    zoomScale = maxItems > 7 ? 7 / maxItems : 1;
+  }
   const maxWidth = 'auto'; // Let it expand naturally
 
   const currentEncounter = runPlan[gameState.runIndex];
@@ -2150,7 +2282,7 @@ export default function SolitaireEngine({
                                       {/* Exploits */}
                                       <div className="bg-slate-700/50 rounded-lg p-2">
                                          <div className="flex items-center gap-1 mb-1.5 text-slate-400">
-                                            <img src={categoryIcons.exploit} alt="" className="w-3 h-3" />
+                                            <img src={categoryIcons.exploit} alt="" className="w-[18px] h-[18px]" />
                                             <span className="uppercase tracking-wider text-[10px]">Exploits</span>
                                          </div>
                                          <div className="flex flex-wrap gap-1">
@@ -2162,7 +2294,7 @@ export default function SolitaireEngine({
                                       {/* Curses */}
                                       <div className="bg-slate-700/50 rounded-lg p-2">
                                          <div className="flex items-center gap-1 mb-1.5 text-slate-400">
-                                            <img src={categoryIcons.curse} alt="" className="w-3 h-3" />
+                                            <img src={categoryIcons.curse} alt="" className="w-[18px] h-[18px]" />
                                             <span className="uppercase tracking-wider text-[10px]">Curses</span>
                                          </div>
                                          <div className="flex flex-wrap gap-1">
@@ -2174,7 +2306,7 @@ export default function SolitaireEngine({
                                       {/* Blessings */}
                                       <div className="bg-slate-700/50 rounded-lg p-2">
                                          <div className="flex items-center gap-1 mb-1.5 text-slate-400">
-                                            <img src={categoryIcons.blessing} alt="" className="w-3 h-3" />
+                                            <img src={categoryIcons.blessing} alt="" className="w-[18px] h-[18px]" />
                                             <span className="uppercase tracking-wider text-[10px]">Blessings</span>
                                          </div>
                                          <div className="flex flex-wrap gap-1">
@@ -2200,11 +2332,11 @@ export default function SolitaireEngine({
                                                colorClass = 'bg-red-600'; // red for resigned/lost
                                             }
                                             return (
-                                               <div 
-                                                  key={i} 
+                                               <div
+                                                  key={i}
                                                   className={`h-6 rounded-sm flex items-center justify-center ${colorClass}`}
                                                   title={`${enc.name}${enc.passed ? ' (Completed)' : run.result === 'lost' ? ' (Failed)' : ' (Not Reached)'}`}>
-                                                  <img src={categoryIcons.curse} alt="" className="w-3 h-3 opacity-80" />
+                                                  <img src={categoryIcons.curse} alt="" className="w-[18px] h-[18px] opacity-80" />
                                                </div>
                                             );
                                          })}
@@ -3031,118 +3163,247 @@ export default function SolitaireEngine({
 
   return (
     <div className={`h-screen w-full font-sans flex flex-col overflow-hidden relative ${themeClasses[settings.theme as keyof typeof themeClasses] || themeClasses.dark} ${settings.reduceMotion ? '[&_*]:!transition-none [&_*]:!animate-none' : ''}`}>
-      <div className="flex-1 w-full mx-auto p-2 pb-40 overflow-x-auto overflow-visible" style={{ transform: `scale(${zoomScale})`, transformOrigin: 'top center' }}>
-        <div className="flex justify-center mb-4">
-          <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${foundationPiles.length + (gameState.piles['shadow-realm'] ? 1 : 0)}, minmax(0, 44px))` }}>
-                {/* Shadow Realm Pile */}
-                {gameState.piles['shadow-realm'] && (
-                   <div
-                      className="relative w-11 max-w-[44px] h-16 max-h-[64px] bg-purple-900/30 border border-purple-500/50 rounded flex items-center justify-center cursor-pointer hover:bg-purple-900/50 transition-colors"
-                      onClick={handleShadowRealmClick}
-                      title="Shadow Realm: Click to summon back (10 coins)">
-                      <div className="absolute -top-2 -left-1 bg-purple-900 text-[8px] px-1 rounded-full border border-purple-500 z-10">Realm</div>
-                      {gameState.piles['shadow-realm'].cards.length === 0 ? (
-                         <div className="text-purple-700 opacity-50"><Skull size={16} /></div>
-                      ) : (
-                         renderCard(gameState.piles['shadow-realm'].cards[gameState.piles['shadow-realm'].cards.length - 1], gameState.piles['shadow-realm'].cards.length - 1, 'shadow-realm')
-                      )}
+      
+      {/* Classic Mode Top Bar - REMOVED, using bottom bar only */}
+      {false && CLASSIC_GAMES[selectedMode] && currentView === 'game' && (
+        <div className="fixed top-0 left-0 right-0 h-[60px] px-3 md:px-6 backdrop-blur-md z-30 border-b-2 border-white/20 shadow-lg bg-slate-900/95">
+          <div className="flex flex-row justify-between items-center h-full w-full">
+            {/* Left Section */}
+            <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+              <button onClick={() => setActiveDrawer('pause')} className="p-2 bg-white/10 hover:bg-white/25 rounded-lg transition-all shadow-sm hover:shadow-md active:scale-95" title="Menu">
+                <Menu size={18} />
+              </button>
+              
+              <div className="hidden sm:flex items-center gap-1.5 text-sm font-mono bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm border border-white/20">
+                <Clock size={16} />
+                <span className="font-bold">{formatTime(elapsedTime)}</span>
+              </div>
+              
+              <div className="hidden sm:flex items-center gap-1.5 text-sm font-mono bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm border border-white/20">
+                <Play size={16} />
+                <span className="font-bold">{gameState.moves}</span>
+              </div>
+            </div>
+            
+            {/* Center Section - Score */}
+            <div className="flex-shrink-0">
+              <div className="bg-black/50 px-4 md:px-6 py-2 rounded-xl text-base font-bold border-2 border-white/30 shadow-lg backdrop-blur-sm">
+                <span className="text-yellow-300">Score: {gameState.score}</span>
+              </div>
+            </div>
+            
+            {/* Right Section */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button 
+                onClick={() => {
+                  if (gameState.history.length > 0) {
+                    const prev = gameState.history[gameState.history.length - 1];
+                    setGameState({ ...prev, history: gameState.history.slice(0, -1) });
+                  }
+                }}
+                disabled={gameState.history.length === 0}
+                className="p-2 bg-white/10 hover:bg-white/25 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md active:scale-95"
+                title="Undo"
+              >
+                <RefreshCw size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Classic Game Layout - Uses absolute positioning from layout() */}
+      {CLASSIC_GAMES[selectedMode] ? (
+        <div className="flex-1 w-full mx-auto pb-40 overflow-x-auto overflow-visible relative" style={{ height: 'calc(100vh - 140px)' }}>
+          {(() => {
+            const classicGame = CLASSIC_GAMES[selectedMode];
+            const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 360;
+            const screenHeight = typeof window !== 'undefined' ? window.innerHeight - 140 : 600;
+            const layoutInfo = classicGame.layout(screenWidth, screenHeight);
+            const { piles: pileConfigs, cardWidth, cardHeight } = layoutInfo;
+
+            return pileConfigs.map(config => {
+              const pile = gameState.piles[config.id];
+              if (!pile) return null;
+
+              const isHighlighted = highlightedMoves.foundationIds.includes(config.id) || highlightedMoves.tableauIds.includes(config.id);
+              const ringColor = selectionColor === 'green' ? 'ring-green-400' : selectionColor === 'yellow' ? 'ring-amber-300' : 'ring-red-400';
+
+              // Render cards in this pile
+              const renderPileCards = () => {
+                if (pile.cards.length === 0) {
+                  // Empty pile placeholder
+                  return (
+                    <div className={`w-full h-full bg-slate-800/30 rounded border border-slate-700 ${isHighlighted ? `ring-2 ${ringColor}` : ''} flex items-center justify-center`}>
+                      {config.type === 'stock' && <div className="text-slate-600 text-xs">Stock</div>}
+                      {config.type === 'waste' && <div className="text-slate-600 text-xs">Waste</div>}
+                      {config.type === 'foundation' && <div className="text-slate-600 text-2xl opacity-20">🃏</div>}
+                      {config.type === 'cell' && <div className="text-slate-600 text-xs">Cell</div>}
+                      <button
+                        type="button"
+                        aria-label={`Empty ${config.type} ${config.id}`}
+                        className="absolute inset-0 w-full h-full bg-transparent"
+                        onClick={() => handleCardClick(config.id, -1)}
+                      />
+                    </div>
+                  );
+                }
+
+                return pile.cards.map((card, idx) => {
+                  let top = 0;
+                  if (config.fan === 'down' && config.fanSpacing) {
+                    top = idx * config.fanSpacing;
+                  }
+
+                  // Override the renderCard positioning for classic games
+                  const classicCard = renderCard(card, idx, config.id);
+                  return (
+                    <div key={`${card.id}-${idx}`} className="absolute" style={{ top: `${top}px`, left: 0, zIndex: idx }}>
+                      {classicCard}
+                    </div>
+                  );
+                });
+              };
+
+              return (
+                <div
+                  key={config.id}
+                  className="absolute"
+                  style={{
+                    left: `${config.x}px`,
+                    top: `${config.y}px`,
+                    width: `${cardWidth}px`,
+                    height: config.fan === 'down' ? 'auto' : `${cardHeight}px`,
+                    minHeight: `${cardHeight}px`
+                  }}
+                  onClick={(e) => {
+                    if (config.type === 'stock' && pile.cards.length > 0) {
+                      e.stopPropagation();
+                      handleCardClick(config.id, pile.cards.length - 1);
+                    }
+                  }}
+                >
+                  {renderPileCards()}
+                </div>
+              );
+            });
+          })()}
+        </div>
+      ) : (
+        /* Coronata Mode Layout - Uses flex/grid */
+        <div className={`flex-1 w-full mx-auto p-2 pb-40 overflow-x-auto overflow-visible`} style={{ transform: `scale(${zoomScale})`, transformOrigin: 'top center' }}>
+          <div className="flex justify-center mb-4">
+            <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${foundationPiles.length + (gameState.piles['shadow-realm'] ? 1 : 0)}, minmax(0, 44px))` }}>
+                  {/* Shadow Realm Pile */}
+                  {gameState.piles['shadow-realm'] && (
+                     <div
+                        className="relative w-11 max-w-[44px] h-16 max-h-[64px] bg-purple-900/30 border border-purple-500/50 rounded flex items-center justify-center cursor-pointer hover:bg-purple-900/50 transition-colors"
+                        onClick={handleShadowRealmClick}
+                        title="Shadow Realm: Click to summon back (10 coins)">
+                        <div className="absolute -top-2 -left-1 bg-purple-900 text-[8px] px-1 rounded-full border border-purple-500 z-10">Realm</div>
+                        {gameState.piles['shadow-realm'].cards.length === 0 ? (
+                           <div className="text-purple-700 opacity-50"><Skull size={16} /></div>
+                        ) : (
+                           renderCard(gameState.piles['shadow-realm'].cards[gameState.piles['shadow-realm'].cards.length - 1], gameState.piles['shadow-realm'].cards.length - 1, 'shadow-realm')
+                        )}
+                     </div>
+                  )}
+
+                  {foundationPiles.map(pile => {
+                     const suitSymbol = pile.id.includes('hearts') ? '♥' : pile.id.includes('diamonds') ? '♦' : pile.id.includes('clubs') ? '♣' : '♠';
+                     const suitColor = pile.id.includes('hearts') || pile.id.includes('diamonds') ? 'text-red-600' : 'text-white';
+                     const isHighlighted = highlightedMoves.foundationIds.includes(pile.id);
+                     const ringColor = selectionColor === 'green' ? 'ring-green-400' : selectionColor === 'yellow' ? 'ring-amber-300' : 'ring-red-400';
+                     const shadowColor = selectionColor === 'green' ? 'shadow-[0_0_0_2px_rgba(74,222,128,0.25)]' : selectionColor === 'yellow' ? 'shadow-[0_0_0_2px_rgba(251,191,36,0.25)]' : 'shadow-[0_0_0_2px_rgba(248,113,113,0.25)]';
+                     return (
+                     <div key={pile.id} className={`relative w-11 max-w-[44px] h-16 max-h-[64px] bg-slate-800/50 rounded border border-slate-700 flex items-center justify-center ${isHighlighted ? `ring-2 ${ringColor} ${shadowColor}` : ''}`}>
+                        {pile.cards.length === 0 ? (
+                           <div className="relative w-full h-full flex items-center justify-center">
+                              <span className={`text-xl opacity-20 ${suitColor}`}>{suitSymbol}</span>
+                              <button type="button" aria-label={`Empty foundation ${pile.id}`} className={`absolute top-0 left-0 w-11 max-w-[44px] h-16 max-h-[64px] bg-transparent ${isHighlighted ? `ring-2 ${ringColor} rounded` : ''}`} onClick={() => handleCardClick(pile.id, -1)} />
+                           </div>
+                        ) : null}
+                        {pile.cards.map((c, i) => renderCard(c, i, pile.id))}
+                     </div>
+                     );
+                  })}
+            </div>
+          </div>
+
+          {/* Active Effect HUDs */}
+          {(activeEffects.includes('ritual_components') || activeEffects.includes('momentum_tokens')) && (
+             <div className="flex justify-center gap-4 mb-2 animate-in fade-in slide-in-from-top-2">
+                {activeEffects.includes('ritual_components') && (
+                   <div className="flex items-center gap-1 bg-slate-800/80 p-1.5 rounded border border-slate-700">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold mr-1">Ritual</span>
+                      {['blood', 'bone', 'ash'].map((step, i) => {
+                         const seq = gameState.effectState?.ritualSequence || [];
+                         const done = seq.length > i;
+                         return <div key={step} className={`w-3 h-3 rounded-full border border-slate-600 ${done ? 'bg-red-500 shadow-[0_0_5px_rgba(239,68,68,0.8)]' : 'bg-slate-900'}`} title={step} />;
+                      })}
                    </div>
                 )}
-
-                {foundationPiles.map(pile => {
-                   const suitSymbol = pile.id.includes('hearts') ? '♥' : pile.id.includes('diamonds') ? '♦' : pile.id.includes('clubs') ? '♣' : '♠';
-                   const suitColor = pile.id.includes('hearts') || pile.id.includes('diamonds') ? 'text-red-600' : 'text-white';
-                   const isHighlighted = highlightedMoves.foundationIds.includes(pile.id);
-                   const ringColor = selectionColor === 'green' ? 'ring-green-400' : selectionColor === 'yellow' ? 'ring-amber-300' : 'ring-red-400';
-                   const shadowColor = selectionColor === 'green' ? 'shadow-[0_0_0_2px_rgba(74,222,128,0.25)]' : selectionColor === 'yellow' ? 'shadow-[0_0_0_2px_rgba(251,191,36,0.25)]' : 'shadow-[0_0_0_2px_rgba(248,113,113,0.25)]';
-                   return (
-                   <div key={pile.id} className={`relative w-11 max-w-[44px] h-16 max-h-[64px] bg-slate-800/50 rounded border border-slate-700 flex items-center justify-center ${isHighlighted ? `ring-2 ${ringColor} ${shadowColor}` : ''}`}>
-                      {pile.cards.length === 0 ? (
-                         <div className="relative w-full h-full flex items-center justify-center">
-                            <span className={`text-xl opacity-20 ${suitColor}`}>{suitSymbol}</span>
-                            <button type="button" aria-label={`Empty foundation ${pile.id}`} className={`absolute top-0 left-0 w-11 max-w-[44px] h-16 max-h-[64px] bg-transparent ${isHighlighted ? `ring-2 ${ringColor} rounded` : ''}`} onClick={() => handleCardClick(pile.id, -1)} />
-                         </div>
-                      ) : null}
-                      {pile.cards.map((c, i) => renderCard(c, i, pile.id))}
+                {activeEffects.includes('momentum_tokens') && (
+                   <div className="flex items-center gap-2 bg-slate-800/80 p-1.5 rounded border border-slate-700">
+                      <div className="flex items-center gap-1">
+                         <span className="text-[10px] text-slate-400 uppercase font-bold">Momentum</span>
+                         <span className="text-sm font-bold text-blue-400">{gameState.effectState?.momentum || 0}</span>
+                      </div>
+                      <div className="flex gap-1">
+                         <button onClick={() => spendMomentum('wild')} disabled={(gameState.effectState?.momentum || 0) < 3} className="px-1.5 py-0.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-[9px] font-bold">Wild (3)</button>
+                         <button onClick={() => spendMomentum('unlock')} disabled={(gameState.effectState?.momentum || 0) < 5} className="px-1.5 py-0.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-[9px] font-bold">Unlock (5)</button>
+                         <button onClick={() => spendMomentum('pts')} disabled={(gameState.effectState?.momentum || 0) < 1} className="px-1.5 py-0.5 bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-[9px] font-bold">Pts (1)</button>
+                      </div>
                    </div>
-                   );
-                })}
+                )}
+             </div>
+          )}
+
+          <div className="flex justify-center">
+            <div className="grid gap-[3px] h-full" style={{ gridTemplateColumns: `repeat(${tableauCount}, minmax(0, 44px))` }}>
+                 {tableauPiles.map(pile => {
+                    const isLinked = activeEffects.includes('linked_fates') && gameState.effectState?.linkedTableaus?.includes(pile.id);
+                    const isLinkedTurn = isLinked && gameState.effectState?.lastLinkedPlayed !== pile.id;
+                    const isParasite = activeEffects.includes('parasite_pile') && gameState.effectState?.parasiteTarget === pile.id;
+                    const isHighlighted = highlightedMoves.tableauIds.includes(pile.id);
+
+                    return (
+                    <div key={pile.id} className={`relative w-full h-full ${isLinked ? 'border-t-2 border-purple-500/50 rounded-t-lg pt-1' : ''} ${isParasite ? 'border-t-2 border-green-500/50 rounded-t-lg pt-1' : ''} ${pile.hidden ? 'invisible pointer-events-none' : ''}`}>
+                        {/* Linked Fates Indicator */}
+                        {isLinked && (
+                           <div className={`absolute -top-7 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center ${isLinkedTurn ? 'text-purple-400 animate-pulse' : 'text-slate-600 opacity-50'}`}>
+                              <LinkIcon size={14} />
+                              {!isLinkedTurn && <span className="text-[8px] uppercase font-bold bg-slate-900 px-1 rounded border border-slate-700">Wait</span>}
+                           </div>
+                        )}
+
+                        {/* Parasite Indicator */}
+                        {isParasite && (
+                           <div className="absolute -top-7 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center text-green-500">
+                              <Bug size={14} />
+                              <div className="w-8 h-1 bg-slate-700 mt-0.5 rounded-full overflow-hidden border border-slate-600">
+                                 <div className="h-full bg-green-500 transition-all duration-300" style={{ width: `${((gameState.moves % 7) / 7) * 100}%` }} />
+                              </div>
+                           </div>
+                        )}
+
+                        {pile.locked && <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-20 text-red-500"><Lock size={10} /></div>}
+                        {pile.cards.length === 0 && (() => {
+                           const ringColor = selectionColor === 'green' ? 'ring-green-400' : selectionColor === 'yellow' ? 'ring-amber-300' : 'ring-red-400';
+                           return (
+                              <div className="relative w-11 max-w-[44px] h-16 max-h-[64px]">
+                                 <div className={`w-full h-full bg-slate-800/50 rounded border border-slate-700 ${isHighlighted ? `ring-2 ${ringColor}` : ''}`}></div>
+                                 <button type="button" aria-label={`Empty ${pile.id}`} className="absolute inset-0 w-full h-full bg-transparent" onClick={() => handleCardClick(pile.id, -1)} />
+                              </div>
+                           );
+                        })()}
+                        {pile.cards.map((c, idx) => renderCard(c, idx, pile.id))}
+                    </div>
+                 )})}
+            </div>
           </div>
         </div>
-
-        {/* Active Effect HUDs */}
-        {(activeEffects.includes('ritual_components') || activeEffects.includes('momentum_tokens')) && (
-           <div className="flex justify-center gap-4 mb-2 animate-in fade-in slide-in-from-top-2">
-              {activeEffects.includes('ritual_components') && (
-                 <div className="flex items-center gap-1 bg-slate-800/80 p-1.5 rounded border border-slate-700">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold mr-1">Ritual</span>
-                    {['blood', 'bone', 'ash'].map((step, i) => {
-                       const seq = gameState.effectState?.ritualSequence || [];
-                       const done = seq.length > i; 
-                       return <div key={step} className={`w-3 h-3 rounded-full border border-slate-600 ${done ? 'bg-red-500 shadow-[0_0_5px_rgba(239,68,68,0.8)]' : 'bg-slate-900'}`} title={step} />;
-                    })}
-                 </div>
-              )}
-              {activeEffects.includes('momentum_tokens') && (
-                 <div className="flex items-center gap-2 bg-slate-800/80 p-1.5 rounded border border-slate-700">
-                    <div className="flex items-center gap-1">
-                       <span className="text-[10px] text-slate-400 uppercase font-bold">Momentum</span>
-                       <span className="text-sm font-bold text-blue-400">{gameState.effectState?.momentum || 0}</span>
-                    </div>
-                    <div className="flex gap-1">
-                       <button onClick={() => spendMomentum('wild')} disabled={(gameState.effectState?.momentum || 0) < 3} className="px-1.5 py-0.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-[9px] font-bold">Wild (3)</button>
-                       <button onClick={() => spendMomentum('unlock')} disabled={(gameState.effectState?.momentum || 0) < 5} className="px-1.5 py-0.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-[9px] font-bold">Unlock (5)</button>
-                       <button onClick={() => spendMomentum('pts')} disabled={(gameState.effectState?.momentum || 0) < 1} className="px-1.5 py-0.5 bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-[9px] font-bold">Pts (1)</button>
-                    </div>
-                 </div>
-              )}
-           </div>
-        )}
-
-        <div className="flex justify-center">
-          <div className="grid gap-[3px] h-full" style={{ gridTemplateColumns: `repeat(${tableauCount}, minmax(0, 44px))` }}>
-               {tableauPiles.map(pile => {
-                  const isLinked = activeEffects.includes('linked_fates') && gameState.effectState?.linkedTableaus?.includes(pile.id);
-                  const isLinkedTurn = isLinked && gameState.effectState?.lastLinkedPlayed !== pile.id;
-                  const isParasite = activeEffects.includes('parasite_pile') && gameState.effectState?.parasiteTarget === pile.id;
-                  const isHighlighted = highlightedMoves.tableauIds.includes(pile.id);
-
-                  return (
-                  <div key={pile.id} className={`relative w-full h-full ${isLinked ? 'border-t-2 border-purple-500/50 rounded-t-lg pt-1' : ''} ${isParasite ? 'border-t-2 border-green-500/50 rounded-t-lg pt-1' : ''} ${pile.hidden ? 'invisible pointer-events-none' : ''}`}>
-                      {/* Linked Fates Indicator */}
-                      {isLinked && (
-                         <div className={`absolute -top-7 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center ${isLinkedTurn ? 'text-purple-400 animate-pulse' : 'text-slate-600 opacity-50'}`}>
-                            <LinkIcon size={14} />
-                            {!isLinkedTurn && <span className="text-[8px] uppercase font-bold bg-slate-900 px-1 rounded border border-slate-700">Wait</span>}
-                         </div>
-                      )}
-                      
-                      {/* Parasite Indicator */}
-                      {isParasite && (
-                         <div className="absolute -top-7 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center text-green-500">
-                            <Bug size={14} />
-                            <div className="w-8 h-1 bg-slate-700 mt-0.5 rounded-full overflow-hidden border border-slate-600">
-                               <div className="h-full bg-green-500 transition-all duration-300" style={{ width: `${((gameState.moves % 7) / 7) * 100}%` }} />
-                            </div>
-                         </div>
-                      )}
-
-                      {pile.locked && <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-20 text-red-500"><Lock size={10} /></div>}
-                      {pile.cards.length === 0 && (() => {
-                         const ringColor = selectionColor === 'green' ? 'ring-green-400' : selectionColor === 'yellow' ? 'ring-amber-300' : 'ring-red-400';
-                         return (
-                            <div className="relative w-11 max-w-[44px] h-16 max-h-[64px]">
-                               <div className={`w-full h-full bg-slate-800/50 rounded border border-slate-700 ${isHighlighted ? `ring-2 ${ringColor}` : ''}`}></div>
-                               <button type="button" aria-label={`Empty ${pile.id}`} className="absolute inset-0 w-full h-full bg-transparent" onClick={() => handleCardClick(pile.id, -1)} />
-                            </div>
-                         );
-                      })()}
-                      {pile.cards.map((c, idx) => renderCard(c, idx, pile.id))}
-                  </div>
-               )})}
-          </div>
-        </div>
-      </div>
+      )}
 
       {gameState.activeMinigame && (
          <div className="absolute inset-0 bg-black/90 z-50 flex flex-col items-center justify-center p-6 animate-in zoom-in-95">
@@ -3242,7 +3503,7 @@ export default function SolitaireEngine({
                                          disabled={gameState.coins < (item.cost || 50) || isOwned}>
                                          {isOwned ? 'SOLD' : (
                                             <>
-                                               <ResponsiveIcon name="coin" fallbackType="exploit" size={12} className="w-3 h-3" alt="coin" />
+                                               <ResponsiveIcon name="coin" fallbackType="exploit" size={18} className="w-[18px] h-[18px]" alt="coin" />
                                                <span>Buy {item.cost || 50}</span>
                                             </>
                                          )}
@@ -3571,6 +3832,22 @@ export default function SolitaireEngine({
                                                {effect.maxCharges && <span className="text-[9px] bg-slate-600 px-1 rounded text-white shrink-0">{charges}/{effect.maxCharges}</span>}
                                            </div>
                                            <div className="text-slate-400 text-[10px]">{effect.description}</div>
+                                           {effect.id === 'trust_fund' && isActive && (
+                                              <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                  onClick={convertScoreToCoin}
+                                                  disabled={gameState.score < 5}
+                                                  className="text-[10px] px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
+                                                  5 Score → 1 Coin
+                                                </button>
+                                                <button
+                                                  onClick={convertCoinToScore}
+                                                  disabled={gameState.coins < 1}
+                                                  className="text-[10px] px-2 py-1 rounded bg-green-600 hover:bg-green-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
+                                                  1 Coin → 4 Score
+                                                </button>
+                                              </div>
+                                           )}
                                        </div>
                                        {isActive && <div className="w-2 h-2 bg-green-400 rounded-full shrink-0"></div>}
                                     </button>
@@ -3586,61 +3863,101 @@ export default function SolitaireEngine({
             {gameState.interactionMode === 'discard_select' && (
                <div className="bg-orange-900/80 text-orange-200 text-xs text-center p-1 mb-1 rounded animate-pulse">Select a card in HAND to discard</div>
             )}
-            <div className="flex justify-between px-2 mb-2 relative group">
-               {runPlan.map((enc, i) => {
-                  const eff = effectsRegistry.find(e => e.id === enc.effectId);
-                  const isCompleted = i < gameState.runIndex;
-                  const isCurrent = i === gameState.runIndex;
-                  const iconClass = isCompleted ? 'opacity-80' : isCurrent ? 'opacity-100' : 'opacity-40 grayscale';
-                  const iconStyle = isCurrent ? { filter: 'brightness(1.5) saturate(1.5) hue-rotate(-15deg)' } : {};
-                  return (
-                     <button
-                        key={i}
-                        type="button"
-                        className={`w-5 h-5 rounded flex items-center justify-center ${isCompleted ? 'bg-green-500/30 border border-green-500' : isCurrent ? 'bg-orange-500/30 border border-orange-500 animate-pulse' : 'bg-slate-700/30 border border-slate-700'}`}
-                        onClick={() => alert(`${enc.type.toUpperCase()}: ${eff?.name || 'Level ' + (i+1)}\n${eff?.description || 'Score goal: ' + enc.goal}`)}
-                        aria-label={`Encounter ${i + 1} ${enc.type} ${eff?.name ?? ''}`}>
-                        <ResponsiveIcon name={enc.effectId} fallbackType="curse" size={12} className={`w-3 h-3 ${iconClass}`} style={iconStyle} alt={eff?.name || ''} />
-                     </button>
-                  );
-               })}
-            </div>
-            <div className="flex items-center gap-2 mb-2">
-               <button type="button" onClick={() => discardAndDrawHand()} aria-label="Draw from deck" className="shrink-0 p-2 bg-blue-900 hover:bg-blue-800 rounded text-blue-300 border border-blue-700 relative">
-                  <img src="/icons/foundation.png" alt="Draw" className="w-4 h-4" />
-                  {gameState.piles.deck.cards.length > 0 && (
-                     <span className="absolute -top-1 -right-1 bg-slate-700 text-[8px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
-                  )}
-               </button>
-               <div className="flex-1">
-                  <div className="w-full bg-slate-800 h-6 rounded-full overflow-hidden border border-slate-700 relative flex items-center justify-center">
-                     <div className="absolute inset-0 bg-emerald-500 h-full transition-all duration-500" style={{ width: `${Math.min(100, (gameState.score / gameState.currentScoreGoal) * 100)}%` }} />
-                     <span className="relative z-10 text-[10px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{gameState.score} / {gameState.currentScoreGoal}</span>
+
+            {/* Bottom Bar - Different for Classic vs Coronata modes */}
+            {!CLASSIC_GAMES[selectedMode] ? (
+               <>
+                  {/* Coronata Mode - Run Progress Bar */}
+                  <div className="flex justify-between px-2 mb-2 relative group">
+                     {runPlan.map((enc, i) => {
+                        const eff = effectsRegistry.find(e => e.id === enc.effectId);
+                        const isCompleted = i < gameState.runIndex;
+                        const isCurrent = i === gameState.runIndex;
+                        const iconClass = isCompleted ? 'opacity-80' : isCurrent ? 'opacity-100' : 'opacity-40 grayscale';
+                        const iconStyle = isCurrent ? { filter: 'brightness(1.5) saturate(1.5) hue-rotate(-15deg)' } : {};
+                        return (
+                           <button
+                              key={i}
+                              type="button"
+                              className={`w-7 h-7 rounded flex items-center justify-center ${isCompleted ? 'bg-green-500/30 border border-green-500' : isCurrent ? 'bg-orange-500/30 border border-orange-500 animate-pulse' : 'bg-slate-700/30 border border-slate-700'}`}
+                              onClick={() => alert(`${enc.type.toUpperCase()}: ${eff?.name || 'Level ' + (i+1)}\n${eff?.description || 'Score goal: ' + enc.goal}`)}
+                              aria-label={`Encounter ${i + 1} ${enc.type} ${eff?.name ?? ''}`}>
+                              <ResponsiveIcon name={enc.effectId} fallbackType="curse" size={18} className={`w-[18px] h-[18px] ${iconClass}`} style={iconStyle} alt={eff?.name || ''} />
+                           </button>
+                        );
+                     })}
                   </div>
-               </div>
-               <button type="button" className="shrink-0 p-2 bg-slate-800 hover:bg-slate-700 rounded border border-slate-700 relative">
-                  <ResponsiveIcon name="coin" fallbackType="exploit" size={16} className="w-4 h-4" alt="coins" />
-                  <span className={`absolute -top-1 -right-1 text-[8px] px-1 rounded-full border border-slate-500 leading-none font-bold ${gameState.coins < 0 ? 'bg-red-900 text-red-300 border-red-700' : 'bg-yellow-900 text-yellow-300 border-yellow-700'}`}>{gameState.coins}</span>
-               </button>
-            </div>
-            <div className="flex w-full gap-1">
-               <button onClick={() => toggleDrawer('pause')} className={`p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}><img src="/icons/pause.png" alt="Pause" className="w-4 h-4" /></button>
-               {(['exploit', 'blessing'] as const).map((type) => {
-                  const hasReady = effectsRegistry.some(e => e.type === type && isEffectReady(e.id, gameState) && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll));
-                  return (
-                               <button key={type} onClick={() => toggleDrawer(type as any)}
-                        className={`flex-1 py-1.5 rounded text-[10px] font-bold border flex flex-col items-center justify-center gap-0.5
-                        ${activeDrawer === type ? 'bg-slate-700 text-white border-slate-600' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
-                        <img src={categoryIcons[type]} alt="" className="w-4 h-4" />
+
+                  {/* Coronata Mode - Score Bar and Buttons */}
+                  <div className="flex items-center gap-2 mb-2">
+                     <button type="button" onClick={() => discardAndDrawHand()} aria-label="Draw from deck" className="shrink-0 p-2 bg-blue-900 hover:bg-blue-800 rounded text-blue-300 border border-blue-700 relative">
+                        <img src="/icons/foundation.png" alt="Draw" className="w-[18px] h-[18px]" />
+                        {gameState.piles.deck.cards.length > 0 && (
+                           <span className="absolute -top-1 -right-1 bg-slate-700 text-[8px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
+                        )}
                      </button>
-                  );
-               })}
-               {/* Curse area - equal size button alongside exploits & blessings */}
-               <button type="button" onClick={() => toggleDrawer('curse')} aria-label={`Curses: ${currentThreat?.name || 'Active Curse'}`} className={`flex-1 py-1.5 rounded text-[10px] font-bold border flex flex-col items-center justify-center gap-0.5
-                  ${activeDrawer === 'curse' ? 'bg-slate-700 text-white' : currentThreat ? 'bg-red-900/30 border-red-500/50 text-red-300' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
-                  <ResponsiveIcon name={currentThreat?.id || 'curse'} fallbackType="curse" size={16} className="w-4 h-4" />
-               </button>
-            </div>
+                     <div className="flex-1">
+                        <div className="w-full bg-slate-800 h-6 rounded-full overflow-hidden border border-slate-700 relative flex items-center justify-center">
+                           <div className="absolute inset-0 bg-emerald-500 h-full transition-all duration-500" style={{ width: `${Math.min(100, (gameState.score / gameState.currentScoreGoal) * 100)}%` }} />
+                           <span className="relative z-10 text-[10px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{gameState.score} / {gameState.currentScoreGoal}</span>
+                        </div>
+                     </div>
+                     <button type="button" className="shrink-0 p-2 bg-slate-800 hover:bg-slate-700 rounded border border-slate-700 relative">
+                        <ResponsiveIcon name="coin" fallbackType="exploit" size={18} className="w-[18px] h-[18px]" alt="coins" />
+                        <span className={`absolute -top-1 -right-1 text-[8px] px-1 rounded-full border border-slate-500 leading-none font-bold ${gameState.coins < 0 ? 'bg-red-900 text-red-300 border-red-700' : 'bg-yellow-900 text-yellow-300 border-yellow-700'}`}>{gameState.coins}</span>
+                     </button>
+                  </div>
+
+                  {/* Coronata Mode - Effect Buttons */}
+                  <div className="flex w-full gap-1">
+                     <button onClick={() => toggleDrawer('pause')} className={`p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}><img src="/icons/pause.png" alt="Pause" className="w-[18px] h-[18px]" /></button>
+                     {(['exploit', 'blessing'] as const).map((type) => {
+                        const hasReady = effectsRegistry.some(e => e.type === type && isEffectReady(e.id, gameState) && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll));
+                        return (
+                                    <button key={type} onClick={() => toggleDrawer(type as any)}
+                              className={`flex-1 py-1.5 rounded text-[10px] font-bold border flex flex-col items-center justify-center gap-0.5
+                              ${activeDrawer === type ? 'bg-slate-700 text-white border-slate-600' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+                              <img src={categoryIcons[type]} alt="" className="w-[18px] h-[18px]" />
+                           </button>
+                        );
+                     })}
+                     <button type="button" onClick={() => toggleDrawer('curse')} aria-label={`Curses: ${currentThreat?.name || 'Active Curse'}`} className={`flex-1 py-1.5 rounded text-[10px] font-bold border flex flex-col items-center justify-center gap-0.5
+                        ${activeDrawer === 'curse' ? 'bg-slate-700 text-white' : currentThreat ? 'bg-red-900/30 border-red-500/50 text-red-300' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+                        <ResponsiveIcon name={currentThreat?.id || 'curse'} fallbackType="curse" size={18} className="w-[18px] h-[18px]" />
+                     </button>
+                  </div>
+               </>
+            ) : (
+               <>
+                  {/* Classic Mode - Single Row with all buttons */}
+                  <div className="flex w-full gap-1">
+                     <button onClick={() => toggleDrawer('pause')} className={`p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}>
+                        <img src="/icons/pause.png" alt="Pause" className="w-[18px] h-[18px]" />
+                     </button>
+                     <button type="button" onClick={() => {/* TODO: Undo logic */}} className="p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700">
+                        <img src="/icons/back.png" alt="Undo" className="w-[18px] h-[18px]" />
+                     </button>
+                     <button type="button" onClick={() => discardAndDrawHand()} aria-label="Draw from deck" className="p-2 bg-blue-900 hover:bg-blue-800 rounded text-blue-300 border border-blue-700 relative">
+                        <img src="/icons/foundation.png" alt="Draw" className="w-[18px] h-[18px]" />
+                        {gameState.piles.deck?.cards?.length > 0 && (
+                           <span className="absolute -top-1 -right-1 bg-slate-700 text-[8px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
+                        )}
+                     </button>
+                     <button className="flex-1 py-1.5 rounded text-[10px] font-bold border border-slate-700 bg-slate-800 text-slate-400 flex flex-col items-center justify-center gap-0.5">
+                        <Clock size={18} />
+                        <span>{formatTime(elapsedTime)}</span>
+                     </button>
+                     <button className="flex-1 py-1.5 rounded text-[10px] font-bold border border-slate-700 bg-slate-800 text-slate-400 flex flex-col items-center justify-center gap-0.5">
+                        <span className="text-[18px]">📊</span>
+                        <span>{gameState.score}</span>
+                     </button>
+                     <button className="flex-1 py-1.5 rounded text-[10px] font-bold border border-slate-700 bg-slate-800 text-slate-400 flex flex-col items-center justify-center gap-0.5">
+                        <Play size={18} />
+                        <span>{gameState.moves}</span>
+                     </button>
+                  </div>
+               </>
+            )}
          </div>
 
       </div>

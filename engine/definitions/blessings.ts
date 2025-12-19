@@ -199,30 +199,38 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
   // ===========================================================================
 
   {
-    id: 'hoarder',
-    name: 'Hoarder',
+    id: 'schemer',
+    name: 'Schemer',
     type: 'blessing',
-    description: 'Consecutive same-suit plays stack +100% points each.',
+    description: 'Foundation cards can be played to tableaus. Consecutive same-suit plays stack +100% points each.',
     effectState: {
-      hoarderLastSuit: null,
-      hoarderStreak: 0
+      schemerLastSuit: null,
+      schemerStreak: 0
     },
     custom: {
+      canMove: (cards, source, target, defaultAllowed) => {
+        // Allow moving from foundation to tableau
+        if (source.type === 'foundation' && target.type === 'tableau') {
+          return true;
+        }
+        return defaultAllowed;
+      },
       calculateScore: (score, context, state) => {
         const suit = context.cards[0].suit;
-        const last = state.effectState.hoarderLastSuit;
-        const streak = state.effectState.hoarderStreak || 0;
+        const last = state.effectState.schemerLastSuit;
+        const streak = Math.min(state.effectState.schemerStreak || 0, 10); // Cap at 10 to prevent overflow
+
         if (last === suit) {
-          return score * (2 ** streak);
+          return score * (1 + streak); // +100% per streak
         }
         return score;
       },
       onMoveComplete: (state, context) => {
         const suit = context.cards[0].suit;
-        const last = state.effectState.hoarderLastSuit;
-        const streak = state.effectState.hoarderStreak || 0;
-        const nextStreak = last === suit ? streak + 1 : 1;
-        return { effectState: { ...state.effectState, hoarderLastSuit: suit, hoarderStreak: nextStreak } };
+        const last = state.effectState.schemerLastSuit;
+        const streak = state.effectState.schemerStreak || 0;
+        const nextStreak = last === suit ? Math.min(streak + 1, 10) : 1; // Cap at 10
+        return { effectState: { ...state.effectState, schemerLastSuit: suit, schemerStreak: nextStreak } };
       }
     }
   },
@@ -273,10 +281,42 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     id: 'trickster',
     name: 'Trickster',
     type: 'blessing',
-    description: 'Add a key to your hand (3 charges).',
-    onActivate: [
-      { action: 'add_card_to_pile', params: { pile: 'hand', cardType: 'key', charges: 3 } }
-    ]
+    description: 'Add a key to your hand (3 charges). Allows playing buried face-up cards while moving their stack.',
+    custom: {
+      onActivate: (state) => {
+        const hand = state.piles['hand'];
+        const tricksterKey: Card = {
+          id: `trickster-key-${Date.now()}`,
+          suit: 'special',
+          rank: 0 as Rank,
+          faceUp: true,
+          meta: { isTricksterKey: true, charges: 3 }
+        };
+        return {
+          piles: {
+            ...state.piles,
+            hand: { ...hand, cards: [...hand.cards, tricksterKey] }
+          }
+        };
+      },
+      canMove: (cards, source, target, defaultAllowed, state) => {
+        // Check if trickster key is in hand with charges
+        const hand = state.piles['hand'];
+        const tricksterKey = hand?.cards.find(c => c.meta?.isTricksterKey && (c.meta.charges || 0) > 0);
+
+        if (tricksterKey && source.type === 'tableau') {
+          // Allow moving any face-up card along with all cards on top of it
+          const sourceCards = source.cards;
+          const firstCardIndex = sourceCards.findIndex(c => c.id === cards[0].id);
+
+          if (firstCardIndex >= 0 && sourceCards[firstCardIndex].faceUp) {
+            return true; // Allow the move
+          }
+        }
+
+        return defaultAllowed;
+      }
+    }
   },
 
   {
@@ -396,17 +436,5 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     }
   },
 
-  {
-    id: 'merchant',
-    name: 'Merchant',
-    type: 'blessing',
-    description: 'Pay 2× goal with coin to skip encounter.',
-    custom: {
-      onActivate: (state) => {
-        const cost = state.currentScoreGoal * 2;
-        if (state.coins < cost) return {};
-        return { coins: state.coins - cost, effectState: { ...state.effectState, skipEncounter: true } };
-      }
-    }
-  },
 ];
+// Merchant blessing removed - merged into Trust Fund exploit
