@@ -78,10 +78,15 @@ const displayPatterns: Record<string, VisualEvaluator> = {
 
   /**
    * 1.2 Hide Suit
-   * Makes suit appear as 'special' (hidden)
+   * Hides suit icon while preserving card color
    */
   hide_suit: (card, pile, state, params = {}) => {
-    return { suit: 'special' };
+    return {
+      meta: {
+        ...card.meta,
+        hideSuitIcon: true
+      }
+    };
   },
 
   /**

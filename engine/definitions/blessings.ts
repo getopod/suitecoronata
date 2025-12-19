@@ -65,12 +65,18 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     id: 'tortoiseshell',
     name: 'Tortoiseshell',
     type: 'blessing',
-    description: 'Tableau plays ignore rank, foundation plays ignore suit.',
+    description: 'Tableau plays ignore rank, foundation plays ignore suit. No duplicate rank+suit in same tableau.',
     custom: {
       canMove: (cards, source, target, defaultAllowed) => {
         const moving = cards[0];
         const top = target.cards[target.cards.length - 1];
         if (target.type === 'tableau') {
+          // Check for duplicate rank+suit in target tableau
+          const hasDuplicate = target.cards.some(card =>
+            card.rank === moving.rank && card.suit === moving.suit
+          );
+          if (hasDuplicate) return false;
+
           if (!top) return isHighestRank(moving.rank);
           return getCardColor(moving.suit) !== getCardColor(top.suit);
         }
