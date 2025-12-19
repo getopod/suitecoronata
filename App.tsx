@@ -1779,6 +1779,37 @@ export default function SolitaireEngine({
     }));
   };
 
+  // Tax Loophole - buy a key for 25% of coins
+  const buyKeyWithTaxLoophole = () => {
+    if (!activeEffects.includes('tax_loophole')) return;
+    if (gameState.coins <= 0) return;
+    const cost = Math.floor(gameState.coins * 0.25);
+    const hand = gameState.piles['hand'];
+    const key: Card = {
+      id: `key-${Date.now()}`,
+      suit: 'special',
+      rank: 0 as Rank,
+      faceUp: true,
+      meta: { isKey: true, universal: true }
+    };
+    setGameState(prev => ({
+      ...prev,
+      coins: prev.coins - cost,
+      piles: { ...prev.piles, hand: { ...hand, cards: [...hand.cards, key] } }
+    }));
+  };
+
+  // Switcheroo - undo last 3 plays for 20% coin
+  const undoWithSwitcheroo = () => {
+    if (!activeEffects.includes('switcheroo')) return;
+    const cost = Math.floor(gameState.coins * 0.2);
+    if (gameState.coins < cost) return;
+    const snapshots = gameState.effectState?.lastSnapshots || [];
+    if (snapshots.length < 3) return;
+    const snapshot = snapshots[snapshots.length - 3];
+    setGameState(prev => ({ ...snapshot, coins: prev.coins - cost }));
+  };
+
   const buyEffect = (effect: GameEffect) => {
      const cost = effect.cost || 50;
      if (gameState.coins < cost) return; // Can't afford
@@ -3473,12 +3504,12 @@ export default function SolitaireEngine({
                      </div>
                      <div className="max-w-md mx-auto mt-2">
                         {activeDrawer === 'pause' ? (
-                           <div className="grid grid-cols-4 gap-2">
-                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><img src="/icons/save.png" alt="" className="w-4 h-4" /><span className="text-[8px]">Save</span></button>
-                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('resign')}><img src="/icons/resign.png" alt="" className="w-4 h-4" /><span className="text-[8px]">Resign</span></button>
-                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('feedback')}><img src="/icons/feedback.png" alt="" className="w-4 h-4" /><span className="text-[8px]">Feedback</span></button>
-                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('test')}><FlaskConical size={16} /><span className="text-[8px]">Test</span></button>
-                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><img src="/icons/settings.png" alt="" className="w-4 h-4" /><span className="text-[8px]">Settings</span></button>
+                           <div className="grid grid-cols-5 gap-1">
+                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600"><img src="/icons/save.png" alt="" className="w-3 h-3" /><span className="text-[7px]">Save</span></button>
+                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('resign')}><img src="/icons/resign.png" alt="" className="w-3 h-3" /><span className="text-[7px]">Resign</span></button>
+                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('feedback')}><img src="/icons/feedback.png" alt="" className="w-3 h-3" /><span className="text-[7px]">Feedback</span></button>
+                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('test')}><FlaskConical size={12} /><span className="text-[7px]">Test</span></button>
+                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><img src="/icons/settings.png" alt="" className="w-3 h-3" /><span className="text-[7px]">Settings</span></button>
                            </div>
                         ) : activeDrawer === 'shop' ? (
                            <div className="flex flex-col gap-2">
@@ -3819,11 +3850,14 @@ export default function SolitaireEngine({
                                        onClick={() => {
                                           // Curses (curse/fear/danger) cannot be toggled off
                                           const isCurseType = ['curse', 'fear', 'danger'].includes(effect.type);
-                                          if (isCurseType) return;
+                                          // Always-on exploits cannot be toggled off
+                                          const alwaysOnIds = ['trust_fund', 'tax_loophole', 'breaking_entering', 'insider_trading', 'switcheroo'];
+                                          const isAlwaysOn = alwaysOnIds.includes(effect.id);
+                                          if (isCurseType || isAlwaysOn) return;
                                           toggleEffect(effect.id);
                                        }}
                                        aria-label={`Toggle effect ${effect.name}`}
-                                       className={`p-2 rounded border text-xs flex items-center gap-3 transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : `${rarityColors.bg} ${rarityColors.border}`} ${['curse', 'fear', 'danger'].includes(effect.type) ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                                       className={`p-2 rounded border text-xs flex items-center gap-3 transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : `${rarityColors.bg} ${rarityColors.border}`} ${['curse', 'fear', 'danger'].includes(effect.type) || ['trust_fund', 'tax_loophole', 'breaking_entering', 'insider_trading', 'switcheroo'].includes(effect.id) ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                        <ResponsiveIcon name={effect.id || effect.name} fallbackType={effectType} size={32} className="w-8 h-8 rounded shrink-0" alt={effect.name} />
                                        <div className="flex-1 min-w-0 text-left">
                                            <div className="font-bold text-white flex gap-1 items-center flex-wrap">
@@ -3845,6 +3879,26 @@ export default function SolitaireEngine({
                                                   disabled={gameState.coins < 1}
                                                   className="text-[10px] px-2 py-1 rounded bg-green-600 hover:bg-green-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
                                                   1 Coin → 4 Score
+                                                </button>
+                                              </div>
+                                           )}
+                                           {effect.id === 'tax_loophole' && isActive && (
+                                              <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                  onClick={buyKeyWithTaxLoophole}
+                                                  disabled={gameState.coins <= 0}
+                                                  className="text-[10px] px-2 py-1 rounded bg-yellow-600 hover:bg-yellow-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
+                                                  Buy Key (25% Coin)
+                                                </button>
+                                              </div>
+                                           )}
+                                           {effect.id === 'switcheroo' && isActive && (
+                                              <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                  onClick={undoWithSwitcheroo}
+                                                  disabled={gameState.coins < Math.floor(gameState.coins * 0.2) || (gameState.effectState?.lastSnapshots || []).length < 3}
+                                                  className="text-[10px] px-2 py-1 rounded bg-purple-600 hover:bg-purple-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
+                                                  Undo (20% Coin)
                                                 </button>
                                               </div>
                                            )}
