@@ -39,7 +39,8 @@ export const generateNewBoard = (
   scoreMult: number,
   coinMult: number,
   hardMode: boolean = false,
-  randomChaos: boolean = false
+  randomChaos: boolean = false,
+  mode: string = 'coronata'
 ): GameState => {
   const suits: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
   const deck: Card[] = [];

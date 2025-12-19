@@ -82,8 +82,8 @@ const generateRunPlan = (effectsRegistry: GameEffect[], rng?: () => number): Enc
    return encounters;
 };
 
-const initialGameState = (): GameState => {
-  return generateNewBoard(0, 150, 1, 1);
+const initialGameState = (mode: string = 'coronata'): GameState => {
+  return generateNewBoard(0, 150, 1, 1, false, false, mode);
 };
 
 const isStandardMoveValid = (movingCards: Card[], targetPile: Pile, patriarchyMode: boolean = false): boolean => {
@@ -766,7 +766,7 @@ export default function SolitaireEngine({
         });
         
         // Generate Board
-        const newBoard = generateNewBoard(0, gameState.coins, gameState.scoreMultiplier, gameState.coinMultiplier);
+        const newBoard = generateNewBoard(0, gameState.coins, gameState.scoreMultiplier, gameState.coinMultiplier, false, false, 'coronata');
 
         // Calculate new active effects list
         let nextActiveEffects = [...keptEffects];
@@ -879,6 +879,7 @@ export default function SolitaireEngine({
   };
 
   const startRun = () => {
+    if (selectedMode === 'coronata') {
       // support seeded plan generation if a seed is set in localStorage
       const rawSeed = (() => { try { return localStorage.getItem('solitaire_seed_v1'); } catch { return null; } })();
       const seedNum = rawSeed ? Number(rawSeed) : null;
@@ -889,7 +890,7 @@ export default function SolitaireEngine({
 
       const plan = generateRunPlan(effectsRegistry, rng);
       const firstEncounter = plan[0];
-      let freshState = initialGameState();
+      let freshState = initialGameState(selectedMode);
       if (firstEncounter) freshState.currentScoreGoal = firstEncounter.goal;
 
       // Apply first encounter onActivate if present (mirror geminicoronata behavior)
@@ -947,6 +948,15 @@ export default function SolitaireEngine({
       setActiveDrawer('blessing_select');
       // Prevent collapsing the blessing picker at run start
       setNonClosableDrawer('blessing_select');
+    } else {
+      // Classic mode
+      const freshState = initialGameState(selectedMode);
+      setGameState(freshState);
+      setCurrentView('game');
+      setActiveEffects([]);
+      setActiveDrawer(null);
+      setNonClosableDrawer(null);
+    }
   };
 
   // Sort effects by type: curse → exploit → blessing for predictable execution order
@@ -1526,17 +1536,17 @@ export default function SolitaireEngine({
     
     
     let handStyle = {};
-    // No transform on hover, just static position. Bottom 30px to peek out behind HUD.
+    // Hand cards stick to top of bottom bar, raise when selected
     if (pileId === 'hand') {
-       const xOffset = (index - (totalCards - 1) / 2) * 45; 
-       handStyle = { 
-           position: 'absolute', 
-           bottom: '30px', 
-           left: '50%', 
-           marginLeft: `${xOffset}px`, 
-           transform: 'translateY(0)', // No movement
-           zIndex: index + 30, 
-           transition: 'none' // Remove animation
+       const xOffset = (index - (totalCards - 1) / 2) * 45;
+       handStyle = {
+           position: 'absolute',
+           bottom: isSelected ? '40px' : '0px',
+           left: '50%',
+           marginLeft: `${xOffset}px`,
+           transform: 'translateY(0)',
+           zIndex: isSelected ? 60 : 50 + index,
+           transition: 'bottom 0.2s ease'
        };
     }
     
@@ -1544,12 +1554,12 @@ export default function SolitaireEngine({
        return (
           <button
              key={`${card.id}-${pileId}-${index}`}
-             className="absolute w-11 h-16 rounded border border-slate-700 shadow-md overflow-hidden"
+             className="absolute w-11 max-w-[44px] h-16 max-h-[64px] rounded border border-slate-700 shadow-md overflow-hidden"
              style={{ top: `${pileId.includes('tableau') ? index * 10 : 0}px` }}
              onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
              onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick(pileId, index); }}
              aria-label={`Face down card ${card.id}`}
-               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); handleDoubleClick(pileId, index); } }}
+             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); handleDoubleClick(pileId, index); } }}
           >
              <img src={`/icons/${settings.cardBack}.png`} alt="Card back" className="w-full h-full object-cover" />
           </button>
@@ -1559,7 +1569,7 @@ export default function SolitaireEngine({
          <button
             key={`${card.id}-${pileId}-${index}`}
             type="button"
-            className={`absolute w-11 h-16 bg-transparent perspective-1000 select-none ${isSelected ? 'z-[60]' : ''}`}
+            className={`absolute w-11 max-w-[44px] h-16 max-h-[64px] bg-transparent perspective-1000 select-none ${isSelected ? 'z-[60]' : ''}`}
             style={pileId === 'hand' ? handStyle : { top: `${pileId.includes('tableau') ? index * 12 : 0}px`, zIndex: isSelected ? 60 : index }}
             onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
             onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick(pileId, index); }}
@@ -1628,10 +1638,32 @@ export default function SolitaireEngine({
   if (currentView === 'home') {
      // Game modes data
      const gameModes = [
-        { id: 'coronata', name: 'Coronata', desc: 'The original rogue-like experience. 10 encounters with effects, shops, and wanders.', unlocked: true, hasStars: true },
-        { id: 'klondike', name: 'Klondike', desc: 'Classic solitaire with a rogue-like twist. Draw 1 or 3 cards.', unlocked: true, hasStars: false },
-        { id: 'spider', name: 'Spider', desc: 'Build sequences of the same suit. 1, 2, or 4 suit variants.', unlocked: true, hasStars: false },
+        { id: 'coronata', name: 'Coronata', desc: 'A rogue-like experience. 10 games to win.', unlocked: true, hasStars: true },
+        { id: 'klondike', name: 'Klondike (Draw 1)', desc: 'Classic solitaire: draw 1 card.', unlocked: true, hasStars: false },
+        { id: 'klondike3', name: 'Klondike (Draw 3)', desc: 'Classic solitaire: draw 3 cards.', unlocked: true, hasStars: false },
+        { id: 'spider1', name: 'Spider (1 Suit)', desc: 'Build sequences of the same suit. 1 suit variant.', unlocked: true, hasStars: false },
+        { id: 'spider2', name: 'Spider (2 Suits)', desc: 'Build sequences of the same suit. 2 suit variants.', unlocked: true, hasStars: false },
+        { id: 'spider4', name: 'Spider (4 Suits)', desc: 'Build sequences of the same suit. 4 suit variants.', unlocked: true, hasStars: false },
         { id: 'freecell', name: 'FreeCell', desc: 'Strategic solitaire with free cells for temporary storage.', unlocked: true, hasStars: false },
+        { id: 'seahaven', name: 'Seahaven Towers', desc: '10 Tableau columns, 4 Free Cells. Tableaus build down in same suit.', unlocked: true, hasStars: false },
+        { id: 'yukon', name: 'Yukon', desc: 'You can move any face-up card, regardless of what is on top of it.', unlocked: true, hasStars: false },
+        { id: 'russian', name: 'Russian Solitaire', desc: 'Groups of cards can be moved regardless of sequence. Tableaus build down in same suit.', unlocked: true, hasStars: false },
+        { id: 'scorpion', name: 'Scorpion', desc: 'You can move any face-up card, along with any cards on top of it.', unlocked: true, hasStars: false },
+        { id: 'wasp', name: 'Wasp', desc: 'All cards are dealt face-up. You can move any card (and cards on top of it).', unlocked: true, hasStars: false },
+        { id: 'golf', name: 'Golf', desc: 'Move all cards from the tableaus to the waste pile.', unlocked: true, hasStars: false },
+        { id: 'pyramid', name: 'Pyramid', desc: 'Clear the pyramid by removing pairs of cards that sum to 13.', unlocked: true, hasStars: false },
+        { id: 'tripeaks', name: 'TriPeaks', desc: 'Move all cards from the peaks to the waste pile.', unlocked: true, hasStars: false },
+        { id: 'fortythieves', name: 'Forty Thieves', desc: 'Move one card at a time. Tableaus build down in same suit.', unlocked: true, hasStars: false },
+        { id: 'bakers', name: 'Baker\'s Dozen', desc: 'Kings are moved to the bottom of their piles during the deal.', unlocked: true, hasStars: false },
+        { id: 'easthaven', name: 'EastHaven', desc: 'Tableaus build down alternating color. Clicking stock deals 1 card to all 7 tableaus.', unlocked: true, hasStars: false },
+        { id: 'canfield', name: 'Canfield', desc: 'Foundations start with a random rank. Tableaus build down alternating color.', unlocked: true, hasStars: false },
+        { id: 'castle', name: 'Beleaguered Castle', desc: 'Aces are removed to foundations at start. Only one card can be moved at a time.', unlocked: true, hasStars: false },
+        { id: 'bus', name: 'Bus Driver', desc: '1 deck. All cards dealt face up to 10 piles. Move one card at a time.', unlocked: true, hasStars: false },
+        { id: 'clock', name: 'Clock Solitaire', desc: 'Foundations are arranged in a clock. Each foundation builds up to the correct number.', unlocked: true, hasStars: false },
+        { id: 'calculation', name: 'Calculation', desc: 'Foundations built in specific intervals.', unlocked: true, hasStars: false },
+        { id: 'aces_up', name: 'Aces Up', desc: 'Remove all cards except the 4 Aces.', unlocked: true, hasStars: false },
+        { id: 'labelle', name: 'La Belle Lucie', desc: '18 fans of 3 cards. Foundations build up in suit.', unlocked: true, hasStars: false },
+        { id: 'cruel', name: 'Cruel', desc: 'Aces start in foundations. Tableaus build down in suit.', unlocked: true, hasStars: false },
      ];
 
      // How to play pages
@@ -1666,9 +1698,9 @@ export default function SolitaireEngine({
               <button onClick={() => setShowModes(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><Gamepad2 size={18}/> Modes</button>
               <button onClick={() => setShowHowTo(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><BookOpen size={18}/> How To</button>
               <button className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2" onClick={() => setShowGlossary(true)}><HelpCircle size={18}/> Glossary</button>
-              <button onClick={() => setShowUpdates(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><RefreshCw size={18}/> Updates</button>
-              <button onClick={() => setShowProfile(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><User size={18}/> Profile</button>
-              <button onClick={() => setShowSettings(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><Settings size={18}/> Settings</button>
+              <button onClick={() => setShowUpdates(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><RefreshCw size={18}/></button>
+              <button onClick={() => setShowProfile(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><User size={18}/></button>
+              <button onClick={() => setShowSettings(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><Settings size={18}/></button>
            </div>
 
            {/* MODES PANEL */}
@@ -1695,16 +1727,11 @@ export default function SolitaireEngine({
                                 <div className="font-bold text-white flex items-center gap-2">
                                    {mode.name}
                                    {!mode.unlocked && <Lock size={14} className="text-slate-500" />}
-                                   {selectedMode === mode.id && <span className="text-xs bg-purple-600 px-2 py-0.5 rounded">Selected</span>}
+                                   {selectedMode === mode.id}
                                 </div>
                                 <div className="text-sm text-slate-400">{mode.desc}</div>
                              </div>
-                             <button 
-                                className={`p-2 rounded-lg ${mode.hasStars ? 'bg-yellow-600/20 text-yellow-400 hover:bg-yellow-600/30' : 'bg-slate-700/30 text-slate-600 cursor-not-allowed'}`}
-                                disabled={!mode.hasStars}
-                                onClick={(e) => { e.stopPropagation(); if (mode.hasStars) alert('High Scores coming soon!'); }}>
-                                <Trophy size={18} />
-                             </button>
+
                           </div>
                        </div>
                     ))}
@@ -1735,15 +1762,6 @@ export default function SolitaireEngine({
                     <button onClick={() => setShowProfile(false)}><X /></button>
                  </div>
 
-                 {/* Avatar & Name */}
-                 <div className="flex items-center gap-4 mb-4 p-4 bg-slate-800 rounded-xl">
-                    <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-600 rounded-full flex items-center justify-center text-2xl">🃏</div>
-                    <div>
-                       <div className="font-bold text-xl">Player One</div>
-                       <div className="text-slate-400 text-sm">Joined Nov 2024</div>
-                    </div>
-                 </div>
-
                  {/* Profile Tab Bar */}
                  <div className="flex gap-1 mb-4">
                     {(['stats', 'feats', 'recaps'] as const).map(tab => (
@@ -1758,7 +1776,7 @@ export default function SolitaireEngine({
                           {tab === 'stats' && <BarChart3 size={16} />}
                           {tab === 'feats' && <img src="/icons/feats.png" alt="" className="w-4 h-4" />}
                           {tab === 'recaps' && <img src="/icons/run history.png" alt="" className="w-4 h-4" />}
-                          {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                          {tab === 'recaps' ? 'History' : tab.charAt(0).toUpperCase() + tab.slice(1)}
                        </button>
                     ))}
                  </div>
@@ -1767,14 +1785,6 @@ export default function SolitaireEngine({
                     {/* STATS TAB */}
                     {profileTab === 'stats' && (
                        <>
-                          {/* Debug: Show raw stats */}
-                          {process.env.NODE_ENV === 'development' && (
-                             <div className="mb-4 p-2 bg-slate-700/50 rounded text-xs">
-                                <div>Stats loaded: {playerStats ? 'Yes' : 'No'}</div>
-                                <div>Runs: {playerStats?.totalRuns || 0}</div>
-                                <div>History length: {playerStats?.runHistory?.length || 0}</div>
-                             </div>
-                          )}
                           {/* Stats Grid */}
                           <div className="grid grid-cols-2 gap-3 mb-6">
                              <div className="bg-slate-800 p-4 rounded-xl text-center">
@@ -1978,27 +1988,23 @@ export default function SolitaireEngine({
                                    {/* Encounter Progress Bar */}
                                    <div>
                                       <div className="flex items-center gap-1 mb-1.5 text-slate-400 text-[10px] uppercase tracking-wider">
-                                         <MapIcon size={10} />
-                                         <span>Journey ({run.encounters.filter(e => e.passed).length}/{run.encounters.length})</span>
+                                         <MapIcon size={20} />
+                                         <span>Curses ({run.encounters.filter(e => e.passed).length}/10)</span>
                                       </div>
-                                      <div className="flex gap-0.5">
+                                      <div className="grid grid-cols-10 gap-1">
                                          {run.encounters.map((enc, i) => {
-                                            const iconMap: Record<string, string> = {
-                                               curse: categoryIcons.curse,
-                                               wander: '/icons/wander.png',
-                                               shop: '/icons/coin.png',
-                                               boss: categoryIcons.curse,
-                                            };
+                                            let colorClass = 'bg-slate-600'; // grey for not completed
+                                            if (enc.passed) {
+                                               colorClass = 'bg-emerald-600'; // green for completed
+                                            } else if (run.result === 'lost') {
+                                               colorClass = 'bg-red-600'; // red for resigned/lost
+                                            }
                                             return (
                                                <div 
                                                   key={i} 
-                                                  className={`flex-1 h-6 rounded-sm flex items-center justify-center ${
-                                                     enc.passed 
-                                                        ? enc.type === 'boss' ? 'bg-yellow-600' : 'bg-emerald-600/80' 
-                                                        : 'bg-red-600/80'
-                                                  }`}
-                                                  title={`${enc.name}${enc.passed ? '' : ' (Failed)'}`}>
-                                                  <img src={iconMap[enc.type] || categoryIcons.curse} alt="" className="w-3 h-3 opacity-80" />
+                                                  className={`h-6 rounded-sm flex items-center justify-center ${colorClass}`}
+                                                  title={`${enc.name}${enc.passed ? ' (Completed)' : run.result === 'lost' ? ' (Failed)' : ' (Not Reached)'}`}>
+                                                  <img src={categoryIcons.curse} alt="" className="w-3 h-3 opacity-80" />
                                                </div>
                                             );
                                          })}
@@ -2096,7 +2102,7 @@ export default function SolitaireEngine({
                                 </div>
                                 
                                 {/* Freecell */}
-                                <div className="p-3 bg-slate-700/50 rounded-lg">
+                                <div className="p-3 bg-slate-700/50 rounded-lg mb-2">
                                    <div className="flex items-center justify-between mb-2">
                                       <div><div className="font-medium text-sm">Freecell</div><div className="text-xs text-slate-400">Strategic solitaire with free cells</div></div>
                                       <button onClick={() => setSettings(s => ({...s, freecellEnabled: !s.freecellEnabled}))} className={`w-12 h-6 ${settings.freecellEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.freecellEnabled ? 'right-0.5' : 'left-0.5'}`}></div></button>
@@ -2110,6 +2116,42 @@ export default function SolitaireEngine({
                                          <div className="text-xs text-purple-400 mt-2">🚧 Coming soon!</div>
                                       </div>
                                    )}
+                                </div>
+
+                                {/* Other Classic Modes - Simple toggle list */}
+                                <div className="space-y-1">
+                                   {[
+                                      { id: 'seahaven', name: 'Seahaven Towers', desc: '10 columns, free cells' },
+                                      { id: 'yukon', name: 'Yukon', desc: 'Move face-up cards freely' },
+                                      { id: 'russian', name: 'Russian Solitaire', desc: 'Move groups regardless of sequence' },
+                                      { id: 'scorpion', name: 'Scorpion', desc: 'Move cards with those on top' },
+                                      { id: 'wasp', name: 'Wasp', desc: 'All cards face-up' },
+                                      { id: 'golf', name: 'Golf', desc: 'Move cards to waste pile' },
+                                      { id: 'pyramid', name: 'Pyramid', desc: 'Remove pairs summing to 13' },
+                                      { id: 'tripeaks', name: 'TriPeaks', desc: 'Clear the three peaks' },
+                                      { id: 'fortythieves', name: 'Forty Thieves', desc: 'One card at a time' },
+                                      { id: 'bakers', name: 'Baker\'s Dozen', desc: 'Kings on bottom' },
+                                      { id: 'easthaven', name: 'EastHaven', desc: 'Deal to all tableaus' },
+                                      { id: 'canfield', name: 'Canfield', desc: 'Random starting rank' },
+                                      { id: 'castle', name: 'Beleaguered Castle', desc: 'Aces start in foundations' },
+                                      { id: 'bus', name: 'Bus Driver', desc: '10 piles, all face-up' },
+                                      { id: 'clock', name: 'Clock Solitaire', desc: 'Build to clock numbers' },
+                                      { id: 'calculation', name: 'Calculation', desc: 'Specific intervals' },
+                                      { id: 'aces_up', name: 'Aces Up', desc: 'Remove all but Aces' },
+                                      { id: 'labelle', name: 'La Belle Lucie', desc: '18 fans of 3' },
+                                      { id: 'cruel', name: 'Cruel', desc: 'Aces start out' }
+                                   ].map(mode => (
+                                      <div key={mode.id} className="flex items-center justify-between p-2 bg-slate-700/30 rounded">
+                                         <div>
+                                            <div className="font-medium text-xs">{mode.name}</div>
+                                            <div className="text-[10px] text-slate-500">{mode.desc}</div>
+                                         </div>
+                                         <button onClick={() => setSettings(s => ({...s, [`${mode.id}Enabled`]: !s[`${mode.id}Enabled` as keyof typeof s]}))} className={`w-10 h-5 ${(settings as any)[`${mode.id}Enabled`] ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors shrink-0`}>
+                                            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${(settings as any)[`${mode.id}Enabled`] ? 'right-0.5' : 'left-0.5'}`}></div>
+                                         </button>
+                                      </div>
+                                   ))}
+                                   <div className="text-xs text-purple-400 mt-2">🚧 Coming soon!</div>
                                 </div>
                              </div>
                           </div>
@@ -2525,31 +2567,24 @@ export default function SolitaireEngine({
                        {expandedSettingsSection === 'about' && (
                           <div className="space-y-3 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
                              <div className="text-center py-4">
-                                <div className="text-3xl mb-2">🃏</div>
                                 <div className="font-bold text-lg">Coronata</div>
-                                <div className="text-xs text-slate-400">v2.5</div>
                              </div>
                              <div className="text-xs text-slate-400 text-center">
-                                Rogue-like solitaire where you play for points, not completing the foundations.
+                                A rogue-like game based on Klondike & inspired by Balatro.
                              </div>
-                             <button 
-                                onClick={() => setShowCredits(true)}
-                                className="w-full p-3 bg-slate-700/50 rounded-lg text-center hover:bg-slate-700 text-sm">
-                                View Credits
-                             </button>
-                             <div className="flex gap-2">
-                                <button className="flex-1 p-2 bg-slate-700/50 rounded-lg text-center hover:bg-slate-700 text-xs">
-                                   Twitter
-                                </button>
+<div className="flex gap-2">                             
                                 <button className="flex-1 p-2 bg-slate-700/50 rounded-lg text-center hover:bg-slate-700 text-xs">
                                    Discord
                                 </button>
                                 <button className="flex-1 p-2 bg-slate-700/50 rounded-lg text-center hover:bg-slate-700 text-xs">
                                    Website
                                 </button>
+<button onClick={() => setShowCredits(true)}
+                                className="flex-1 p-2 bg-slate-700/50 rounded-lg text-center hover:bg-slate-700 text-xs">Credits</button>
+
                              </div>
                              <div className="text-[10px] text-slate-500 text-center pt-2">
-                                Made with ☕ and questionable life choices
+                                Made with obsession and questionable life choices.
                              </div>
                           </div>
                        )}
@@ -2575,7 +2610,7 @@ export default function SolitaireEngine({
                           <div className="text-center mb-6">
                              <div className="text-4xl mb-2"></div>
                              <div className="font-bold text-xl">Coronata</div>
-                             <div className="text-xs text-slate-400">Credits</div>
+                             <div className="text-xs text-slate-400">Pre-release</div>
                           </div>
                           <div className="space-y-4 text-sm">
                              <div>
@@ -2584,23 +2619,18 @@ export default function SolitaireEngine({
                              </div>
                              <div>
                                 <div className="text-purple-400 font-bold text-xs uppercase mb-1">Art Direction</div>
-                                <div className="text-slate-300">Me</div>
+                                <div className="text-slate-300">Just me<div className="text-slate-500 text-xs">Send help</div></div>
                              </div>
                              <div>
                                 <div className="text-purple-400 font-bold text-xs uppercase mb-1">Music & Sound</div>
-                                <div className="text-slate-300">Not Yet</div>
+                                <div className="text-slate-300">Just me<div className="text-slate-500 text-xs">Send help</div></div>
                              </div>
                              <div>
                                 <div className="text-purple-400 font-bold text-xs uppercase mb-1">Special Thanks</div>
-                                <div className="text-slate-300">Late nights turning into long days, everyone who doesn't know what a rogue-like is, & the love of games.</div>
+                                <div className="text-slate-300">Anyone who's never heard of a rogue-like.</div>
                              </div>
-                             <div>
-                                <div className="text-purple-400 font-bold text-xs uppercase mb-1">Beta Testers</div>
-                                <div className="text-slate-300">You</div>
-                             </div>
-                             <div className="border-t border-slate-700 pt-4 text-center">
-                                <div className="text-slate-500 text-xs">Made with React, TypeScript, Tailwind, and an unhealthy amount of determination</div>
-                             </div>
+
+
                           </div>
                           <button onClick={() => setShowCredits(false)} className="w-full mt-6 bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded font-bold text-sm">Close</button>
                        </div>
@@ -2803,18 +2833,12 @@ export default function SolitaireEngine({
   return (
     <div className={`h-screen w-full font-sans flex flex-col overflow-hidden relative ${themeClasses[settings.theme as keyof typeof themeClasses] || themeClasses.dark} ${settings.reduceMotion ? '[&_*]:!transition-none [&_*]:!animate-none' : ''}`}>
       <div className="flex-1 w-full mx-auto p-2 pb-40 overflow-x-auto overflow-visible">
-        <div className={`grid ${gameState.piles['shadow-realm'] ? 'grid-cols-6' : 'grid-cols-5'} gap-1 mb-4`}>
-                <div className="relative w-11 h-16">
-                   <button type="button" className="w-full h-full bg-blue-900 border border-slate-600 rounded flex items-center justify-center" onClick={() => discardAndDrawHand()} aria-label="Draw from deck">
-                        <div className="absolute -top-2 -left-1 bg-slate-700 text-[8px] px-1 rounded-full border border-slate-500 z-10">Draw</div>
-                        {gameState.piles.deck.cards.length > 0 ? <div className="font-bold text-blue-300 text-xs">{gameState.piles.deck.cards.length}</div> : <RefreshCw className="text-slate-600 w-4 h-4" />}
-                   </button>
-                </div>
-                
+        <div className="flex justify-center mb-4">
+          <div className={`grid ${gameState.piles['shadow-realm'] ? 'grid-cols-5' : 'grid-cols-4'} gap-[3px]`}>
                 {/* Shadow Realm Pile */}
                 {gameState.piles['shadow-realm'] && (
-                   <div 
-                      className="relative w-11 h-16 bg-purple-900/30 border border-purple-500/50 rounded flex items-center justify-center cursor-pointer hover:bg-purple-900/50 transition-colors"
+                   <div
+                      className="relative w-11 max-w-[44px] h-16 max-h-[64px] bg-purple-900/30 border border-purple-500/50 rounded flex items-center justify-center cursor-pointer hover:bg-purple-900/50 transition-colors"
                       onClick={handleShadowRealmClick}
                       title="Shadow Realm: Click to summon back (10 coins)">
                       <div className="absolute -top-2 -left-1 bg-purple-900 text-[8px] px-1 rounded-full border border-purple-500 z-10">Realm</div>
@@ -2833,17 +2857,18 @@ export default function SolitaireEngine({
                    const ringColor = selectionColor === 'green' ? 'ring-green-400' : selectionColor === 'yellow' ? 'ring-amber-300' : 'ring-red-400';
                    const shadowColor = selectionColor === 'green' ? 'shadow-[0_0_0_2px_rgba(74,222,128,0.25)]' : selectionColor === 'yellow' ? 'shadow-[0_0_0_2px_rgba(251,191,36,0.25)]' : 'shadow-[0_0_0_2px_rgba(248,113,113,0.25)]';
                    return (
-                   <div key={pile.id} className={`relative w-11 h-16 bg-slate-800/50 rounded border border-slate-700 flex items-center justify-center ${isHighlighted ? `ring-2 ${ringColor} ${shadowColor}` : ''}`}>
+                   <div key={pile.id} className={`relative w-11 max-w-[44px] h-16 max-h-[64px] bg-slate-800/50 rounded border border-slate-700 flex items-center justify-center ${isHighlighted ? `ring-2 ${ringColor} ${shadowColor}` : ''}`}>
                       {pile.cards.length === 0 ? (
                          <div className="relative w-full h-full flex items-center justify-center">
                             <span className={`text-xl opacity-20 ${suitColor}`}>{suitSymbol}</span>
-                            <button type="button" aria-label={`Empty foundation ${pile.id}`} className={`absolute top-0 left-0 w-11 h-16 bg-transparent ${isHighlighted ? `ring-2 ${ringColor} rounded` : ''}`} onClick={() => handleCardClick(pile.id, -1)} />
+                            <button type="button" aria-label={`Empty foundation ${pile.id}`} className={`absolute top-0 left-0 w-11 max-w-[44px] h-16 max-h-[64px] bg-transparent ${isHighlighted ? `ring-2 ${ringColor} rounded` : ''}`} onClick={() => handleCardClick(pile.id, -1)} />
                          </div>
                       ) : null}
                       {pile.cards.map((c, i) => renderCard(c, i, pile.id))}
                    </div>
                    );
                 })}
+          </div>
         </div>
 
         {/* Active Effect HUDs */}
@@ -2875,15 +2900,16 @@ export default function SolitaireEngine({
            </div>
         )}
 
-        <div className="grid gap-1 h-full" style={{ gridTemplateColumns: `repeat(${visibleTableauCount}, minmax(0, 1fr))` }}>
-               {tableauPiles.filter(pile => !pile.hidden).map(pile => {
+        <div className="flex justify-center">
+          <div className="grid gap-[3px] h-full" style={{ gridTemplateColumns: `repeat(${tableauCount}, minmax(0, 44px))` }}>
+               {tableauPiles.map(pile => {
                   const isLinked = activeEffects.includes('linked_fates') && gameState.effectState?.linkedTableaus?.includes(pile.id);
                   const isLinkedTurn = isLinked && gameState.effectState?.lastLinkedPlayed !== pile.id;
                   const isParasite = activeEffects.includes('parasite_pile') && gameState.effectState?.parasiteTarget === pile.id;
                   const isHighlighted = highlightedMoves.tableauIds.includes(pile.id);
 
                   return (
-                  <div key={pile.id} className={`relative w-full h-full ${isLinked ? 'border-t-2 border-purple-500/50 rounded-t-lg pt-1' : ''} ${isParasite ? 'border-t-2 border-green-500/50 rounded-t-lg pt-1' : ''}`}>
+                  <div key={pile.id} className={`relative w-full h-full ${isLinked ? 'border-t-2 border-purple-500/50 rounded-t-lg pt-1' : ''} ${isParasite ? 'border-t-2 border-green-500/50 rounded-t-lg pt-1' : ''} ${pile.hidden ? 'invisible pointer-events-none' : ''}`}>
                       {/* Linked Fates Indicator */}
                       {isLinked && (
                          <div className={`absolute -top-7 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center ${isLinkedTurn ? 'text-purple-400 animate-pulse' : 'text-slate-600 opacity-50'}`}>
@@ -2906,12 +2932,16 @@ export default function SolitaireEngine({
                       {pile.cards.length === 0 && (() => {
                          const ringColor = selectionColor === 'green' ? 'ring-green-400' : selectionColor === 'yellow' ? 'ring-amber-300' : 'ring-red-400';
                          return (
-                            <button type="button" aria-label={`Empty ${pile.id}`} className={`absolute inset-0 w-full h-full bg-transparent ${isHighlighted ? `ring-2 ${ringColor} rounded-md` : ''}`} onClick={() => handleCardClick(pile.id, -1)} />
+                            <div className="relative w-11 max-w-[44px] h-16 max-h-[64px]">
+                               <div className={`w-full h-full bg-slate-800/50 rounded border border-slate-700 ${isHighlighted ? `ring-2 ${ringColor}` : ''}`}></div>
+                               <button type="button" aria-label={`Empty ${pile.id}`} className="absolute inset-0 w-full h-full bg-transparent" onClick={() => handleCardClick(pile.id, -1)} />
+                            </div>
                          );
                       })()}
                       {pile.cards.map((c, idx) => renderCard(c, idx, pile.id))}
                   </div>
                )})}
+          </div>
         </div>
       </div>
 
@@ -2943,7 +2973,7 @@ export default function SolitaireEngine({
       <div className="fixed bottom-0 left-0 w-full z-50 flex flex-col justify-end pointer-events-none">
          {/* Hand cards - positioned relative to bottom panel */}
          <div className="w-full flex justify-center pointer-events-none">
-             <div className="relative w-full max-w-md h-0"> 
+             <div className="relative w-full max-w-md h-0">
                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-0 pointer-events-auto">
                     {gameState.piles.hand.cards.map((c, i) => renderCard(c, i, 'hand', gameState.piles.hand.cards.length))}
                  </div>
@@ -2984,21 +3014,11 @@ export default function SolitaireEngine({
                      <div className="max-w-md mx-auto mt-2">
                         {activeDrawer === 'pause' ? (
                            <div className="grid grid-cols-4 gap-2">
-                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><SkipBack size={16} /><span className="text-[8px]">Prev</span></button>
-                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><Play size={16} /><span className="text-[8px]">Play/Pause</span></button>
-                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><SkipForward size={16} /><span className="text-[8px]">Next</span></button>
-                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('feedback')}><MessageSquare size={16} /><span className="text-[8px]">Feedback</span></button>
-                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('test')}><FlaskConical size={16} /><span className="text-[8px]">Test UI</span></button>
-                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><Save size={16} /><span className="text-[8px]">Save</span></button>
-                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => {
-                                 if (settings.confirmResign) {
-                                    setActiveDrawer('resign');
-                                 } else {
-                                    setCurrentView('home');
-                                    setActiveDrawer(null);
-                                 }
-                              }}><Flag size={16} /><span className="text-[8px]">Resign</span></button>
-                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><Settings size={16} /><span className="text-[8px]">Settings</span></button>
+                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600"><img src="/icons/save.png" alt="" className="w-4 h-4" /><span className="text-[8px]">Save</span></button>
+                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('resign')}><img src="/icons/resign.png" alt="" className="w-4 h-4" /><span className="text-[8px]">Resign</span></button>
+                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('feedback')}><img src="/icons/feedback.png" alt="" className="w-4 h-4" /><span className="text-[8px]">Feedback</span></button>
+                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('test')}><FlaskConical size={16} /><span className="text-[8px]">Test</span></button>
+                              <button className="p-2 bg-slate-700 rounded flex flex-col items-center gap-1 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><img src="/icons/settings.png" alt="" className="w-4 h-4" /><span className="text-[8px]">Settings</span></button>
                            </div>
                         ) : activeDrawer === 'shop' ? (
                            <div className="flex flex-col gap-2">
@@ -3119,61 +3139,127 @@ export default function SolitaireEngine({
                               </div>
                            </div>
                         ) : activeDrawer === 'settings' ? (
-                           <div className="flex flex-col gap-3">
-                              <div className="text-xs text-slate-400 uppercase mb-1">Audio</div>
-                              <label className="flex items-center justify-between text-sm text-slate-300 bg-slate-700/30 p-2 rounded">
-                                 <span>Sound Effects</span>
-                                 <button onClick={() => setSettings(s => ({...s, sfxEnabled: !s.sfxEnabled}))} className={`w-12 h-6 ${settings.sfxEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}>
-                                    <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.sfxEnabled ? 'right-0.5' : 'left-0.5'}`}></div>
+                           <div className="flex flex-col gap-2">
+                              {/* Audio - Collapsible */}
+                              <div className="bg-slate-800/50 rounded-lg overflow-hidden">
+                                 <button
+                                    onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'audio' ? null : 'audio')}
+                                    className="w-full flex items-center justify-between p-3 hover:bg-slate-800">
+                                    <div className="flex items-center gap-2">
+                                       <img src="/icons/volume.png" alt="" className="w-4 h-4" />
+                                       <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Audio</h3>
+                                    </div>
+                                    <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'audio' ? 'rotate-180' : ''}`} />
                                  </button>
-                              </label>
-                              <label className="flex items-center justify-between text-sm text-slate-300 bg-slate-700/30 p-2 rounded">
-                                 <span>Music</span>
-                                 <button onClick={() => setSettings(s => ({...s, musicEnabled: !s.musicEnabled}))} className={`w-12 h-6 ${settings.musicEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}>
-                                    <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.musicEnabled ? 'right-0.5' : 'left-0.5'}`}></div>
-                                 </button>
-                              </label>
-
-                              <div className="text-xs text-slate-400 uppercase mb-1 mt-2">Display</div>
-                              <label className="flex items-center justify-between text-sm text-slate-300 bg-slate-700/30 p-2 rounded">
-                                 <span>Card Animations</span>
-                                 <button onClick={() => setSettings(s => ({...s, cardAnimations: !s.cardAnimations}))} className={`w-12 h-6 ${settings.cardAnimations ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}>
-                                    <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.cardAnimations ? 'right-0.5' : 'left-0.5'}`}></div>
-                                 </button>
-                              </label>
-                              <label className="flex items-center justify-between text-sm text-slate-300 bg-slate-700/30 p-2 rounded">
-                                 <span>Reduce Motion</span>
-                                 <button onClick={() => setSettings(s => ({...s, reduceMotion: !s.reduceMotion}))} className={`w-12 h-6 ${settings.reduceMotion ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}>
-                                    <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.reduceMotion ? 'right-0.5' : 'left-0.5'}`}></div>
-                                 </button>
-                              </label>
-                              <div className="flex items-center justify-between text-sm text-slate-300 bg-slate-700/30 p-2 rounded">
-                                 <span>Theme</span>
-                                 <select value={settings.theme} onChange={(e) => setSettings(s => ({...s, theme: e.target.value}))} className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs">
-                                    <option value="dark">Dark</option>
-                                    <option value="light">Light</option>
-                                    <option value="oled">OLED</option>
-                                    <option value="system">System</option>
-                                 </select>
+                                 {expandedSettingsSection === 'audio' && (
+                                    <div className="space-y-3 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
+                                       {/* Master Volume */}
+                                       <div className="p-3 bg-slate-700/50 rounded-lg">
+                                          <div className="flex justify-between mb-2"><span className="text-sm">Master Volume</span><span className="text-slate-400 text-sm">{settings.masterVolume}%</span></div>
+                                          <input type="range" min="0" max="100" value={settings.masterVolume} onChange={(e) => setSettings(s => ({...s, masterVolume: Number(e.target.value)}))} className="w-full h-2 bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-emerald-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
+                                       </div>
+                                       {/* SFX Section */}
+                                       <div className="border-t border-slate-600 pt-3">
+                                          <div className="flex items-center justify-between mb-2">
+                                             <div className="text-xs text-slate-400 uppercase">Sound Effects</div>
+                                             <button onClick={() => setSettings(s => ({...s, sfxEnabled: !s.sfxEnabled}))} className={`w-10 h-5 ${settings.sfxEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.sfxEnabled ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                          </div>
+                                          {settings.sfxEnabled && (
+                                             <>
+                                                <div className="p-3 bg-slate-700/50 rounded-lg mb-2">
+                                                   <div className="flex justify-between mb-2"><span className="text-sm">SFX Volume</span><span className="text-slate-400 text-sm">{settings.sfxVolume}%</span></div>
+                                                   <input type="range" min="0" max="100" value={settings.sfxVolume} onChange={(e) => setSettings(s => ({...s, sfxVolume: Number(e.target.value)}))} className="w-full h-2 bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-emerald-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                   {[{key: 'cardFlip', label: 'Card Flip'}, {key: 'cardPlace', label: 'Card Place'}, {key: 'invalidMove', label: 'Invalid Move'}, {key: 'scorePoints', label: 'Score Points'}, {key: 'levelComplete', label: 'Level Complete'}, {key: 'uiClicks', label: 'UI Clicks'}].map(item => (
+                                                      <div key={item.key} className="flex items-center justify-between p-2 bg-slate-700/30 rounded">
+                                                         <span className="text-xs">{item.label}</span>
+                                                         <button onClick={() => setSettings(s => ({...s, [item.key]: !s[item.key as keyof typeof s]}))} className={`w-10 h-5 ${settings[item.key as keyof typeof settings] ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings[item.key as keyof typeof settings] ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                                      </div>
+                                                   ))}
+                                                </div>
+                                             </>
+                                          )}
+                                       </div>
+                                       {/* Music Section */}
+                                       <div className="border-t border-slate-600 pt-3">
+                                          <div className="flex items-center justify-between mb-2">
+                                             <div className="text-xs text-slate-400 uppercase">Music</div>
+                                             <button onClick={() => setSettings(s => ({...s, musicEnabled: !s.musicEnabled}))} className={`w-10 h-5 ${settings.musicEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.musicEnabled ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                          </div>
+                                          {settings.musicEnabled && (
+                                             <>
+                                                <div className="p-3 bg-slate-700/50 rounded-lg mb-2">
+                                                   <div className="flex justify-between mb-2"><span className="text-sm">Music Volume</span><span className="text-slate-400 text-sm">{settings.musicVolume}%</span></div>
+                                                   <input type="range" min="0" max="100" value={settings.musicVolume} onChange={(e) => setSettings(s => ({...s, musicVolume: Number(e.target.value)}))} className="w-full h-2 bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-emerald-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                   {[{key: 'menuMusic', label: 'Menu Music'}, {key: 'gameplayMusic', label: 'Gameplay Music'}, {key: 'shopMusic', label: 'Shop Music'}, {key: 'wanderMusic', label: 'Wander Music'}].map(item => (
+                                                      <div key={item.key} className="flex items-center justify-between p-2 bg-slate-700/30 rounded">
+                                                         <span className="text-xs">{item.label}</span>
+                                                         <button onClick={() => setSettings(s => ({...s, [item.key]: !s[item.key as keyof typeof s]}))} className={`w-10 h-5 ${settings[item.key as keyof typeof settings] ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings[item.key as keyof typeof settings] ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                                      </div>
+                                                   ))}
+                                                </div>
+                                             </>
+                                          )}
+                                       </div>
+                                    </div>
+                                 )}
                               </div>
-                              <div className="flex items-center justify-between text-sm text-slate-300 bg-slate-700/30 p-2 rounded">
-                                 <span>Card Back</span>
-                                 <select value={settings.cardBack} onChange={(e) => setSettings(s => ({...s, cardBack: e.target.value}))} className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs">
-                                    <option value="card-back">Classic</option>
-                                    <option value="heratic">Heretic</option>
-                                    <option value="midas">Midas</option>
-                                    <option value="molten">Molten</option>
-                                    <option value="sacred">Sacred</option>
-                                    <option value="sands">Sands</option>
-                                    <option value="shattered">Shattered</option>
-                                    <option value="shrouded">Shrouded</option>
-                                    <option value="verdant">Verdant</option>
-                                    <option value="withered">Withered</option>
-                                    <option value="worn">Worn</option>
-                                 </select>
-                              </div>
 
-                              <div className="text-xs text-slate-400 uppercase mb-1 mt-2">Gameplay</div>
+                              {/* Display - Collapsible */}
+                              <div className="bg-slate-800/50 rounded-lg overflow-hidden">
+                                 <button
+                                    onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'display' ? null : 'display')}
+                                    className="w-full flex items-center justify-between p-3 hover:bg-slate-800">
+                                    <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Display</h3>
+                                    <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'display' ? 'rotate-180' : ''}`} />
+                                 </button>
+                                 {expandedSettingsSection === 'display' && (
+                                    <div className="space-y-2 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
+                                       <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                          <div><div className="font-medium text-sm">Theme</div><div className="text-xs text-slate-400">Color scheme</div></div>
+                                          <select value={settings.theme} onChange={(e) => setSettings(s => ({...s, theme: e.target.value}))} className="bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm">
+                                             <option value="dark">Dark</option>
+                                             <option value="light">Light</option>
+                                             <option value="system">System</option>
+                                             <option value="oled">OLED</option>
+                                          </select>
+                                       </div>
+                                       <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                          <div><div className="font-medium text-sm">Card Animations</div><div className="text-xs text-slate-400">Smooth animations</div></div>
+                                          <button onClick={() => setSettings(s => ({...s, cardAnimations: !s.cardAnimations}))} className={`w-12 h-6 ${settings.cardAnimations ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.cardAnimations ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                       </div>
+                                       <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                          <div><div className="font-medium text-sm">Reduce Motion</div><div className="text-xs text-slate-400">Minimize animations</div></div>
+                                          <button onClick={() => setSettings(s => ({...s, reduceMotion: !s.reduceMotion}))} className={`w-12 h-6 ${settings.reduceMotion ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.reduceMotion ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                       </div>
+                                       <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                          <div><div className="font-medium text-sm">High Contrast</div><div className="text-xs text-slate-400">Better visibility</div></div>
+                                          <button onClick={() => setSettings(s => ({...s, highContrast: !s.highContrast}))} className={`w-12 h-6 ${settings.highContrast ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}><div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.highContrast ? 'right-0.5' : 'left-0.5'}`}></div></button>
+                                       </div>
+                                       <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                                          <div><div className="font-medium text-sm">Card Back</div><div className="text-xs text-slate-400">Design preference</div></div>
+                                          <select value={settings.cardBack} onChange={(e) => setSettings(s => ({...s, cardBack: e.target.value}))} className="bg-slate-600 border border-slate-500 rounded px-2 py-1 text-xs">
+                                             <option value="card-back">Classic</option>
+                                             <option value="heratic">Heretic</option>
+                                             <option value="midas">Midas</option>
+                                             <option value="molten">Molten</option>
+                                             <option value="sacred">Sacred</option>
+                                             <option value="sands">Sands</option>
+                                             <option value="shattered">Shattered</option>
+                                             <option value="shrouded">Shrouded</option>
+                                             <option value="verdant">Verdant</option>
+                                             <option value="withered">Withered</option>
+                                          </select>
+                                       </div>
+                                    </div>
+                                 )}
+                              </div>
+                           </div>
+                        ) : activeDrawer === 'gameplay_settings' ? (
+                           <div className="flex flex-col gap-2">
                               <label className="flex items-center justify-between text-sm text-slate-300 bg-slate-700/30 p-2 rounded">
                                  <span>Confirm Resign</span>
                                  <button onClick={() => setSettings(s => ({...s, confirmResign: !s.confirmResign}))} className={`w-12 h-6 ${settings.confirmResign ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}>
@@ -3324,13 +3410,13 @@ export default function SolitaireEngine({
                      <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${Math.min(100, (gameState.score / gameState.currentScoreGoal) * 100)}%` }} />
                   </div>
                </div>
-               <div className="flex items-center gap-1 shrink-0 bg-slate-800 px-2 py-1 rounded border border-slate-700">
-                  <ResponsiveIcon name="coin" fallbackType="exploit" size={12} className="w-3 h-3" alt="coins" />
-                  <span className={`text-xs font-bold font-mono ${gameState.coins < 0 ? 'text-red-400' : 'text-yellow-400'}`}>{gameState.coins}</span>
-               </div>
+               <button type="button" className="shrink-0 p-2 bg-slate-800 hover:bg-slate-700 rounded border border-slate-700 relative">
+                  <ResponsiveIcon name="coin" fallbackType="exploit" size={16} className="w-4 h-4" alt="coins" />
+                  <span className={`absolute -top-1 -right-1 text-[8px] px-1 rounded-full border border-slate-500 leading-none font-bold ${gameState.coins < 0 ? 'bg-red-900 text-red-300 border-red-700' : 'bg-yellow-900 text-yellow-300 border-yellow-700'}`}>{gameState.coins}</span>
+               </button>
             </div>
             <div className="flex w-full gap-1">
-               <button onClick={() => toggleDrawer('pause')} className={`p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}><Pause size={16} /></button>
+               <button onClick={() => toggleDrawer('pause')} className={`p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}><img src="/icons/pause.png" alt="Pause" className="w-4 h-4" /></button>
                {(['exploit', 'blessing'] as const).map((type) => {
                   const hasReady = effectsRegistry.some(e => e.type === type && isEffectReady(e.id, gameState) && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll));
                   return (
@@ -3346,6 +3432,13 @@ export default function SolitaireEngine({
                <button type="button" onClick={() => toggleDrawer('curse')} aria-label={`Curses: ${currentThreat?.name || 'Active Curse'}`} className={`flex-1 py-1.5 rounded text-[10px] font-bold border flex flex-col items-center justify-center gap-0.5
                   ${activeDrawer === 'curse' ? 'bg-slate-700 text-white' : currentThreat ? 'bg-red-900/30 border-red-500/50 text-red-300' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
                   <ResponsiveIcon name={currentThreat?.id || 'curse'} fallbackType="curse" size={16} className="w-4 h-4" />
+               </button>
+               {/* Deck button - draw cards */}
+               <button type="button" onClick={() => discardAndDrawHand()} aria-label="Draw from deck" className="p-2 bg-blue-900 hover:bg-blue-800 rounded text-blue-300 border border-blue-700 relative">
+                  <img src="/icons/foundation.png" alt="Draw" className="w-4 h-4" />
+                  {gameState.piles.deck.cards.length > 0 && (
+                     <span className="absolute -top-1 -right-1 bg-slate-700 text-[8px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
+                  )}
                </button>
             </div>
          </div>
