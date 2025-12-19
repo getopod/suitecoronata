@@ -219,11 +219,8 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     custom: {
       onActivate: (state) => {
         const newPiles = { ...state.piles };
-        for (let i = 0; i < 4; i++) {
-          newPiles[`babel-${i}`] = { id: `babel-${i}`, type: 'tableau', cards: [] };
-        }
         Object.keys(newPiles).filter(k => k.startsWith('foundation')).forEach(fid => { delete newPiles[fid]; });
-        return { piles: newPiles, scoreMultiplier: 0 };
+        return { piles: newPiles };
       }
     }
   },

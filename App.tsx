@@ -143,8 +143,6 @@ const getRarityColor = (rarity?: string): { bg: string; text: string; border: st
    }
 };
 
-
-
 // Small synonyms map for common registry keys vs actual filenames
 const ICON_SYNONYMS: Record<string, string> = {
   coins: 'coin',
@@ -222,7 +220,7 @@ const ICON_SYNONYMS: Record<string, string> = {
   'moon-toad-cheeks': 'moontoadcheeks',
 };
 
-// Icon helper - converts effect name to icon path with type fallback
+// Icon helper - converts effect name to icon path
 const getEffectIcon = (nameOrId: string, type: 'exploit' | 'curse' | 'blessing') => {
    const lower = (nameOrId || '').toLowerCase();
    
@@ -231,24 +229,22 @@ const getEffectIcon = (nameOrId: string, type: 'exploit' | 'curse' | 'blessing')
       return `/icons/${encodeURIComponent(ICON_SYNONYMS[lower])}.png`;
    }
 
-   // 2. Try replacing underscores with spaces (e.g. "above_the_law" -> "above the law.png")
+   // 2. Try replacing underscores with spaces
    if (lower.includes('_')) {
       return `/icons/${encodeURIComponent(lower.replace(/_/g, ' '))}.png`;
    }
 
-   // 3. Try replacing spaces with underscores (e.g. "Bait & Switch" -> "bait_switch" -> "baitandswitch")
-   // This handles cases where we passed the Name but the file/synonym is keyed by ID
-   // First, try to map Name to ID-like string
+   // 3. Try replacing spaces with underscores
    const asId = lower.replace(/\s+/g, '_').replace(/&/g, 'and').replace(/[^a-z0-9_]/g, '');
    if (ICON_SYNONYMS[asId]) {
        return `/icons/${encodeURIComponent(ICON_SYNONYMS[asId])}.png`;
    }
 
-   // 4. Default: use name directly
+   // 4. Default: use name
    return `/icons/${encodeURIComponent(lower)}.png`;
 };
 
-// Category icon paths
+// Category icons
 const categoryIcons: Record<string, string> = {
    danger: '/icons/danger.png',
    dangers: '/icons/danger.png',
@@ -283,7 +279,6 @@ export default function SolitaireEngine({
   // Player Stats
   const [playerStats, setPlayerStats] = useState<PlayerStats>(() => loadPlayerStats());
   const [runStartData, setRunStartData] = useState<{ startTime: number; startCoins: number; encounterLog: RunEncounterRecord[] } | null>(null);
-  
   const [activeDrawer, setActiveDrawer] = useState<'pause' | 'exploit' | 'curse' | 'blessing' | 'shop' | 'feedback' | 'test' | 'settings' | 'resign' | 'blessing_select' | null>(null);
   const [shopInventory, setShopInventory] = useState<GameEffect[]>([]);
   const [blessingChoices, setBlessingChoices] = useState<GameEffect[]>([]);
@@ -366,15 +361,20 @@ export default function SolitaireEngine({
       if (['exploit', 'curse', 'blessing'].includes(activeDrawer)) {
          return effectsRegistry.filter(e => {
             const isOwned = gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll;
+            const isActive = activeEffects.includes(e.id);
+            // For curses, only show currently active curses
+            if (activeDrawer === 'curse') {
+               return ['curse'].includes(e.type) && isActive;
+            }
+            // For other drawers, show owned effects
             if (!isOwned) return false;
             if (activeDrawer === 'exploit') return ['exploit', 'epic', 'legendary', 'rare', 'uncommon'].includes(e.type);
-            if (activeDrawer === 'curse') return ['curse'].includes(e.type);
             if (activeDrawer === 'blessing') return ['blessing'].includes(e.type);
             return false;
          });
       }
       return [] as GameEffect[];
-   }, [activeDrawer, blessingChoices, shopInventory, gameState.ownedEffects, gameState.debugUnlockAll, effectsRegistry]);
+   }, [activeDrawer, blessingChoices, shopInventory, gameState.ownedEffects, gameState.debugUnlockAll, effectsRegistry, activeEffects]);
 
    const drawerVisibleCount = Math.min(drawerItems.length, 4);
    const DRAWER_ITEM_HEIGHT = 72; // px per row (approx)
@@ -414,8 +414,8 @@ export default function SolitaireEngine({
           musicEnabled: parsed.musicEnabled ?? false,
           sfxEnabled: parsed.sfxEnabled ?? false,
           masterVolume: parsed.masterVolume ?? 50,
-          musicVolume: parsed.musicVolume ?? 60,
-          sfxVolume: parsed.sfxVolume ?? 100,
+          musicVolume: parsed.musicVolume ?? 50,
+          sfxVolume: parsed.sfxVolume ?? 50,
           menuMusic: parsed.menuMusic ?? true,
           gameplayMusic: parsed.gameplayMusic ?? true,
           shopMusic: parsed.shopMusic ?? true,
@@ -433,7 +433,7 @@ export default function SolitaireEngine({
           cardAnimations: parsed.cardAnimations ?? true,
           theme: parsed.theme ?? 'dark',
           language: parsed.language ?? 'en',
-          sarcasmLevel: parsed.sarcasmLevel ?? 50,
+          sarcasmLevel: parsed.sarcasmLevel ?? 0,
           hogwartsHouse: parsed.hogwartsHouse ?? 'undecided',
           cheatCode: '',
         };
@@ -454,8 +454,8 @@ export default function SolitaireEngine({
       musicEnabled: false,
       sfxEnabled: false,
       masterVolume: 50,
-      musicVolume: 60,
-      sfxVolume: 100,
+      musicVolume: 50,
+      sfxVolume: 50,
       menuMusic: true,
       gameplayMusic: true,
       shopMusic: true,
@@ -473,7 +473,7 @@ export default function SolitaireEngine({
       cardAnimations: true,
       theme: 'dark',
       language: 'en',
-      sarcasmLevel: 50,
+      sarcasmLevel: 0,
       hogwartsHouse: 'undecided',
       cheatCode: '',
     };
@@ -508,40 +508,6 @@ export default function SolitaireEngine({
      if (id === 'lobbyist') return state.coins >= 100;
      return true;
   };
-
-  // Placeholder wanders for when no wander registry is provided
-  const PLACEHOLDER_WANDERS: Wander[] = [
-    {
-      id: 'placeholder_wander_1',
-      label: 'The Crossroads',
-      description: 'Two paths diverge before you. Each seems to promise something different.',
-      type: 'wander',
-      choices: [
-        { label: 'Take the left path', result: 'You find a small cache of coins.', effects: [{ type: 'modify_coin', params: [15] }] },
-        { label: 'Take the right path', result: 'A shortcut! You feel invigorated.', effects: [{ type: 'modify_score', params: [25] }] },
-      ],
-    },
-    {
-      id: 'placeholder_wander_2',
-      label: 'The Merchant',
-      description: 'A traveling merchant offers you a deal.',
-      type: 'wander',
-      choices: [
-        { label: 'Trade coins for points (-20 coins)', result: 'A fair exchange.', effects: [{ type: 'modify_coin', params: [-20] }, { type: 'modify_score', params: [50] }] },
-        { label: 'Decline politely', result: 'The merchant nods and moves on.', effects: [] },
-      ],
-    },
-    {
-      id: 'placeholder_wander_3',
-      label: 'The Gamble',
-      description: 'A mysterious figure offers you a wager.',
-      type: 'wander',
-      choices: [
-        { label: 'Accept the bet', result: 'Fortune favors the bold!', effects: [{ type: 'modify_coin', params: [30] }] },
-        { label: 'Walk away', result: 'Sometimes caution is wise.', effects: [{ type: 'modify_score', params: [10] }] },
-      ],
-    },
-  ];
 
   const resolveWanderEffect = (effects: any[]) => {
     console.log('resolveWanderEffect called with:', effects);
@@ -598,8 +564,6 @@ export default function SolitaireEngine({
       setActiveEffects(Array.from(new Set(newActive)));
   };
 
-  // Duplicate PLACEHOLDER_WANDERS declaration removed - using the one above
-
   const startWanderPhase = () => {
      setActiveDrawer(null);
      setGameState(prev => ({ ...prev, wanderRound: 1 }));
@@ -608,21 +572,26 @@ export default function SolitaireEngine({
 
   const triggerWanderSelection = () => {
      let validWanders = wanderRegistry.filter(w => {
-         if (w.isHidden) return false; 
+         if (w.isHidden) return false;
          if (w.conditions?.minEncounter && gameState.runIndex < w.conditions.minEncounter) return false;
+         // Filter out wanders that have already been seen this run
+         if (gameState.seenWanders && gameState.seenWanders.includes(w.id)) return false;
          return true;
      });
-     
-     // Use placeholder wanders if none available
-     if (validWanders.length === 0) {
-       validWanders = PLACEHOLDER_WANDERS;
-     }
-     
+
      const opts = validWanders.sort(() => 0.5 - Math.random()).slice(0, 3);
      setGameState(prev => ({ ...prev, wanderState: 'selection', wanderOptions: opts, activeWander: null, wanderResultText: null }));
   };
 
-  const chooseWanderOption = (wander: any) => { setGameState(prev => ({ ...prev, wanderState: 'active', activeWander: wander })); };
+  const chooseWanderOption = (wander: any) => {
+    // Mark this wander as seen
+    setGameState(prev => ({
+      ...prev,
+      wanderState: 'active',
+      activeWander: wander,
+      seenWanders: [...(prev.seenWanders || []), wander.id]
+    }));
+  };
   
   const resolveWander = (choice: WanderChoice) => {
     // Handle both old-style effects array and new-style onChoose callback
@@ -770,6 +739,8 @@ export default function SolitaireEngine({
            setActiveDrawer('blessing_select');
            setNonClosableDrawer('blessing_select');
            setPreEncounterBlessing(true);
+           // Clear wander state before showing blessing selection
+           setGameState(prev => ({ ...prev, wanderState: 'none', wanderRound: 0, runIndex: nextIdx, charges: newCharges }));
            return;
         }
 
@@ -820,20 +791,21 @@ export default function SolitaireEngine({
         });
 
         // Prepare base state for the new encounter
-        let nextState: GameState = { 
+        let nextState: GameState = {
             ...gameState,
-            piles: newBoard.piles, 
-            score: 0, 
+            piles: newBoard.piles,
+            score: 0,
             moves: 0,
             selectedCardIds: null,
             activeMinigame: null,
             minigameResult: null,
-            coins: gameState.coins, 
-            runIndex: nextIdx, 
-            currentScoreGoal: nextEncounter.goal, 
-            isLevelComplete: false, 
-            charges: newCharges, 
+            coins: gameState.coins,
+            runIndex: nextIdx,
+            currentScoreGoal: nextEncounter.goal,
+            isLevelComplete: false,
+            charges: newCharges,
             wanderState: 'none',
+            wanderRound: 0,
             lastActionType: 'none',
             // Clear forcedCurse after using it
             run: {
@@ -2852,7 +2824,10 @@ export default function SolitaireEngine({
                    return (
                    <div key={pile.id} className={`relative w-11 h-16 bg-slate-800/50 rounded border border-slate-700 flex items-center justify-center ${isHighlighted ? `ring-2 ${ringColor} ${shadowColor}` : ''}`}>
                       {pile.cards.length === 0 ? (
-                         <button type="button" aria-label={`Empty foundation ${pile.id}`} className={`text-xl opacity-20 ${suitColor} bg-transparent border-0 ${isHighlighted ? `ring-2 ${ringColor} rounded` : ''}`} onClick={() => handleCardClick(pile.id, -1)}>{suitSymbol}</button>
+                         <div className="relative w-full h-full flex items-center justify-center">
+                            <span className={`text-xl opacity-20 ${suitColor}`}>{suitSymbol}</span>
+                            <button type="button" aria-label={`Empty foundation ${pile.id}`} className={`absolute top-0 left-0 w-11 h-16 bg-transparent ${isHighlighted ? `ring-2 ${ringColor} rounded` : ''}`} onClick={() => handleCardClick(pile.id, -1)} />
+                         </div>
                       ) : null}
                       {pile.cards.map((c, i) => renderCard(c, i, pile.id))}
                    </div>
@@ -3020,6 +2995,7 @@ export default function SolitaireEngine({
                                 {shopTab === 'buy' && shopInventory.map(item => {
                                     const rarityColors = getRarityColor(item.rarity);
                                     const itemType = item.type === 'curse' ? 'curse' : item.type === 'blessing' ? 'blessing' : 'exploit';
+                                    const isOwned = gameState.ownedEffects.includes(item.id);
                                     return (
                                     <div key={item.id} className={`p-2 rounded border ${rarityColors.border} ${rarityColors.bg} flex items-center gap-3`}>
                                        <ResponsiveIcon name={item.id || item.name} fallbackType={itemType} size={32} className="w-8 h-8 rounded shrink-0" alt={item.name} />
@@ -3030,11 +3006,16 @@ export default function SolitaireEngine({
                                           </div>
                                           <div className="text-slate-400 text-[10px]">{item.description}</div>
                                        </div>
-                                       <button 
-                                         className={`text-white px-2 py-1 rounded text-xs font-bold shrink-0 ${gameState.coins >= (item.cost || 50) ? 'bg-yellow-600 hover:bg-yellow-500' : 'bg-slate-600 cursor-not-allowed'}`}
+                                       <button
+                                         className={`text-white px-2 py-1 rounded text-xs font-bold shrink-0 flex items-center gap-1 ${isOwned ? 'bg-red-600 cursor-not-allowed' : gameState.coins >= (item.cost || 50) ? 'bg-green-600 hover:bg-green-500' : 'bg-slate-600 cursor-not-allowed'}`}
                                          onClick={() => buyEffect(item)}
-                                         disabled={gameState.coins < (item.cost || 50)}>
-                                         Buy {item.cost || 50}
+                                         disabled={gameState.coins < (item.cost || 50) || isOwned}>
+                                         {isOwned ? 'SOLD' : (
+                                            <>
+                                               <ResponsiveIcon name="coin" fallbackType="exploit" size={12} className="w-3 h-3" alt="coin" />
+                                               <span>Buy {item.cost || 50}</span>
+                                            </>
+                                         )}
                                        </button>
                                     </div>
                                  );})}
@@ -3253,10 +3234,10 @@ export default function SolitaireEngine({
                               {effectsRegistry.filter(e => {
                                  const isOwned = gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll;
                                  const isActive = activeEffects.includes(e.id);
-                                 // For curses, show if active OR owned (encounter curses are active but not owned)
+                                 // For curses, only show the currently active curse (the current encounter's curse)
                                  if (activeDrawer === 'curse') {
                                     const isCurseType = ['curse', 'fear', 'danger'].includes(e.type);
-                                    return isCurseType && (isOwned || isActive);
+                                    return isCurseType && isActive;
                                  }
                                  // For other drawers, only show owned effects
                                  if (!isOwned) return false;
@@ -3312,15 +3293,17 @@ export default function SolitaireEngine({
             <div className="flex justify-between px-2 mb-2 relative group">
                {runPlan.map((enc, i) => {
                   const eff = effectsRegistry.find(e => e.id === enc.effectId);
-                  const cls = `w-2 h-2 rounded-full ${i < gameState.runIndex ? 'bg-green-500' : i === gameState.runIndex ? 'bg-white animate-pulse' : 'bg-purple-700'}`;
+                  const isCompleted = i < gameState.runIndex;
+                  const isCurrent = i === gameState.runIndex;
                   return (
                      <button
                         key={i}
                         type="button"
-                        className={cls}
+                        className={`w-5 h-5 rounded flex items-center justify-center ${isCompleted ? 'bg-green-500/30 border border-green-500' : isCurrent ? 'bg-white/20 border border-white animate-pulse' : 'bg-purple-700/30 border border-purple-700'}`}
                         onClick={() => alert(`${enc.type.toUpperCase()}: ${eff?.name || 'Level ' + (i+1)}\n${eff?.description || 'Score goal: ' + enc.goal}`)}
-                        aria-label={`Encounter ${i + 1} ${enc.type} ${eff?.name ?? ''}`}
-                     />
+                        aria-label={`Encounter ${i + 1} ${enc.type} ${eff?.name ?? ''}`}>
+                        <ResponsiveIcon name={enc.effectId} fallbackType="curse" size={12} className="w-3 h-3 opacity-80" alt={eff?.name || ''} />
+                     </button>
                   );
                })}
             </div>
@@ -3331,7 +3314,7 @@ export default function SolitaireEngine({
                   </div>
                </div>
                <div className="flex items-center gap-1 shrink-0 bg-slate-800 px-2 py-1 rounded border border-slate-700">
-                  <Coins size={12} className="text-yellow-400" />
+                  <ResponsiveIcon name="coin" fallbackType="exploit" size={12} className="w-3 h-3" alt="coins" />
                   <span className={`text-xs font-bold font-mono ${gameState.coins < 0 ? 'text-red-400' : 'text-yellow-400'}`}>{gameState.coins}</span>
                </div>
             </div>

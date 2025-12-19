@@ -107,6 +107,7 @@ export const generateNewBoard = (
     wanderOptions: [],
     activeWander: null,
     wanderResultText: null,
+    seenWanders: [],
     interactionMode: 'normal',
     charges: {},
     resources: { handSize: 5, shuffles: 0, discards: 0 },

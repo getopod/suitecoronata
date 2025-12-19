@@ -163,6 +163,7 @@ export interface GameState {
   activeWander: Wander | null;
   wanderResultText: string | null;
   wanderRound: number;
+  seenWanders: string[]; // Track wanders seen this run
 
   // Minigame State
   activeMinigame: { type: string; title: string; context?: any } | null;
