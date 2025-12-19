@@ -41,7 +41,7 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
   },
 
   {
-    id: 'schrondingers_deck',
+    id: 'schrodingers_deck',
     name: "Schrodinger's Deck",
     type: 'curse',
     description: 'Tableaus 50% exist after each play; at least 3 exist.',
@@ -166,7 +166,7 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
       canMove: (cards, source, target, defaultAllowed) => {
         if (target.type === 'tableau' && target.cards.length > 0) {
           const top = target.cards[target.cards.length - 1];
-          return cards[0].rank === top.rank;
+          return cards[0].rank === top.rank || defaultAllowed;
         }
         return defaultAllowed;
       }

@@ -759,9 +759,10 @@ export default function SolitaireEngine({
         }
         
         // Retain only persistent effects (blessings now persist like exploits/curses)
+        // But exclude curses - they should only be active for their specific encounter
         const keptEffects = activeEffects.filter(id => { 
             const e = effectsRegistry.find(x => x.id === id); 
-            return e?.type === 'exploit' || e?.type === 'curse' || e?.type === 'epic' || e?.type === 'legendary' || e?.type === 'blessing'; 
+            return e?.type === 'exploit' || e?.type === 'epic' || e?.type === 'legendary' || e?.type === 'blessing'; 
         });
         
         // Generate Board
@@ -1338,7 +1339,10 @@ export default function SolitaireEngine({
        }
     });
 
-    if (!valid) return false;
+    if (!valid) {
+      console.log('Move not valid:', { cardIds, sourcePileId, targetPileId, baseMoves, effects: effects.map(e => e.id) });
+      return false;
+    }
 
     // Handle charged cards
     if (sourcePileId === 'hand') {
@@ -1416,6 +1420,13 @@ export default function SolitaireEngine({
      
      const reward = currentEncounter.type === 'curse' ? 75 : 0;
      setGameState(prev => ({ ...prev, coins: prev.coins + reward, score: 0 }));
+     
+     // Deactivate all curses at the end of an encounter
+     setActiveEffects(prev => prev.filter(id => {
+        const e = effectsRegistry.find(x => x.id === id);
+        return e?.type !== 'curse';
+     }));
+     
      // Always open shop after encounter completion
      openShop(true);
   };
@@ -1532,7 +1543,7 @@ export default function SolitaireEngine({
     if (!visualCard.faceUp) {
        return (
           <button
-             key={card.id}
+             key={`${card.id}-${pileId}-${index}`}
              className="absolute w-11 h-16 rounded border border-slate-700 shadow-md overflow-hidden"
              style={{ top: `${pileId.includes('tableau') ? index * 10 : 0}px` }}
              onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
@@ -1546,7 +1557,7 @@ export default function SolitaireEngine({
     }
     return (
          <button
-            key={card.id}
+            key={`${card.id}-${pileId}-${index}`}
             type="button"
             className={`absolute w-11 h-16 bg-transparent perspective-1000 select-none ${isSelected ? 'z-[60]' : ''}`}
             style={pileId === 'hand' ? handStyle : { top: `${pileId.includes('tableau') ? index * 12 : 0}px`, zIndex: isSelected ? 60 : index }}
@@ -1607,9 +1618,9 @@ export default function SolitaireEngine({
 
   // Calculate dynamic zoom based on actual tableau count
   const tableauCount = tableauPiles.length;
-  const baseTableauCount = 7;
-  const zoomScale = tableauCount > baseTableauCount ? baseTableauCount / tableauCount : 1;
-  const maxWidth = tableauCount > baseTableauCount ? `calc(42rem/${zoomScale})` : '42rem';
+  const visibleTableauCount = tableauPiles.filter(p => !p.hidden).length;
+  const zoomScale = 1; // Removed zooming - always show at full scale
+  const maxWidth = 'auto'; // Let it expand naturally
 
   const currentEncounter = runPlan[gameState.runIndex];
   const currentThreat = effectsRegistry.find(e => e.id === currentEncounter?.effectId);
@@ -2791,7 +2802,7 @@ export default function SolitaireEngine({
 
   return (
     <div className={`h-screen w-full font-sans flex flex-col overflow-hidden relative ${themeClasses[settings.theme as keyof typeof themeClasses] || themeClasses.dark} ${settings.reduceMotion ? '[&_*]:!transition-none [&_*]:!animate-none' : ''}`}>
-      <div className="flex-1 w-full mx-auto p-2 pb-40 origin-top transition-transform overflow-visible" style={{ transform: `scale(${zoomScale})`, maxWidth: maxWidth }}>
+      <div className="flex-1 w-full mx-auto p-2 pb-40 overflow-x-auto overflow-visible">
         <div className={`grid ${gameState.piles['shadow-realm'] ? 'grid-cols-6' : 'grid-cols-5'} gap-1 mb-4`}>
                 <div className="relative w-11 h-16">
                    <button type="button" className="w-full h-full bg-blue-900 border border-slate-600 rounded flex items-center justify-center" onClick={() => discardAndDrawHand()} aria-label="Draw from deck">
@@ -2864,8 +2875,8 @@ export default function SolitaireEngine({
            </div>
         )}
 
-        <div className="grid gap-1 h-full" style={{ gridTemplateColumns: `repeat(${tableauCount}, minmax(0, 1fr))` }}>
-               {tableauPiles.map(pile => {
+        <div className="grid gap-1 h-full" style={{ gridTemplateColumns: `repeat(${visibleTableauCount}, minmax(0, 1fr))` }}>
+               {tableauPiles.filter(pile => !pile.hidden).map(pile => {
                   const isLinked = activeEffects.includes('linked_fates') && gameState.effectState?.linkedTableaus?.includes(pile.id);
                   const isLinkedTurn = isLinked && gameState.effectState?.lastLinkedPlayed !== pile.id;
                   const isParasite = activeEffects.includes('parasite_pile') && gameState.effectState?.parasiteTarget === pile.id;
@@ -2962,7 +2973,7 @@ export default function SolitaireEngine({
                             : activeDrawer === 'test' ? 'Test UI' 
                             : activeDrawer === 'settings' ? 'Settings' 
                             : activeDrawer === 'blessing_select' ? 'Select a Blessing' 
-                            : `${activeDrawer} Registry`}
+                            : activeDrawer.charAt(0).toUpperCase() + activeDrawer.slice(1)}
                         </h3>
                         {nonClosableDrawer === activeDrawer ? (
                            <div style={{ width: 28 }} />
@@ -3182,12 +3193,12 @@ export default function SolitaireEngine({
                               <button className="text-xs text-slate-500 underline mt-2" onClick={() => setActiveDrawer('pause')}>Back to Menu</button>
                            </div>
                         ) : activeDrawer === 'test' ? (
-                           <div className="flex flex-col gap-2">
-                              <button className="bg-blue-600 text-white p-2 rounded font-bold" onClick={() => setGameState(p => ({ ...p, score: p.currentScoreGoal }))}>Complete Goal</button>
-                              <button className="bg-green-600 text-white p-2 rounded font-bold" onClick={() => setGameState(p => ({ ...p, coins: p.coins + 100 }))}>+100 Coins</button>
-                              <button className="bg-red-600 text-white p-2 rounded font-bold" onClick={() => setGameState(p => ({ ...p, coins: p.coins - 50 }))}>-50 Coins</button>
-                              <button className="bg-purple-600 text-white p-2 rounded font-bold flex items-center justify-center gap-2" onClick={() => setGameState(p => ({...p, debugUnlockAll: !p.debugUnlockAll}))}><Unlock size={16} /> Toggle All</button>
-                              <button className="text-xs text-slate-500 underline mt-4" onClick={() => setActiveDrawer('pause')}>Back to Menu</button>
+                           <div className="flex flex-col gap-1">
+                              <button className="bg-blue-600 text-white px-2 py-1 rounded text-sm font-medium" onClick={() => setGameState(p => ({ ...p, score: p.currentScoreGoal }))}>Complete Goal</button>
+                              <button className="bg-green-600 text-white px-2 py-1 rounded text-sm font-medium" onClick={() => setGameState(p => ({ ...p, coins: p.coins + 100 }))}>+100 Coins</button>
+                              <button className="bg-red-600 text-white px-2 py-1 rounded text-sm font-medium" onClick={() => setGameState(p => ({ ...p, coins: p.coins - 50 }))}>-50 Coins</button>
+                              <button className="bg-purple-600 text-white px-2 py-1 rounded text-sm font-medium flex items-center justify-center gap-1" onClick={() => setGameState(p => ({...p, debugUnlockAll: !p.debugUnlockAll}))}><Unlock size={14} /> Toggle All</button>
+                              <button className="text-xs text-slate-500 underline mt-2" onClick={() => setActiveDrawer('pause')}>Back to Menu</button>
                            </div>
                         ) : activeDrawer === 'blessing_select' ? (
                            <div className="flex flex-col gap-2">
@@ -3328,15 +3339,13 @@ export default function SolitaireEngine({
                         ${activeDrawer === type ? 'bg-slate-700 text-white' : 'bg-slate-800 text-slate-400 border-slate-700'}
                         ${hasReady ? 'ring-1 ring-yellow-400 text-yellow-100 bg-yellow-900/20' : ''}`}>
                         <img src={categoryIcons[type]} alt="" className="w-4 h-4" />
-                        <span>{type.charAt(0).toUpperCase() + type.slice(1)}s</span>
                      </button>
                   );
                })}
                {/* Curse area - equal size button alongside exploits & blessings */}
                <button type="button" onClick={() => toggleDrawer('curse')} aria-label={`Curses: ${currentThreat?.name || 'Active Curse'}`} className={`flex-1 py-1.5 rounded text-[10px] font-bold border flex flex-col items-center justify-center gap-0.5
                   ${activeDrawer === 'curse' ? 'bg-slate-700 text-white' : currentThreat ? 'bg-red-900/30 border-red-500/50 text-red-300' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
-                  <Skull size={16} className={currentThreat ? "text-red-400" : "text-slate-500"} />
-                  <span className="leading-tight line-clamp-2">{currentThreat ? currentThreat.name : 'Curses'}</span>
+                  <ResponsiveIcon name={currentThreat?.id || 'curse'} fallbackType="curse" size={16} className="w-4 h-4" />
                </button>
             </div>
          </div>

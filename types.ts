@@ -171,7 +171,7 @@ export interface GameState {
   
   interactionMode: 'normal' | 'discard_select';
   
-  // Wander Compatibility Fields (for claudecoronata wander helpers)
+  // Wander Compatibility Fields
   resources?: { handSize?: number; shuffles?: number; discards?: number; };
   rules?: Record<string, any>;
   run?: {

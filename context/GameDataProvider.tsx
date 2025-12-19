@@ -1,11 +1,7 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { GameEffect, Wander } from '../types';
 
-// ==========================================
 // GAME DATA CONTEXT
-// This allows the UI to work independently of concrete effect/wander implementations
-// ==========================================
-
 export interface GameDataContextType {
   effectsRegistry: GameEffect[];
   wanderRegistry: Wander[];

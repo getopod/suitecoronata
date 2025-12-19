@@ -10,9 +10,7 @@ interface ResponsiveIconProps extends React.HTMLAttributes<HTMLElement> {
   fallbackType?: 'exploit' | 'curse' | 'blessing' | 'danger' | 'fear';
 }
 
-// Small synonyms map for common registry keys vs actual filenames in /public/icons
-// Named ICON_SYNONYMS to avoid colliding with other modules that may declare
-// a SYNONYMS identifier in the global build scope.
+// Synonyms for registry keys vs filenames in /public/icons
 const ICON_SYNONYMS: Record<string, string> = {
   coins: 'coin',
   coin: 'coin',
@@ -90,19 +88,15 @@ const ICON_SYNONYMS: Record<string, string> = {
  };
 
 
-// Merge-in any additional suggested mappings from a dedicated file. We only
-// add keys that aren't already defined in the local `ICON_SYNONYMS` to avoid
-// unintended overrides.
+// Merge-in additional suggested mappings from a dedicated file
 for (const [k, v] of Object.entries(ADDITIONAL_ICON_SYNONYMS)) {
   if (!(k in ICON_SYNONYMS)) {
     // Mutate the object so subsequent lookups find the suggested mapping.
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore - dynamic extension of a const object is intentional here.
     (ICON_SYNONYMS as any)[k] = v;
   }
 }
 
-// Map common emoji (used in registries) to canonical icon file basenames
+// Map emoji to canonical icon basenames
 const EMOJI_MAP: Record<string, string> = {};
 
 function slug(s: string) {
@@ -249,7 +243,7 @@ export default function ResponsiveIcon(props: ResponsiveIconProps) {
 
     const debug = (...args: any[]) => {
       try {
-        if (typeof window !== 'undefined' && ((window as any).__DEBUG_RESPONSIVE_ICON || true)) { // Enable debug
+        if (typeof window !== 'undefined' && ((window as any).__DEBUG_RESPONSIVE_ICON || false)) { // Enable debug
           // eslint-disable-next-line no-console
           console.debug(...args);
         }

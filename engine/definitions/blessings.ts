@@ -25,13 +25,13 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     id: 'blacksmith',
     name: 'Blacksmith',
     type: 'blessing',
-    description: 'Foundation plays allow ±1 rank.',
+    description: 'Foundation plays allow same or ±1 rank.',
     custom: {
       canMove: (cards, source, target, defaultAllowed) => {
         if (target.type === 'foundation' && target.cards.length > 0) {
           const moving = cards[0];
           const top = target.cards[target.cards.length - 1];
-          const step = Math.abs(moving.rank - top.rank) === 1;
+          const step = Math.abs(moving.rank - top.rank) <= 1;
           return moving.suit === top.suit && step;
         }
         return defaultAllowed;
