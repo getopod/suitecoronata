@@ -9,6 +9,8 @@ import ResponsiveIcon from './components/ResponsiveIcon';
 import { WANDER_REGISTRY } from './data/wanders';
 import { useEffectDebugger } from './hooks/useEffectDebugger';
 import { detectConflicts } from './utils/effectDebug';
+import { CLASSIC_GAMES } from './src/classic/games';
+import { convertCoronataPilesToClassic, convertClassicPilesToCoronata } from './src/classic/types';
 
 // ==========================================
 // INJECTABLE REGISTRIES (defaults to empty for decoupled UI)
@@ -496,13 +498,33 @@ export default function SolitaireEngine({
     }
   }, [settings]);
 
-  // Auto-advance when score goal is reached
+  // Auto-advance when score goal is reached or classic game is won
   React.useEffect(() => {
-    if (currentView === 'game' && gameState.score >= gameState.currentScoreGoal && !gameState.isLevelComplete && !showLevelComplete) {
-      setGameState(p => ({ ...p, isLevelComplete: true }));
-      setShowLevelComplete(true);
+    if (currentView === 'game' && !gameState.isLevelComplete && !showLevelComplete) {
+      // Check if this is a classic solitaire mode
+      const classicGame = CLASSIC_GAMES[selectedMode];
+      if (classicGame) {
+        // Use classic game win condition
+        const classicPiles = convertCoronataPilesToClassic(gameState.piles);
+        const classicState = {
+          piles: classicPiles,
+          score: gameState.score,
+          moves: gameState.moves,
+          history: []
+        };
+        if (classicGame.winCondition(classicState)) {
+          setGameState(p => ({ ...p, isLevelComplete: true }));
+          setShowLevelComplete(true);
+        }
+      } else {
+        // Use coronata score-based win condition
+        if (gameState.score >= gameState.currentScoreGoal) {
+          setGameState(p => ({ ...p, isLevelComplete: true }));
+          setShowLevelComplete(true);
+        }
+      }
     }
-  }, [gameState.score, gameState.currentScoreGoal, gameState.isLevelComplete, currentView, showLevelComplete]);
+  }, [gameState.score, gameState.currentScoreGoal, gameState.isLevelComplete, gameState.piles, gameState.moves, currentView, showLevelComplete, selectedMode]);
 
   const isEffectReady = (id: string, state: GameState) => {
      if (id === 'lobbyist') return state.coins >= 100;
@@ -981,6 +1003,54 @@ export default function SolitaireEngine({
 
   // Find valid move destinations for a card/stack
   const findValidMoves = useCallback((movingCardIds: string[], sourcePileId: string): { tableauIds: string[]; foundationIds: string[] } => {
+    // Check if this is a classic solitaire mode
+    const classicGame = CLASSIC_GAMES[selectedMode];
+    if (classicGame) {
+      const classicPiles = convertCoronataPilesToClassic(gameState.piles);
+      const classicSourcePile = classicPiles[sourcePileId];
+
+      if (!classicSourcePile) return { tableauIds: [], foundationIds: [] };
+
+      // Find the card index
+      const cardIndex = classicSourcePile.findIndex(c => c.id === movingCardIds[0]);
+      if (cardIndex === -1) return { tableauIds: [], foundationIds: [] };
+
+      // Check if cards can be dragged
+      if (!classicGame.canDrag(sourcePileId, cardIndex, classicSourcePile)) {
+        return { tableauIds: [], foundationIds: [] };
+      }
+
+      const tableauIds: string[] = [];
+      const foundationIds: string[] = [];
+
+      // Check all possible target piles
+      Object.keys(classicPiles).forEach(pileId => {
+        if (pileId === sourcePileId) return;
+
+        const targetPile = classicPiles[pileId];
+        const moveAttempt = {
+          cardIds: movingCardIds,
+          sourcePileId,
+          targetPileId: pileId
+        };
+
+        if (classicGame.canDrop(moveAttempt, targetPile, {
+          piles: classicPiles,
+          score: gameState.score,
+          moves: gameState.moves,
+          history: []
+        })) {
+          if (pileId.startsWith('tableau')) {
+            tableauIds.push(pileId);
+          } else if (pileId.startsWith('foundation')) {
+            foundationIds.push(pileId);
+          }
+        }
+      });
+
+      return { tableauIds, foundationIds };
+    }
+
     const sourcePile = gameState.piles[sourcePileId];
     if (!sourcePile) return { tableauIds: [], foundationIds: [] };
     const movingCards = sourcePile.cards.filter(c => movingCardIds.includes(c.id));
@@ -1048,7 +1118,7 @@ export default function SolitaireEngine({
     }
 
     return { tableauIds, foundationIds };
-  }, [gameState, getEffects, settings.supportPatriarchy]);
+  }, [gameState, getEffects, settings.supportPatriarchy, selectedMode]);
 
   const runMinigame = () => {
      if (!gameState.activeMinigame) return;
@@ -1197,6 +1267,60 @@ export default function SolitaireEngine({
     
     if (gameState.interactionMode === 'discard_select') { if (pileId === 'hand' && cardIndex >= 0) { const newCards = [...pile.cards]; newCards.splice(cardIndex, 1); const charges = gameState.charges['knock_on_wood'] - 1; setGameState(prev => ({ ...prev, piles: { ...prev.piles, hand: { ...pile, cards: newCards } }, interactionMode: 'normal', charges: { ...prev.charges, knock_on_wood: charges } })); } return; }
     
+    // Check if this is a classic solitaire mode
+    const classicGame = CLASSIC_GAMES[selectedMode];
+    if (classicGame) {
+      // Handle stock clicks for classic games
+      if (pileId === 'stock' || pileId === 'deck') {
+        const classicPiles = convertCoronataPilesToClassic(gameState.piles);
+        const result = classicGame.onStockClick?.({
+          piles: classicPiles,
+          score: gameState.score,
+          moves: gameState.moves,
+          history: []
+        });
+
+        if (result) {
+          const newCoronataPiles = convertClassicPilesToCoronata(result.piles);
+          setGameState(prev => ({
+            ...prev,
+            piles: newCoronataPiles,
+            score: result.score ?? prev.score,
+            moves: result.moves ?? prev.moves,
+            customData: result.customData ?? prev.customData
+          }));
+        }
+        return;
+      }
+
+      // Handle card clicks for classic games
+      if (pileId.startsWith('tableau') || pileId.startsWith('foundation') || pileId === 'waste') {
+        if (!clickedCard && cardIndex === -1) {
+          // Empty pile click - try to move selected cards here
+          if (gameState.selectedCardIds) {
+            const moved = attemptMove(gameState.selectedCardIds, selectedPileId!, pileId);
+            if (moved) clearSelection();
+          }
+          return;
+        }
+        if (clickedCard) {
+          if (gameState.selectedCardIds) {
+            // Try to move to this card's pile
+            const moved = attemptMove(gameState.selectedCardIds, selectedPileId!, pileId);
+            if (moved) {
+              clearSelection();
+              return;
+            }
+          } else {
+            // Select this card
+            selectCardAndCompute(pileId, cardIndex);
+            return;
+          }
+        }
+      }
+      return;
+    }
+    
     if (!gameState.selectedCardIds) {
       if (pile.type === 'deck') { discardAndDrawHand(); return; }
       if (!clickedCard) { clearSelection(); return; }
@@ -1338,6 +1462,59 @@ export default function SolitaireEngine({
     const sourcePile = gameState.piles[sourcePileId];
     const movingCards = sourcePile.cards.filter(c => cardIds.includes(c.id));
     if (movingCards.length === 0) return false;
+
+    // Check if this is a classic solitaire mode
+    const classicGame = CLASSIC_GAMES[selectedMode];
+    if (classicGame) {
+      // Use classic game rules
+      const classicPiles = convertCoronataPilesToClassic(gameState.piles);
+      const classicSourcePile = classicPiles[sourcePileId];
+      const classicTargetPile = classicPiles[targetPileId];
+
+      if (!classicSourcePile || !classicTargetPile) return false;
+
+      // Find the card index in the source pile
+      const cardIndex = classicSourcePile.findIndex(c => c.id === cardIds[0]);
+      if (cardIndex === -1) return false;
+
+      // Check if the cards can be dragged
+      if (!classicGame.canDrag(sourcePileId, cardIndex, classicSourcePile)) return false;
+
+      // Check if the move is valid
+      const moveAttempt = {
+        cardIds,
+        sourcePileId,
+        targetPileId
+      };
+
+      if (!classicGame.canDrop(moveAttempt, classicTargetPile, {
+        piles: classicPiles,
+        score: gameState.score,
+        moves: gameState.moves,
+        history: []
+      })) {
+        console.log('Classic move not valid');
+        return false;
+      }
+
+      // Perform the move
+      const newSourceCards = sourcePile.cards.filter(c => !cardIds.includes(c.id));
+      // Auto-flip top card when exposed (standard solitaire behavior)
+      if (sourcePile.type === 'tableau' && newSourceCards.length > 0) {
+        const newTop = newSourceCards[newSourceCards.length - 1];
+        if (!newTop.faceUp) newSourceCards[newSourceCards.length - 1] = { ...newTop, faceUp: true };
+      }
+      const newTargetCards = [...targetPile.cards, ...movingCards];
+      const newPiles = { ...gameState.piles, [sourcePileId]: { ...sourcePile, cards: newSourceCards }, [targetPileId]: { ...targetPile, cards: newTargetCards } };
+
+      setGameState(prev => ({
+        ...prev,
+        piles: newPiles,
+        moves: prev.moves + 1
+      }));
+
+      return true;
+    }
 
     let context: MoveContext = { source: sourcePileId, target: targetPileId, cards: movingCards };
     effects.forEach(eff => {

@@ -7,6 +7,8 @@
 
 import { GameEffect, Suit, Card, Rank, Pile, GameState } from '../types';
 import { compileAllEffects } from '../engine';
+import { CLASSIC_GAMES } from '../src/classic/games';
+import { convertClassicPilesToCoronata } from '../src/classic/types';
 
 // =============================================================================
 // Effects RNG Control
@@ -42,6 +44,52 @@ export const generateNewBoard = (
   randomChaos: boolean = false,
   mode: string = 'coronata'
 ): GameState => {
+  // Check if this is a classic solitaire mode
+  const classicGame = CLASSIC_GAMES[mode];
+  if (classicGame) {
+    // Use classic game rules
+    const classicPiles = classicGame.deal();
+    const piles = convertClassicPilesToCoronata(classicPiles);
+
+    return {
+      piles,
+      score: currentScore,
+      coins: currentCoins,
+      moves: 0,
+      selectedCardIds: null,
+      effectState: {},
+      scoreMultiplier: scoreMult,
+      coinMultiplier: coinMult,
+      runIndex: 0,
+      currentScoreGoal: 150,
+      ownedEffects: [],
+      isLevelComplete: false,
+      isGameOver: false,
+      startTime: Date.now(),
+      seed: Math.random().toString(36).substring(7),
+      debugUnlockAll: false,
+      activeMinigame: null,
+      minigameResult: null,
+      wanderState: 'none',
+      wanderRound: 0,
+      wanderOptions: [],
+      activeWander: null,
+      wanderResultText: null,
+      seenWanders: [],
+      interactionMode: 'normal',
+      charges: {},
+      resources: { handSize: 5, shuffles: 0, discards: 0 },
+      rules: {},
+      run: {
+        inventory: { items: [], fortunes: [] },
+        unlockedWanders: [],
+        activeQuests: [],
+        statuses: []
+      }
+    };
+  }
+
+  // Original coronata logic
   const suits: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
   const deck: Card[] = [];
   suits.forEach(suit => {
