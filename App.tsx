@@ -1695,12 +1695,12 @@ export default function SolitaireEngine({
            </div>
            <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
               <button onClick={startRun} className="col-span-2 bg-emerald-600 hover:bg-emerald-500 text-white py-4 rounded-xl font-bold text-xl shadow-lg shadow-emerald-900/50 flex items-center justify-center gap-2"><Play fill="currentColor" /> Play</button>
-              <button onClick={() => setShowModes(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><Gamepad2 size={18}/> Modes</button>
-              <button onClick={() => setShowHowTo(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><BookOpen size={18}/> How To</button>
-              <button className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2" onClick={() => setShowGlossary(true)}><HelpCircle size={18}/> Glossary</button>
+              <button onClick={() => setShowModes(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2">Modes</button>
+              <button onClick={() => setShowHowTo(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2">How To</button>
+              <button className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2" onClick={() => setShowGlossary(true)}><img src="/icons/glossary.png" alt="Glossary" className="w-5 h-5" /></button>
               <button onClick={() => setShowUpdates(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><RefreshCw size={18}/></button>
               <button onClick={() => setShowProfile(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><User size={18}/></button>
-              <button onClick={() => setShowSettings(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><Settings size={18}/></button>
+              <button onClick={() => setShowSettings(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><img src="/icons/settings.png" alt="Settings" className="w-5 h-5" /></button>
            </div>
 
            {/* MODES PANEL */}
@@ -2787,7 +2787,7 @@ export default function SolitaireEngine({
                  <div className="grid grid-cols-1 gap-4">
                     {gameState.wanderOptions.map(opt => (
                        <button key={opt.id} type="button" onClick={() => chooseWanderOption(opt)} aria-label={`Wander option: ${opt.label}`} className="bg-slate-800/80 border border-slate-600 hover:border-purple-400 p-6 rounded-xl transition-all hover:scale-[1.02] shadow-xl text-left">
-                          <div className="flex items-center gap-3 mb-2"><MapIcon className="text-purple-400" /><h3 className="text-xl font-bold">{opt.label}</h3></div>
+                          <h3 className="text-xl font-bold mb-2">{opt.label}</h3>
                           <p className="text-slate-400 text-sm">{opt.description}</p>
                        </button>
                     ))}
@@ -2812,7 +2812,6 @@ export default function SolitaireEngine({
            {gameState.wanderState === 'result' && (
               <div className="z-10 w-full max-w-md text-center animate-in zoom-in-95">
                  <div className="bg-slate-800 border border-slate-600 p-8 rounded-xl shadow-2xl">
-                    <div className="text-4xl mb-4">✨</div>
                     <p className="text-lg text-slate-200 mb-8">{gameState.wanderResultText}</p>
                     <button onClick={finishWander} className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg shadow-lg">Continue Journey</button>
                  </div>
