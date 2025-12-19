@@ -21,6 +21,14 @@ import {
   SpecialRankPatternId,
 } from './types';
 
+// --- PATCH: Forcibly allow foundation moves by filtering out 'no_foundation_plays' ---
+// This monkey-patch will forcibly remove 'no_foundation_plays' from any active stack patterns
+export function filterNoFoundationPlays(patterns: any[]): any[] {
+  return Array.isArray(patterns)
+    ? patterns.filter((p) => p !== 'no_foundation_plays')
+    : patterns;
+}
+
 // =============================================================================
 // Utility Functions
 // =============================================================================

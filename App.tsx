@@ -108,32 +108,7 @@ const isStandardMoveValid = (movingCards: Card[], targetPile: Pile, patriarchyMo
   return false;
 };
 
-// Find all valid move targets for a set of cards
-const findValidMoves = (
-  movingCards: Card[], 
-  sourcePileId: string, 
-  _sourceCardIndex: number, 
-  piles: Record<string, Pile>,
-  patriarchyMode: boolean = false
-): { tableauIds: string[]; foundationIds: string[] } => {
-  const tableauIds: string[] = [];
-  const foundationIds: string[] = [];
-  
-  for (const [pileId, pile] of Object.entries(piles)) {
-    if (pileId === sourcePileId) continue; // Can't move to same pile
-    if (pile.locked) continue; // Can't move to locked piles
-    
-    if (isStandardMoveValid(movingCards, pile, patriarchyMode)) {
-      if (pile.type === 'tableau') {
-        tableauIds.push(pileId);
-      } else if (pile.type === 'foundation') {
-        foundationIds.push(pileId);
-      }
-    }
-  }
-  
-  return { tableauIds, foundationIds };
-};
+// Removed duplicate findValidMoves - using the useCallback version inside the component that properly handles effects
 
 // UI helper: human-readable rank display
 const getRankDisplay = (r: Rank) => {
@@ -420,46 +395,88 @@ export default function SolitaireEngine({
   const [expandedAchievement, setExpandedAchievement] = useState<number | null>(null);
   const [expandedSettingsSection, setExpandedSettingsSection] = useState<string | null>(null);
   
-  // Settings state
-  const [settings, setSettings] = useState({
-    confirmResign: true,
-    supportPatriarchy: false, // Kings high instead of Queens
-    // Classic game modes
-    klondikeEnabled: false,
-    klondikeDraw: '3' as '1' | '3',
-    klondikeScoring: 'standard' as 'standard' | 'vegas' | 'none',
-    spiderEnabled: false,
-    spiderSuits: '4' as '1' | '2' | '4',
-    freecellEnabled: false,
-    freecellAutoMove: true,
-    // Audio
-    musicEnabled: false,
-    sfxEnabled: false,
-    masterVolume: 50,
-    musicVolume: 60,
-    sfxVolume: 100,
-    menuMusic: true,
-    gameplayMusic: true,
-    shopMusic: true,
-    wanderMusic: true,
-    cardFlip: true,
-    cardPlace: true,
-    invalidMove: true,
-    scorePoints: true,
-    levelComplete: true,
-    uiClicks: true,
-    // Display
-    reduceMotion: false,
-    highContrast: false,
-    colorBlindMode: 'off',
-    cardBack: 'card-back',
-    cardAnimations: true,
-    theme: 'dark',
-    language: 'en',
-    // Advanced (joke) settings
-    sarcasmLevel: 50,
-    hogwartsHouse: 'undecided',
-    cheatCode: '',
+  // Settings state - load from localStorage or use defaults
+  const [settings, setSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('solitaire_settings_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          confirmResign: parsed.confirmResign ?? true,
+          supportPatriarchy: parsed.supportPatriarchy ?? false,
+          klondikeEnabled: parsed.klondikeEnabled ?? false,
+          klondikeDraw: parsed.klondikeDraw ?? '3',
+          klondikeScoring: parsed.klondikeScoring ?? 'standard',
+          spiderEnabled: parsed.spiderEnabled ?? false,
+          spiderSuits: parsed.spiderSuits ?? '4',
+          freecellEnabled: parsed.freecellEnabled ?? false,
+          freecellAutoMove: parsed.freecellAutoMove ?? true,
+          musicEnabled: parsed.musicEnabled ?? false,
+          sfxEnabled: parsed.sfxEnabled ?? false,
+          masterVolume: parsed.masterVolume ?? 50,
+          musicVolume: parsed.musicVolume ?? 60,
+          sfxVolume: parsed.sfxVolume ?? 100,
+          menuMusic: parsed.menuMusic ?? true,
+          gameplayMusic: parsed.gameplayMusic ?? true,
+          shopMusic: parsed.shopMusic ?? true,
+          wanderMusic: parsed.wanderMusic ?? true,
+          cardFlip: parsed.cardFlip ?? true,
+          cardPlace: parsed.cardPlace ?? true,
+          invalidMove: parsed.invalidMove ?? true,
+          scorePoints: parsed.scorePoints ?? true,
+          levelComplete: parsed.levelComplete ?? true,
+          uiClicks: parsed.uiClicks ?? true,
+          reduceMotion: parsed.reduceMotion ?? false,
+          highContrast: parsed.highContrast ?? false,
+          colorBlindMode: parsed.colorBlindMode ?? 'off',
+          cardBack: parsed.cardBack ?? 'card-back',
+          cardAnimations: parsed.cardAnimations ?? true,
+          theme: parsed.theme ?? 'dark',
+          language: parsed.language ?? 'en',
+          sarcasmLevel: parsed.sarcasmLevel ?? 50,
+          hogwartsHouse: parsed.hogwartsHouse ?? 'undecided',
+          cheatCode: '',
+        };
+      }
+    } catch (e) {
+      console.error('Failed to load settings:', e);
+    }
+    return {
+      confirmResign: true,
+      supportPatriarchy: false,
+      klondikeEnabled: false,
+      klondikeDraw: '3' as '1' | '3',
+      klondikeScoring: 'standard' as 'standard' | 'vegas' | 'none',
+      spiderEnabled: false,
+      spiderSuits: '4' as '1' | '2' | '4',
+      freecellEnabled: false,
+      freecellAutoMove: true,
+      musicEnabled: false,
+      sfxEnabled: false,
+      masterVolume: 50,
+      musicVolume: 60,
+      sfxVolume: 100,
+      menuMusic: true,
+      gameplayMusic: true,
+      shopMusic: true,
+      wanderMusic: true,
+      cardFlip: true,
+      cardPlace: true,
+      invalidMove: true,
+      scorePoints: true,
+      levelComplete: true,
+      uiClicks: true,
+      reduceMotion: false,
+      highContrast: false,
+      colorBlindMode: 'off',
+      cardBack: 'card-back',
+      cardAnimations: true,
+      theme: 'dark',
+      language: 'en',
+      sarcasmLevel: 50,
+      hogwartsHouse: 'undecided',
+      cheatCode: '',
+    };
   });
   const [callParentsCount, setCallParentsCount] = useState(0);
   const [showParentsPopup, setShowParentsPopup] = useState(false);
@@ -469,6 +486,15 @@ export default function SolitaireEngine({
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackType, setFeedbackType] = useState('bug');
   const [feedbackChecks, setFeedbackChecks] = useState<Record<string, boolean>>({});
+
+  // Save settings to localStorage whenever they change
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('solitaire_settings_v1', JSON.stringify(settings));
+    } catch (e) {
+      console.error('Failed to save settings:', e);
+    }
+  }, [settings]);
 
   // Auto-advance when score goal is reached
   React.useEffect(() => {
@@ -1021,11 +1047,15 @@ export default function SolitaireEngine({
       Object.entries(gameState.piles).forEach(([pileId, pile]) => {
         if (pile && pile.type === 'foundation') {
           let valid = isStandardMoveValid(movingCards, pile, settings.supportPatriarchy);
+          console.log(`[findValidMoves] Foundation ${pileId}: card=${movingCards[0]?.rank}${movingCards[0]?.suit}, topCard=${pile.cards[pile.cards.length-1]?.rank}${pile.cards[pile.cards.length-1]?.suit}, valid=${valid}`);
           effects.forEach(eff => {
             if (eff.canMove) {
               try {
                 const res = eff.canMove(movingCards, sourcePile, pile, valid, gameState);
-                if (res !== undefined) valid = res;
+                if (res !== undefined) {
+                  console.log(`[findValidMoves] Effect ${eff.id} changed valid from ${valid} to ${res}`);
+                  valid = res;
+                }
               } catch (e) { /* ignore */ }
             }
           });
@@ -1138,11 +1168,12 @@ export default function SolitaireEngine({
       if (!card.faceUp && pile.type === 'tableau') return; // selection only for face-up cards (tableau)
 
       const movingCards = pile.type === 'tableau' ? pile.cards.slice(cardIndex) : [card];
-      const moves = findValidMoves(movingCards, pileId, cardIndex, gameState.piles, settings.supportPatriarchy);
+      const movingCardIds = movingCards.map(c => c.id);
+      const moves = findValidMoves(movingCardIds, pileId);
       const allTargets = [...moves.tableauIds, ...moves.foundationIds];
       const color: 'red' | 'green' | 'yellow' | 'none' = allTargets.length === 0 ? 'red' : allTargets.length === 1 ? 'green' : 'yellow';
 
-      setGameState(prev => ({ ...prev, selectedCardIds: movingCards.map(c => c.id) }));
+      setGameState(prev => ({ ...prev, selectedCardIds: movingCardIds }));
       setSelectedPileId(pileId);
       setSelectedCardIndex(cardIndex);
       setHintTargets(allTargets);
@@ -1246,7 +1277,7 @@ export default function SolitaireEngine({
       if (!card.faceUp) return;
       if (cardIndex !== pile.cards.length - 1) return; // only top card auto-move
 
-      const moves = findValidMoves([card], pileId, cardIndex, gameState.piles, settings.supportPatriarchy);
+      const moves = findValidMoves([card.id], pileId);
 
       // Prefer foundations
       if (moves.foundationIds.length > 0) {
@@ -1325,7 +1356,7 @@ export default function SolitaireEngine({
     
     const targetPile = gameState.piles[finalTargetPileId];
 
-    const baseMoves = findValidMoves(movingCards, sourcePileId, sourceCardIndex, gameState.piles, settings.supportPatriarchy);
+    const baseMoves = findValidMoves(cardIds, sourcePileId);
     let valid = baseMoves.tableauIds.includes(finalTargetPileId) || baseMoves.foundationIds.includes(finalTargetPileId);
 
     effects.forEach(eff => {
@@ -1537,7 +1568,7 @@ export default function SolitaireEngine({
              aria-label={`Face down card ${card.id}`}
                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); handleDoubleClick(pileId, index); } }}
           >
-             <img src={`/${settings.cardBack}.png`} alt="Card back" className="w-full h-full object-cover" />
+             <img src={`/icons/${settings.cardBack}.png`} alt="Card back" className="w-full h-full object-cover" />
           </button>
        );
     }
@@ -1581,7 +1612,7 @@ export default function SolitaireEngine({
              {visualCard.meta?.showFake && <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none"><Skull size={24} className="text-red-900" /></div>}
           </div>
           <div className="absolute inset-0 backface-hidden rotate-y-180 rounded border border-slate-700 shadow-md overflow-hidden">
-             <img src={`/${settings.cardBack}.png`} alt="Card back" className="w-full h-full object-cover" />
+             <img src={`/icons/${settings.cardBack}.png`} alt="Card back" className="w-full h-full object-cover" />
           </div>
             </div>
          </button>
@@ -1591,7 +1622,23 @@ export default function SolitaireEngine({
   // ... (Rest of Component - Render Logic - Identical) ...
   // ...
    const foundationPiles = (Object.values(gameState.piles) as Pile[]).filter(p => p.type === 'foundation').sort((a, b) => a.id.localeCompare(b.id));
-   const tableauPiles = (Object.values(gameState.piles) as Pile[]).filter(p => p.type === 'tableau').sort((a, b) => Number.parseInt(a.id.split('-')[1] as string, 10) - Number.parseInt(b.id.split('-')[1] as string, 10));
+   const tableauPiles = (Object.values(gameState.piles) as Pile[]).filter(p => p.type === 'tableau').sort((a, b) => {
+      // Sort tableau piles: regular tableau (0-6) first, then babel piles (0-3)
+      const aNum = Number.parseInt(a.id.split('-')[1] as string, 10);
+      const bNum = Number.parseInt(b.id.split('-')[1] as string, 10);
+      const aIsBabel = a.id.startsWith('babel');
+      const bIsBabel = b.id.startsWith('babel');
+      if (aIsBabel && !bIsBabel) return 1; // babel comes after tableau
+      if (!aIsBabel && bIsBabel) return -1; // tableau comes before babel
+      return aNum - bNum; // same type, sort by number
+   });
+
+  // Calculate dynamic zoom based on actual tableau count
+  const tableauCount = tableauPiles.length;
+  const baseTableauCount = 7;
+  const zoomScale = tableauCount > baseTableauCount ? baseTableauCount / tableauCount : 1;
+  const maxWidth = tableauCount > baseTableauCount ? `calc(42rem/${zoomScale})` : '42rem';
+
   const currentEncounter = runPlan[gameState.runIndex];
   const currentThreat = effectsRegistry.find(e => e.id === currentEncounter?.effectId);
 
@@ -2200,7 +2247,7 @@ export default function SolitaireEngine({
                                          onClick={() => setSettings(s => ({...s, cardBack: back.id}))}
                                          className={`relative aspect-[5/7] rounded border-2 overflow-hidden transition-all ${settings.cardBack === back.id ? 'border-emerald-500 ring-2 ring-emerald-500/50' : 'border-slate-600 hover:border-slate-500'}`}
                                       >
-                                         <img src={`/${back.id}.png`} alt={back.name} className="w-full h-full object-cover" />
+                                         <img src={`/icons/${back.id}.png`} alt={back.name} className="w-full h-full object-cover" />
                                          {settings.cardBack === back.id && (
                                             <div className="absolute inset-0 bg-emerald-500/20 flex items-center justify-center">
                                                <div className="w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center text-white text-xs">✓</div>
@@ -2772,7 +2819,7 @@ export default function SolitaireEngine({
 
   return (
     <div className={`h-screen w-full font-sans flex flex-col overflow-hidden relative ${themeClasses[settings.theme as keyof typeof themeClasses] || themeClasses.dark} ${settings.reduceMotion ? '[&_*]:!transition-none [&_*]:!animate-none' : ''}`}>
-      <div className="flex-1 w-full max-w-2xl mx-auto p-2 pb-40 overflow-hidden">
+      <div className="flex-1 w-full mx-auto p-2 pb-40 origin-top transition-transform overflow-visible" style={{ transform: `scale(${zoomScale})`, maxWidth: maxWidth }}>
         <div className={`grid ${gameState.piles['shadow-realm'] ? 'grid-cols-6' : 'grid-cols-5'} gap-1 mb-4`}>
                 <div className="relative w-11 h-16">
                    <button type="button" className="w-full h-full bg-blue-900 border border-slate-600 rounded flex items-center justify-center" onClick={() => discardAndDrawHand()} aria-label="Draw from deck">
@@ -2800,10 +2847,12 @@ export default function SolitaireEngine({
                    const suitSymbol = pile.id.includes('hearts') ? '♥' : pile.id.includes('diamonds') ? '♦' : pile.id.includes('clubs') ? '♣' : '♠';
                    const suitColor = pile.id.includes('hearts') || pile.id.includes('diamonds') ? 'text-red-600' : 'text-white';
                    const isHighlighted = highlightedMoves.foundationIds.includes(pile.id);
+                   const ringColor = selectionColor === 'green' ? 'ring-green-400' : selectionColor === 'yellow' ? 'ring-amber-300' : 'ring-red-400';
+                   const shadowColor = selectionColor === 'green' ? 'shadow-[0_0_0_2px_rgba(74,222,128,0.25)]' : selectionColor === 'yellow' ? 'shadow-[0_0_0_2px_rgba(251,191,36,0.25)]' : 'shadow-[0_0_0_2px_rgba(248,113,113,0.25)]';
                    return (
-                   <div key={pile.id} className={`relative w-11 h-16 bg-slate-800/50 rounded border border-slate-700 flex items-center justify-center ${isHighlighted ? 'ring-2 ring-amber-300 shadow-[0_0_0_2px_rgba(251,191,36,0.25)]' : ''}`}>
+                   <div key={pile.id} className={`relative w-11 h-16 bg-slate-800/50 rounded border border-slate-700 flex items-center justify-center ${isHighlighted ? `ring-2 ${ringColor} ${shadowColor}` : ''}`}>
                       {pile.cards.length === 0 ? (
-                         <button type="button" aria-label={`Empty foundation ${pile.id}`} className={`text-xl opacity-20 ${suitColor} bg-transparent border-0 ${isHighlighted ? 'ring-2 ring-amber-300 rounded' : ''}`} onClick={() => handleCardClick(pile.id, -1)}>{suitSymbol}</button>
+                         <button type="button" aria-label={`Empty foundation ${pile.id}`} className={`text-xl opacity-20 ${suitColor} bg-transparent border-0 ${isHighlighted ? `ring-2 ${ringColor} rounded` : ''}`} onClick={() => handleCardClick(pile.id, -1)}>{suitSymbol}</button>
                       ) : null}
                       {pile.cards.map((c, i) => renderCard(c, i, pile.id))}
                    </div>
@@ -2840,7 +2889,7 @@ export default function SolitaireEngine({
            </div>
         )}
 
-        <div className={`grid gap-1 h-full ${activeEffects.includes('tower_of_babel') ? 'grid-cols-11' : 'grid-cols-7'}`}>
+        <div className="grid gap-1 h-full" style={{ gridTemplateColumns: `repeat(${tableauCount}, minmax(0, 1fr))` }}>
                {tableauPiles.map(pile => {
                   const isLinked = activeEffects.includes('linked_fates') && gameState.effectState?.linkedTableaus?.includes(pile.id);
                   const isLinkedTurn = isLinked && gameState.effectState?.lastLinkedPlayed !== pile.id;
@@ -2868,9 +2917,12 @@ export default function SolitaireEngine({
                       )}
 
                       {pile.locked && <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-20 text-red-500"><Lock size={10} /></div>}
-                      {pile.cards.length === 0 && (
-                         <button type="button" aria-label={`Empty ${pile.id}`} className={`absolute inset-0 w-full h-full bg-transparent ${isHighlighted ? 'ring-2 ring-amber-300 rounded-md' : ''}`} onClick={() => handleCardClick(pile.id, -1)} />
-                      )}
+                      {pile.cards.length === 0 && (() => {
+                         const ringColor = selectionColor === 'green' ? 'ring-green-400' : selectionColor === 'yellow' ? 'ring-amber-300' : 'ring-red-400';
+                         return (
+                            <button type="button" aria-label={`Empty ${pile.id}`} className={`absolute inset-0 w-full h-full bg-transparent ${isHighlighted ? `ring-2 ${ringColor} rounded-md` : ''}`} onClick={() => handleCardClick(pile.id, -1)} />
+                         );
+                      })()}
                       {pile.cards.map((c, idx) => renderCard(c, idx, pile.id))}
                   </div>
                )})}
@@ -3075,32 +3127,78 @@ export default function SolitaireEngine({
                               </div>
                            </div>
                         ) : activeDrawer === 'settings' ? (
-                           <div className="flex flex-col gap-4">
-                              <label className="flex items-center justify-between text-sm text-slate-300">
+                           <div className="flex flex-col gap-3">
+                              <div className="text-xs text-slate-400 uppercase mb-1">Audio</div>
+                              <label className="flex items-center justify-between text-sm text-slate-300 bg-slate-700/30 p-2 rounded">
                                  <span>Sound Effects</span>
                                  <button onClick={() => setSettings(s => ({...s, sfxEnabled: !s.sfxEnabled}))} className={`w-12 h-6 ${settings.sfxEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}>
                                     <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.sfxEnabled ? 'right-0.5' : 'left-0.5'}`}></div>
                                  </button>
                               </label>
-                              <label className="flex items-center justify-between text-sm text-slate-300">
+                              <label className="flex items-center justify-between text-sm text-slate-300 bg-slate-700/30 p-2 rounded">
                                  <span>Music</span>
                                  <button onClick={() => setSettings(s => ({...s, musicEnabled: !s.musicEnabled}))} className={`w-12 h-6 ${settings.musicEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}>
                                     <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.musicEnabled ? 'right-0.5' : 'left-0.5'}`}></div>
                                  </button>
                               </label>
-                              <label className="flex items-center justify-between text-sm text-slate-300">
+
+                              <div className="text-xs text-slate-400 uppercase mb-1 mt-2">Display</div>
+                              <label className="flex items-center justify-between text-sm text-slate-300 bg-slate-700/30 p-2 rounded">
                                  <span>Card Animations</span>
                                  <button onClick={() => setSettings(s => ({...s, cardAnimations: !s.cardAnimations}))} className={`w-12 h-6 ${settings.cardAnimations ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}>
                                     <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.cardAnimations ? 'right-0.5' : 'left-0.5'}`}></div>
                                  </button>
                               </label>
-                              <div className="flex items-center justify-between text-sm text-slate-300">
+                              <label className="flex items-center justify-between text-sm text-slate-300 bg-slate-700/30 p-2 rounded">
+                                 <span>Reduce Motion</span>
+                                 <button onClick={() => setSettings(s => ({...s, reduceMotion: !s.reduceMotion}))} className={`w-12 h-6 ${settings.reduceMotion ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}>
+                                    <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.reduceMotion ? 'right-0.5' : 'left-0.5'}`}></div>
+                                 </button>
+                              </label>
+                              <div className="flex items-center justify-between text-sm text-slate-300 bg-slate-700/30 p-2 rounded">
+                                 <span>Theme</span>
+                                 <select value={settings.theme} onChange={(e) => setSettings(s => ({...s, theme: e.target.value}))} className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs">
+                                    <option value="dark">Dark</option>
+                                    <option value="light">Light</option>
+                                    <option value="oled">OLED</option>
+                                    <option value="system">System</option>
+                                 </select>
+                              </div>
+                              <div className="flex items-center justify-between text-sm text-slate-300 bg-slate-700/30 p-2 rounded">
                                  <span>Card Back</span>
                                  <select value={settings.cardBack} onChange={(e) => setSettings(s => ({...s, cardBack: e.target.value}))} className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs">
                                     <option value="card-back">Classic</option>
+                                    <option value="heratic">Heretic</option>
+                                    <option value="midas">Midas</option>
+                                    <option value="molten">Molten</option>
+                                    <option value="sacred">Sacred</option>
+                                    <option value="sands">Sands</option>
+                                    <option value="shattered">Shattered</option>
+                                    <option value="shrouded">Shrouded</option>
+                                    <option value="verdant">Verdant</option>
+                                    <option value="withered">Withered</option>
+                                    <option value="worn">Worn</option>
                                  </select>
                               </div>
-                              <button className="text-xs text-slate-500 underline mt-4" onClick={() => setActiveDrawer('pause')}>Back to Menu</button>
+
+                              <div className="text-xs text-slate-400 uppercase mb-1 mt-2">Gameplay</div>
+                              <label className="flex items-center justify-between text-sm text-slate-300 bg-slate-700/30 p-2 rounded">
+                                 <span>Confirm Resign</span>
+                                 <button onClick={() => setSettings(s => ({...s, confirmResign: !s.confirmResign}))} className={`w-12 h-6 ${settings.confirmResign ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}>
+                                    <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.confirmResign ? 'right-0.5' : 'left-0.5'}`}></div>
+                                 </button>
+                              </label>
+                              <label className="flex items-center justify-between text-sm text-slate-300 bg-slate-700/30 p-2 rounded">
+                                 <div>
+                                    <div>Support Patriarchy</div>
+                                    <div className="text-[10px] text-slate-400">Kings high instead of Queens</div>
+                                 </div>
+                                 <button onClick={() => setSettings(s => ({...s, supportPatriarchy: !s.supportPatriarchy}))} className={`w-12 h-6 ${settings.supportPatriarchy ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}>
+                                    <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.supportPatriarchy ? 'right-0.5' : 'left-0.5'}`}></div>
+                                 </button>
+                              </label>
+
+                              <button className="text-xs text-slate-500 underline mt-2" onClick={() => setActiveDrawer('pause')}>Back to Menu</button>
                            </div>
                         ) : activeDrawer === 'test' ? (
                            <div className="flex flex-col gap-2">
@@ -3154,9 +3252,15 @@ export default function SolitaireEngine({
                            <div className="grid grid-cols-1 gap-2">
                               {effectsRegistry.filter(e => {
                                  const isOwned = gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll;
-                                 if (!isOwned) return false; 
+                                 const isActive = activeEffects.includes(e.id);
+                                 // For curses, show if active OR owned (encounter curses are active but not owned)
+                                 if (activeDrawer === 'curse') {
+                                    const isCurseType = ['curse', 'fear', 'danger'].includes(e.type);
+                                    return isCurseType && (isOwned || isActive);
+                                 }
+                                 // For other drawers, only show owned effects
+                                 if (!isOwned) return false;
                                  if (activeDrawer === 'exploit') return ['exploit', 'epic', 'legendary', 'rare', 'uncommon'].includes(e.type);
-                                 if (activeDrawer === 'curse') return ['curse', 'fear', 'danger'].includes(e.type);
                                  if (activeDrawer === 'blessing') return ['blessing'].includes(e.type);
                                  return false;
                               }).sort((a,b) => {
@@ -3245,13 +3349,12 @@ export default function SolitaireEngine({
                      </button>
                   );
                })}
-               {/* Curse area - moved from between deck and foundations */}
-               {(currentThreat || currentEncounter) && (
-                  <button type="button" aria-label={`Threat: ${currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}`} className="flex-1 py-1.5 bg-red-900/50 border-2 border-red-500/50 rounded text-[10px] font-bold flex flex-col items-center justify-center gap-0.5 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.4)]" onClick={() => alert(`${currentThreat?.type?.toUpperCase() || currentEncounter?.type?.toUpperCase() || 'CHALLENGE'}: ${currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}\n${currentThreat?.description || 'Score goal: ' + (currentEncounter?.goal || gameState.currentScoreGoal)}`)}>
-                     <Skull size={16} className="text-red-400" />
-                     <span className="leading-tight line-clamp-2">{currentThreat?.name || 'Level ' + ((currentEncounter?.index || 0) + 1)}</span>
-                  </button>
-               )}
+               {/* Curse area - equal size button alongside exploits & blessings */}
+               <button type="button" onClick={() => toggleDrawer('curse')} aria-label={`Curses: ${currentThreat?.name || 'Active Curse'}`} className={`flex-1 py-1.5 rounded text-[10px] font-bold border flex flex-col items-center justify-center gap-0.5
+                  ${activeDrawer === 'curse' ? 'bg-slate-700 text-white' : currentThreat ? 'bg-red-900/30 border-red-500/50 text-red-300' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+                  <Skull size={16} className={currentThreat ? "text-red-400" : "text-slate-500"} />
+                  <span className="leading-tight line-clamp-2">{currentThreat ? currentThreat.name : 'Curses'}</span>
+               </button>
             </div>
          </div>
 

@@ -114,10 +114,6 @@ function addRandomBlessing(state: any, rng?: () => number) {
   return addRandomFromList(state, blessings, 'blessings', rng);
 }
 
-function addRandomFortune(state: any, rng?: () => number) {
-  return addRandomFromList(state, fortunes, 'fortunes', rng);
-}
-
 function removeCurse(state: any, rng?: () => number) {
   if (!state?.run?.inventory?.curses?.length) return state;
   const idx = Math.floor((rng || Math.random)() * state.run.inventory.curses.length);
