@@ -154,6 +154,15 @@ const getRarityColor = (rarity?: string): { bg: string; text: string; border: st
 
 // Small synonyms map for common registry keys vs actual filenames
 const ICON_SYNONYMS: Record<string, string> = {
+   // --- Explicit curse icon mappings for missing icons ---
+   schrodingersdeck: 'schrodingersdeck',
+   counterfeiting: 'Counterfeiting',
+   towerofbabel: 'towerofbabel',
+   eattherich: 'eattherich',
+   cagedbakeneko: 'cagedbakeneko',
+   moodswings: 'moodswings',
+   fogofwar: 'fogofwar',
+   revolvingdoor: 'revolvingdoor',
   coins: 'coin',
   coin: 'coin',
   fortunes: 'fortune',
@@ -1999,7 +2008,7 @@ export default function SolitaireEngine({
     const isClassicGame = CLASSIC_GAMES[selectedMode];
     const cardStyle = pileId === 'hand' ? handStyle :
                       isClassicGame ? { zIndex: index } :
-                      { top: `${pileId.includes('tableau') ? index * 12 : 0}px`, zIndex: index };
+                      { top: `${pileId.includes('tableau') ? index * 18 : 0}px`, zIndex: index };
 
     const cardAnimClass = animatingCards.get(card.id) || '';
 
@@ -3491,7 +3500,7 @@ export default function SolitaireEngine({
           )}
 
           <div className="flex justify-center">
-            <div className="grid gap-[3px] h-full" style={{ gridTemplateColumns: `repeat(${tableauCount}, minmax(0, 44px))` }}>
+            <div className="grid gap-x-[3px] h-full" style={{ gridTemplateColumns: `repeat(${tableauCount}, minmax(0, 44px))` }}>
                  {tableauPiles.map(pile => {
                     const isLinked = activeEffects.includes('linked_fates') && gameState.effectState?.linkedTableaus?.includes(pile.id);
                     const isLinkedTurn = isLinked && gameState.effectState?.lastLinkedPlayed !== pile.id;
@@ -4038,10 +4047,10 @@ export default function SolitaireEngine({
                            <button
                               key={i}
                               type="button"
-                              className={`${isCurrentCurse ? 'w-10 h-10' : 'w-6 h-6'} rounded flex items-center justify-center transition-all ${isCompleted ? 'bg-green-500/30 border border-green-500' : isCurrent ? 'bg-orange-500/30 border border-orange-500 animate-pulse' : 'bg-slate-700/30 border border-slate-700'}`}
+                              className={`w-8 h-8 rounded flex items-center justify-center transition-all ${isCompleted ? 'bg-green-500/10 border-2 border-green-500' : isCurrent ? 'bg-orange-500/10 border-2 border-orange-500 animate-pulse' : 'bg-slate-700/10 border-2 border-slate-700'}`}
                               onClick={() => isCurrentCurse ? toggleDrawer('curse') : alert(`${enc.type.toUpperCase()}: ${eff?.name || 'Level ' + (i+1)}\n${eff?.description || 'Score goal: ' + enc.goal}`)}
                               aria-label={`Encounter ${i + 1} ${enc.type} ${eff?.name ?? ''}`}>
-                              <ResponsiveIcon name={enc.effectId} fallbackType="curse" size={isCurrentCurse ? 24 : 16} className={`${isCurrentCurse ? 'w-6 h-6' : 'w-4 h-4'} ${iconClass}`} style={iconStyle} alt={eff?.name || ''} />
+                              <ResponsiveIcon name={enc.effectId} fallbackType="curse" size={32} className={`w-8 h-8 object-contain aspect-square stroke-2 fill-none ${iconClass}`} style={{ ...iconStyle, stroke: 'currentColor', fill: 'none' }} alt={eff?.name || ''} />
                            </button>
                         );
                      })}
@@ -4059,26 +4068,26 @@ export default function SolitaireEngine({
 
                   {/* Coronata Mode - Effect Buttons */}
                   <div className="flex w-full gap-1">
-                     <button onClick={() => toggleDrawer('pause')} className={`p-1.5 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}><img src="/icons/pause.png" alt="Pause" className="w-[15px] h-[15px]" /></button>
-                     <button type="button" onClick={undoLastMove} aria-label="Undo" className="shrink-0 p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700">
-                        <img src="/icons/back.png" alt="Undo" className="w-[15px] h-[15px]" />
+                     <button onClick={() => toggleDrawer('pause')} className={`w-11 h-11 flex items-center justify-center bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}><img src="/icons/pause.png" alt="Pause" className="w-9 h-9" /></button>
+                     <button type="button" onClick={undoLastMove} aria-label="Undo" className="shrink-0 w-11 h-11 flex items-center justify-center bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700">
+                        <img src="/icons/back.png" alt="Undo" className="w-9 h-9" />
                      </button>
-                     <button type="button" className="shrink-0 p-2 bg-transparent hover:bg-slate-700 rounded relative">
-                        <ResponsiveIcon name="coin" fallbackType="exploit" size={18} className="w-[18px] h-[18px]" alt="coins" />
+                     <button type="button" className="shrink-0 w-11 h-11 flex items-center justify-center bg-transparent hover:bg-slate-700 rounded relative">
+                        <ResponsiveIcon name="coin" fallbackType="exploit" size={36} className="w-9 h-9" alt="coins" />
                         <span className={`absolute -top-1 -right-1 text-[8px] px-1 rounded-full border border-slate-500 leading-none font-bold ${gameState.coins < 0 ? 'bg-red-900 text-red-300 border-red-700' : 'bg-yellow-900 text-yellow-300 border-yellow-700'}`}>{gameState.coins}</span>
                      </button>
                      {(['exploit', 'blessing'] as const).map((type) => {
                         const hasReady = effectsRegistry.some(e => e.type === type && isEffectReady(e.id, gameState) && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll));
                         return (
-                                    <button key={type} onClick={() => toggleDrawer(type as any)}
-                              className={`flex-1 py-1.5 rounded text-[10px] font-bold border flex flex-col items-center justify-center gap-0.5
+                           <button key={type} onClick={() => toggleDrawer(type as any)}
+                              className={`w-11 h-11 flex items-center justify-center rounded text-[10px] font-bold border flex-col gap-0.5
                               ${activeDrawer === type ? 'bg-slate-700 text-white border-slate-600' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
-                              <img src={categoryIcons[type]} alt="" className="w-[18px] h-[18px]" />
+                              <img src={categoryIcons[type]} alt="" className="w-9 h-9" />
                            </button>
                         );
                      })}
-                     <button type="button" onClick={() => discardAndDrawHand()} aria-label="Draw from deck" className="shrink-0 p-2 bg-blue-900 hover:bg-blue-800 rounded text-blue-300 border border-blue-700 relative">
-                        <img src="/icons/foundation.png" alt="Draw" className="w-[15px] h-[15px]" />
+                     <button type="button" onClick={() => discardAndDrawHand()} aria-label="Draw from deck" className="shrink-0 w-11 h-11 flex items-center justify-center bg-blue-900 hover:bg-blue-800 rounded text-blue-300 border border-blue-700 relative">
+                        <img src="/icons/foundation.png" alt="Draw" className="w-9 h-9" />
                         {gameState.piles.deck.cards.length > 0 && (
                            <span className="absolute -top-1 -right-1 bg-slate-700 text-[8px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
                         )}
