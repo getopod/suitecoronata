@@ -296,6 +296,11 @@ export default function SolitaireEngine({
   const [shopInventory, setShopInventory] = useState<GameEffect[]>([]);
   const [blessingChoices, setBlessingChoices] = useState<GameEffect[]>([]);
   const [showLevelComplete, setShowLevelComplete] = useState(false);
+
+  // Animation state
+  const [floatingElements, setFloatingElements] = useState<Array<{ id: number; text: string; x: number; y: number; color: string; isMult?: boolean }>>([]);
+  const [activeBanner, setActiveBanner] = useState<{ id: number; name: string; icon: string } | null>(null);
+  const [animatingCards, setAnimatingCards] = useState<Map<string, string>>(new Map());
    // When set, this drawer is intentionally non-closable by the collapse button
    const [nonClosableDrawer, setNonClosableDrawer] = useState<'blessing_select' | 'shop' | null>(null);
    // Shop tab state (buy / sell / continue)
@@ -321,6 +326,38 @@ export default function SolitaireEngine({
 
    // Enable effect debugger in development
    const debug = useEffectDebugger(process.env.NODE_ENV === 'development');
+
+   // Animation helpers
+   const spawnFloating = useCallback((text: string, x: number, y: number, color: string, isMult: boolean = false) => {
+     const id = Date.now() + Math.random();
+     setFloatingElements(prev => [...prev, { id, text, x, y, color, isMult }]);
+     setTimeout(() => {
+       setFloatingElements(prev => prev.filter(e => e.id !== id));
+     }, 1000);
+   }, []);
+
+   const spawnBanner = useCallback((name: string, icon: string) => {
+     const id = Date.now();
+     setActiveBanner({ id, name, icon });
+     setTimeout(() => {
+       setActiveBanner(prev => prev?.id === id ? null : prev);
+     }, 2000);
+   }, []);
+
+   const triggerCardAnimation = useCallback((cardIds: string[], animClass: string) => {
+     setAnimatingCards(prev => {
+       const next = new Map(prev);
+       cardIds.forEach(id => next.set(id, animClass));
+       return next;
+     });
+     setTimeout(() => {
+       setAnimatingCards(prev => {
+         const next = new Map(prev);
+         cardIds.forEach(id => next.delete(id));
+         return next;
+       });
+     }, 450);
+   }, []);
 
    // Validate effects on mount (development only)
    useEffect(() => {
@@ -1667,9 +1704,46 @@ export default function SolitaireEngine({
     if (minigameTrigger) {
        nextState.activeMinigame = { type: minigameTrigger, title: minigameTrigger.toUpperCase() };
     }
-    
+
     setGameState(nextState);
-    
+
+    // Trigger card movement animation
+    const animClass = sourcePileId === 'hand' ? 'anim-hand-to-pile' :
+                      targetPile.type === 'foundation' ? 'anim-to-foundation' :
+                      'anim-move-stack';
+    triggerCardAnimation(movingCards.map(c => c.id), animClass);
+
+    // Show floating score/coin indicators
+    if (scoreDelta > 0 || coinDelta > 0) {
+      const targetEl = document.querySelector(`[data-pile-id="${finalTargetPileId}"]`);
+      if (targetEl) {
+        const rect = targetEl.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        if (scoreDelta > 0) {
+          spawnFloating(`+${scoreDelta}`, centerX, centerY, 'text-blue-400');
+        }
+        if (coinDelta > 0) {
+          spawnFloating(`🪙+${coinDelta}`, centerX, centerY + 20, 'text-amber-400');
+        }
+      }
+    }
+
+    // Check for foundation completion and show banner
+    if (targetPile.type === 'foundation' && newTargetCards.length === 13) {
+      spawnBanner('FOUNDATION COMPLETE', 'fa-crown');
+    }
+
+    // Check for newly activated effects
+    const newActives = nextState.activeItemIds?.filter(id => !gameState.activeItemIds?.includes(id)) || [];
+    if (newActives.length > 0) {
+      const newEffect = effectsRegistry.find(e => e.id === newActives[0]);
+      if (newEffect) {
+        spawnBanner(newEffect.name.toUpperCase(), newEffect.type === 'curse' ? 'fa-skull' : 'fa-bolt');
+      }
+    }
+
     if (nextState.score >= nextState.currentScoreGoal && !nextState.isLevelComplete) {
        setGameState(p => ({ ...p, isLevelComplete: true }));
        setShowLevelComplete(true);
@@ -1913,11 +1987,13 @@ export default function SolitaireEngine({
                       isClassicGame ? { zIndex: index } :
                       { top: `${pileId.includes('tableau') ? index * 12 : 0}px`, zIndex: index };
 
+    const cardAnimClass = animatingCards.get(card.id) || '';
+
     return (
          <button
             key={`${card.id}-${pileId}-${index}`}
             type="button"
-            className={`${isClassicGame ? 'relative' : 'absolute'} w-11 max-w-[44px] h-16 max-h-[64px] bg-transparent perspective-1000 select-none transition-transform hover:scale-105 hover:brightness-110 cursor-pointer`}
+            className={`${isClassicGame ? 'relative' : 'absolute'} w-11 max-w-[44px] h-16 max-h-[64px] bg-transparent perspective-1000 select-none transition-transform hover:scale-105 hover:brightness-110 cursor-pointer ${cardAnimClass}`}
             style={cardStyle}
             onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
             onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick(pileId, index); }}
@@ -3357,7 +3433,7 @@ export default function SolitaireEngine({
                      const ringColor = selectionColor === 'green' ? 'ring-green-400' : selectionColor === 'yellow' ? 'ring-amber-300' : 'ring-red-400';
                      const shadowColor = selectionColor === 'green' ? 'shadow-[0_0_0_2px_rgba(74,222,128,0.25)]' : selectionColor === 'yellow' ? 'shadow-[0_0_0_2px_rgba(251,191,36,0.25)]' : 'shadow-[0_0_0_2px_rgba(248,113,113,0.25)]';
                      return (
-                     <div key={pile.id} className={`relative w-11 max-w-[44px] h-16 max-h-[64px] bg-slate-800/50 rounded border border-slate-700 flex items-center justify-center ${isHighlighted ? `ring-2 ${ringColor} ${shadowColor}` : ''}`}>
+                     <div key={pile.id} data-pile-id={pile.id} className={`relative w-11 max-w-[44px] h-16 max-h-[64px] bg-slate-800/50 rounded border border-slate-700 flex items-center justify-center ${isHighlighted ? `ring-2 ${ringColor} ${shadowColor}` : ''}`}>
                         {pile.cards.length === 0 ? (
                            <div className="relative w-full h-full flex items-center justify-center">
                               <span className={`text-xl opacity-20 ${suitColor}`}>{suitSymbol}</span>
@@ -3409,7 +3485,7 @@ export default function SolitaireEngine({
                     const isHighlighted = highlightedMoves.tableauIds.includes(pile.id);
 
                     return (
-                    <div key={pile.id} className={`relative w-full h-full ${isLinked ? 'border-t-2 border-purple-500/50 rounded-t-lg pt-1' : ''} ${isParasite ? 'border-t-2 border-green-500/50 rounded-t-lg pt-1' : ''} ${pile.hidden ? 'invisible pointer-events-none' : ''}`}>
+                    <div key={pile.id} data-pile-id={pile.id} className={`relative w-full h-full ${isLinked ? 'border-t-2 border-purple-500/50 rounded-t-lg pt-1' : ''} ${isParasite ? 'border-t-2 border-green-500/50 rounded-t-lg pt-1' : ''} ${pile.hidden ? 'invisible pointer-events-none' : ''}`}>
                         {/* Linked Fates Indicator */}
                         {isLinked && (
                            <div className={`absolute -top-7 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center ${isLinkedTurn ? 'text-purple-400 animate-pulse' : 'text-slate-600 opacity-50'}`}>
@@ -4035,6 +4111,25 @@ export default function SolitaireEngine({
                <p className="text-slate-400 mb-6">Goal reached: {gameState.score}</p>
                <button onClick={completeLevel} className="w-full py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 font-bold flex items-center justify-center gap-2">Move On <ShoppingCart size={16} /></button>
             </div>
+         </div>
+      )}
+
+      {/* Floating Score/Coin Indicators */}
+      {floatingElements.map(el => (
+         <div
+            key={el.id}
+            className={`floating-text fixed ${el.color} ${el.isMult ? 'mult-pop' : ''}`}
+            style={{ left: el.x, top: el.y }}
+         >
+            {el.text}
+         </div>
+      ))}
+
+      {/* Effect Banner */}
+      {activeBanner && (
+         <div className="effect-banner fixed top-8 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-3 bg-gradient-to-r from-purple-900 via-blue-900 to-purple-900 px-6 py-3 rounded-full border-2 border-yellow-400 shadow-[0_0_30px_rgba(234,179,8,0.5)]">
+            <i className={`fa ${activeBanner.icon} text-yellow-400 text-2xl effect-icon-flash`} />
+            <span className="text-white font-black text-lg tracking-wider">{activeBanner.name}</span>
          </div>
       )}
     </div>
