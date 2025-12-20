@@ -58,7 +58,6 @@ export const generateNewBoard = (
       moves: 0,
       selectedCardIds: null,
       effectState: {},
-      charges: {},
       scoreMultiplier: scoreMult,
       coinMultiplier: coinMult,
       history: [],
@@ -79,7 +78,7 @@ export const generateNewBoard = (
       wanderResultText: null,
       seenWanders: [],
       interactionMode: 'normal',
-      charges: {},
+        // charges key removed (already present if needed)
       resources: { handSize: 5, shuffles: 0, discards: 0 },
       rules: {},
       run: {
@@ -162,7 +161,7 @@ export const generateNewBoard = (
     wanderResultText: null,
     seenWanders: [],
     interactionMode: 'normal',
-    charges: {},
+      // charges key removed (already present if needed)
     resources: { handSize: 5, shuffles: 0, discards: 0 },
     rules: {},
     run: {

@@ -272,9 +272,13 @@ const categoryIcons: Record<string, string> = {
 // ==========================================
 
 export default function SolitaireEngine({ 
-  effectsRegistry = EFFECTS_REGISTRY, 
-  wanderRegistry = WANDER_REGISTRY 
+   effectsRegistry = EFFECTS_REGISTRY, 
+   wanderRegistry = WANDER_REGISTRY 
 }: SolitaireEngineProps = {}) {
+   // Placeholder undo function. Replace with real undo logic as needed.
+   function undoLastMove() {
+      alert('Undo not yet implemented.');
+   }
   const [currentView, setCurrentView] = useState<'home' | 'game'>('home');
   const [runPlan, setRunPlan] = useState<Encounter[]>([]);
   const [gameState, setGameState] = useState<GameState>(initialGameState());
@@ -3625,7 +3629,7 @@ export default function SolitaireEngine({
                                           <div className="text-slate-400 text-[10px]">{item.description}</div>
                                        </div>
                                        <button
-                                         className={`text-white px-2 py-1 rounded text-xs font-bold shrink-0 flex items-center gap-1 ${isOwned ? 'bg-red-600 cursor-not-allowed' : gameState.coins >= (item.cost || 50) ? 'bg-green-600 hover:bg-green-500' : 'bg-slate-600 cursor-not-allowed'}`}
+                                         className={`text-white px-2 py-1 rounded text-xs font-bold shrink-0 flex items-center gap-1 ${isOwned ? 'bg-transparent cursor-not-allowed' : gameState.coins >= (item.cost || 50) ? 'bg-green-600 hover:bg-green-500' : 'bg-slate-600 cursor-not-allowed'}`}
                                          onClick={() => buyEffect(item)}
                                          disabled={gameState.coins < (item.cost || 50) || isOwned}>
                                          {isOwned ? (
@@ -3633,7 +3637,7 @@ export default function SolitaireEngine({
                                          ) : (
                                             <>
                                                <ResponsiveIcon name="coin" fallbackType="exploit" size={18} className="w-[18px] h-[18px]" alt="coin" />
-                                               <span>Buy {item.cost || 50}</span>
+                                               <span>{item.cost || 50}</span>
                                             </>
                                          )}
                                        </button>
@@ -4046,17 +4050,20 @@ export default function SolitaireEngine({
                   {/* Coronata Mode - Score Bar */}
                   <div className="flex items-center gap-2 mb-2">
                      <div className="flex-1">
-                        <div className="w-full bg-slate-800 h-6 rounded-full overflow-hidden border border-slate-700 relative flex items-center justify-center">
+                        <div className="w-full bg-slate-800 h-5 rounded-full overflow-hidden border border-slate-700 relative flex items-center justify-center px-1">
                            <div className="absolute inset-0 bg-emerald-500 h-full transition-all duration-500" style={{ width: `${Math.min(100, (gameState.score / gameState.currentScoreGoal) * 100)}%` }} />
-                           <span className="relative z-10 text-[10px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{gameState.score} / {gameState.currentScoreGoal}</span>
+                           <span className="relative z-10 text-[9px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{gameState.score} / {gameState.currentScoreGoal}</span>
                         </div>
                      </div>
                   </div>
 
                   {/* Coronata Mode - Effect Buttons */}
                   <div className="flex w-full gap-1">
-                     <button onClick={() => toggleDrawer('pause')} className={`p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}><img src="/icons/pause.png" alt="Pause" className="w-[18px] h-[18px]" /></button>
-                     <button type="button" className="shrink-0 p-2 bg-slate-800 hover:bg-slate-700 rounded border border-slate-700 relative">
+                     <button onClick={() => toggleDrawer('pause')} className={`p-1.5 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}><img src="/icons/pause.png" alt="Pause" className="w-[15px] h-[15px]" /></button>
+                     <button type="button" onClick={undoLastMove} aria-label="Undo" className="shrink-0 p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700">
+                        <img src="/icons/back.png" alt="Undo" className="w-[15px] h-[15px]" />
+                     </button>
+                     <button type="button" className="shrink-0 p-2 bg-transparent hover:bg-slate-700 rounded relative">
                         <ResponsiveIcon name="coin" fallbackType="exploit" size={18} className="w-[18px] h-[18px]" alt="coins" />
                         <span className={`absolute -top-1 -right-1 text-[8px] px-1 rounded-full border border-slate-500 leading-none font-bold ${gameState.coins < 0 ? 'bg-red-900 text-red-300 border-red-700' : 'bg-yellow-900 text-yellow-300 border-yellow-700'}`}>{gameState.coins}</span>
                      </button>
@@ -4071,7 +4078,7 @@ export default function SolitaireEngine({
                         );
                      })}
                      <button type="button" onClick={() => discardAndDrawHand()} aria-label="Draw from deck" className="shrink-0 p-2 bg-blue-900 hover:bg-blue-800 rounded text-blue-300 border border-blue-700 relative">
-                        <img src="/icons/foundation.png" alt="Draw" className="w-[18px] h-[18px]" />
+                        <img src="/icons/foundation.png" alt="Draw" className="w-[15px] h-[15px]" />
                         {gameState.piles.deck.cards.length > 0 && (
                            <span className="absolute -top-1 -right-1 bg-slate-700 text-[8px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
                         )}
