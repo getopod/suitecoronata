@@ -1678,12 +1678,14 @@ export default function SolitaireEngine({
 
     let scoreDelta = 0;
     const card = movingCards[0];
-    if (targetPile.type === 'tableau' && !card.meta?.scoredTableau) { scoreDelta += card.rank; card.meta = { ...card.meta, scoredTableau: true }; } 
+    if (targetPile.type === 'tableau' && !card.meta?.scoredTableau) { scoreDelta += card.rank; card.meta = { ...card.meta, scoredTableau: true }; }
     else if (targetPile.type === 'foundation' && !card.meta?.scoredFoundation) { scoreDelta += card.rank * 2; card.meta = { ...card.meta, scoredFoundation: true }; }
-    
+
+    const baseScore = scoreDelta;
     effects.forEach(eff => {
        if (eff.calculateScore) scoreDelta = eff.calculateScore(scoreDelta, context, gameState);
     });
+    const multiplier = baseScore > 0 ? Math.round(scoreDelta / baseScore) : 1;
 
     let coinDelta = 0;
     effects.forEach(eff => {
@@ -1714,7 +1716,7 @@ export default function SolitaireEngine({
     triggerCardAnimation(movingCards.map(c => c.id), animClass);
 
     // Show floating score/coin indicators
-    if (scoreDelta > 0 || coinDelta > 0) {
+    if (scoreDelta > 0 || coinDelta > 0 || multiplier > 1) {
       const targetEl = document.querySelector(`[data-pile-id="${finalTargetPileId}"]`);
       if (targetEl) {
         const rect = targetEl.getBoundingClientRect();
@@ -1727,12 +1729,20 @@ export default function SolitaireEngine({
         if (coinDelta > 0) {
           spawnFloating(`🪙+${coinDelta}`, centerX, centerY + 20, 'text-amber-400');
         }
+        if (multiplier > 1) {
+          spawnFloating(`×${multiplier}`, centerX, centerY - 25, 'text-purple-400 text-2xl', true);
+        }
       }
     }
 
     // Check for foundation completion and show banner
     if (targetPile.type === 'foundation' && newTargetCards.length === 13) {
       spawnBanner('FOUNDATION COMPLETE', 'fa-crown');
+    }
+
+    // Show banner for high multipliers
+    if (multiplier >= 3) {
+      spawnBanner(`×${multiplier} MULTIPLIER!`, 'fa-bolt');
     }
 
     // Check for newly activated effects
@@ -1934,7 +1944,7 @@ export default function SolitaireEngine({
        const xOffset = (index - (totalCards - 1) / 2) * 45;
        handStyle = {
            position: 'absolute',
-           bottom: isSelected ? '40px' : '-32px',
+           bottom: isSelected ? '0px' : '-32px',
            left: '50%',
            marginLeft: `${xOffset}px`,
            transform: 'translateY(0)',
@@ -1966,7 +1976,7 @@ export default function SolitaireEngine({
          <button
             key={`${card.id}-${pileId}-${index}`}
             type="button"
-            className={`absolute w-11 max-w-[44px] h-16 max-h-[64px] bg-transparent select-none flex items-center justify-center ${isSelected ? 'ring-4 ring-yellow-400' : ''} relative`}
+            className={`absolute w-11 max-w-[44px] h-11 bg-transparent select-none flex items-end justify-center ${isSelected ? 'ring-4 ring-yellow-400' : ''} relative`}
             style={pileId === 'hand' ? handStyle : { top: `${pileId.includes('tableau') ? index * 12 : 0}px`, zIndex: index }}
             onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
             aria-label={isTricksterKey ? `Trickster Key (${charges} charges)` : "Key - Click to select, then click locked tableau to unlock"}
@@ -3939,14 +3949,14 @@ export default function SolitaireEngine({
                                           // Curses (curse/fear/danger) and passive triggers cannot be toggled off
                                           const isCurseType = ['curse', 'fear', 'danger'].includes(effect.type);
                                           const isPassive = effect.type === 'passive';
-                                          // Always-on exploits cannot be toggled off
+                                          // Always-on exploits cannot be toggled off once active
                                           const alwaysOnIds = ['trust_fund', 'tax_loophole', 'breaking_entering', 'insider_trading', 'switcheroo'];
-                                          const isAlwaysOn = alwaysOnIds.includes(effect.id);
+                                          const isAlwaysOn = alwaysOnIds.includes(effect.id) && isActive;
                                           if (isCurseType || isPassive || isAlwaysOn) return;
                                           toggleEffect(effect.id);
                                        }}
                                        aria-label={`Toggle effect ${effect.name}`}
-                                       className={`p-2 rounded border text-xs flex items-center gap-3 transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : `${rarityColors.bg} ${rarityColors.border}`} ${['curse', 'fear', 'danger', 'passive'].includes(effect.type) || ['trust_fund', 'tax_loophole', 'breaking_entering', 'insider_trading', 'switcheroo'].includes(effect.id) ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                                       className={`p-2 rounded border text-xs flex items-center gap-3 transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : `${rarityColors.bg} ${rarityColors.border}`} ${['curse', 'fear', 'danger', 'passive'].includes(effect.type) || (['trust_fund', 'tax_loophole', 'breaking_entering', 'insider_trading', 'switcheroo'].includes(effect.id) && isActive) ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                        <ResponsiveIcon name={effect.id || effect.name} fallbackType={effectType} size={32} className="w-8 h-8 rounded shrink-0" alt={effect.name} />
                                        <div className="flex-1 min-w-0 text-left">
                                            <div className="font-bold text-white flex gap-1 items-center flex-wrap">

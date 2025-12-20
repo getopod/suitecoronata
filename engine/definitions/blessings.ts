@@ -261,7 +261,7 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     id: 'klabautermann',
     name: 'Klabautermann',
     type: 'blessing',
-    description: 'Once per encounter, you may discard your hand to draw 5 cards. Block 1 ability trigger or gain 1 advantage per encounter.',
+    description: 'Block 1 ability trigger or gain 1 advantage per encounter.',
     effectState: {
       klabautermannUsed: false,
       masterDebaterCharges: 1,
@@ -287,23 +287,7 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
           moodSwingsStartingRank: null,
           eatTheRichCoinReduction: 0
         }
-      }),
-      onActivate: (state) => {
-        if (state.effectState.klabautermannUsed) return {};
-        const deck = state.piles['deck'];
-        const hand = state.piles['hand'];
-        const drawCount = Math.min(5, deck.cards.length);
-        const drawn = deck.cards.slice(-drawCount).map(c => ({ ...c, faceUp: true }));
-        const remainingDeck = deck.cards.slice(0, -drawCount);
-        return {
-          effectState: { ...state.effectState, klabautermannUsed: true },
-          piles: {
-            ...state.piles,
-            hand: { ...hand, cards: drawn },
-            deck: { ...deck, cards: remainingDeck }
-          }
-        };
-      }
+      })
     }
   },
 
