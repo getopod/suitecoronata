@@ -107,10 +107,22 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     id: 'vagrant',
     name: 'Vagrant',
     type: 'blessing',
-    description: '+2 tableaus.',
+    description: '+2 tableaus. Build foundations in any order once aces are placed.',
     onActivate: [
       { action: 'add_piles', params: { type: 'tableau', count: 2 } }
-    ]
+    ],
+    custom: {
+      canMove: (cards, source, target, defaultAllowed) => {
+        if (target.type === 'foundation') {
+          const moving = cards[0];
+          const top = target.cards[target.cards.length - 1];
+          if (!top) return moving.rank === 1;
+          return moving.suit === top.suit && (isNextHigherInOrder(moving.rank, top.rank) ||
+                 isNextLowerInOrder(moving.rank, top.rank));
+        }
+        return defaultAllowed;
+      }
+    }
   },
 
   {
@@ -142,11 +154,7 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     id: 'schemer',
     name: 'Schemer',
     type: 'blessing',
-    description: 'All tableau cards face up. +1 wild foundation. Foundation cards can be played to tableaus. Consecutive same-suit plays stack +100% points each.',
-    effectState: {
-      schemerLastSuit: null,
-      schemerStreak: 0
-    },
+    description: 'All tableau cards face up. +1 wild foundation.',
     visuals: [
       { pattern: 'force_face_up', appliesTo: ['tableau'] }
     ],
@@ -158,14 +166,6 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
         return { piles: newPiles };
       },
       canMove: (cards, source, target, defaultAllowed) => {
-        // Allow moving from foundation to tableau
-        if (source.type === 'foundation' && target.type === 'tableau') {
-          const moving = cards[0];
-          const top = target.cards[target.cards.length - 1];
-          if (!top) return isHighestRank(moving.rank);
-          return getCardColor(moving.suit) !== getCardColor(top.suit) &&
-                 isNextLowerInOrder(moving.rank, top.rank);
-        }
         // Wild foundation logic
         if (target.meta?.isWildFoundation) {
           const top = target.cards[target.cards.length - 1];
@@ -173,23 +173,6 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
           return isNextHigherInOrder(cards[0].rank, top.rank);
         }
         return defaultAllowed;
-      },
-      calculateScore: (score, context, state) => {
-        const suit = context.cards[0].suit;
-        const last = state.effectState.schemerLastSuit;
-        const streak = Math.min(state.effectState.schemerStreak || 0, 10); // Cap at 10 to prevent overflow
-
-        if (last === suit) {
-          return score * (1 + streak); // +100% per streak
-        }
-        return score;
-      },
-      onMoveComplete: (state, context) => {
-        const suit = context.cards[0].suit;
-        const last = state.effectState.schemerLastSuit;
-        const streak = state.effectState.schemerStreak || 0;
-        const nextStreak = last === suit ? Math.min(streak + 1, 10) : 1; // Cap at 10
-        return { effectState: { ...state.effectState, schemerLastSuit: suit, schemerStreak: nextStreak } };
       }
     }
   },
@@ -278,9 +261,33 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     id: 'klabautermann',
     name: 'Klabautermann',
     type: 'blessing',
-    description: 'Once per encounter, you may discard your hand to draw 5 cards.',
-    effectState: { klabautermannUsed: false },
+    description: 'Once per encounter, you may discard your hand to draw 5 cards. Block 1 ability trigger or gain 1 advantage per encounter.',
+    effectState: {
+      klabautermannUsed: false,
+      masterDebaterCharges: 1,
+      fleshWoundBandages: 0,
+      cagedBakenekoBonusKeys: 0,
+      streetSmartsCoinSaved: 0,
+      fogOfWarBlocked: false,
+      threeRulesDelayPlays: 0,
+      moodSwingsStartingRank: null,
+      eatTheRichCoinReduction: 0
+    },
     custom: {
+      onEncounterStart: (state) => ({
+        effectState: {
+          ...state.effectState,
+          klabautermannUsed: false,
+          masterDebaterCharges: 1,
+          fleshWoundBandages: 0,
+          cagedBakenekoBonusKeys: 0,
+          streetSmartsCoinSaved: 0,
+          fogOfWarBlocked: false,
+          threeRulesDelayPlays: 0,
+          moodSwingsStartingRank: null,
+          eatTheRichCoinReduction: 0
+        }
+      }),
       onActivate: (state) => {
         if (state.effectState.klabautermannUsed) return {};
         const deck = state.piles['deck'];
@@ -341,38 +348,6 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
         playedCards.push(...context.cards);
         return { effectState: { ...state.effectState, lastPlayedCards: playedCards.slice(-20) } };
       }
-    }
-  },
-
-  {
-    id: 'master_debater',
-    name: 'Master Debater',
-    type: 'blessing',
-    description: 'Block 1 ability trigger or gain 1 advantage per encounter.',
-    effectState: {
-      masterDebaterCharges: 1,
-      fleshWoundBandages: 0,
-      cagedBakenekoBonusKeys: 0,
-      streetSmartsCoinSaved: 0,
-      fogOfWarBlocked: false,
-      threeRulesDelayPlays: 0,
-      moodSwingsStartingRank: null,
-      eatTheRichCoinReduction: 0
-    },
-    custom: {
-      onEncounterStart: (state) => ({
-        effectState: {
-          ...state.effectState,
-          masterDebaterCharges: 1,
-          fleshWoundBandages: 0,
-          cagedBakenekoBonusKeys: 0,
-          streetSmartsCoinSaved: 0,
-          fogOfWarBlocked: false,
-          threeRulesDelayPlays: 0,
-          moodSwingsStartingRank: null,
-          eatTheRichCoinReduction: 0
-        }
-      })
     }
   },
 

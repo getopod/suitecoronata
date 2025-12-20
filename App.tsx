@@ -1019,13 +1019,18 @@ export default function SolitaireEngine({
       curse: 0,
       exploit: 1,
       blessing: 2,
-      epic: 3,
-      legendary: 4,
-      rare: 5,
-      uncommon: 6
+      passive: 3,
+      epic: 4,
+      legendary: 5,
+      rare: 6,
+      uncommon: 7
     };
+    // Include passive triggers automatically + active effects
+    const passiveTriggerIds = effectsRegistry.filter(e => e.type === 'passive').map(e => e.id);
+    const allActiveIds = [...new Set([...passiveTriggerIds, ...activeEffects])];
+
     return effectsRegistry
-      .filter(e => activeEffects.includes(e.id))
+      .filter(e => allActiveIds.includes(e.id))
       .sort((a, b) => {
         const orderA = typeOrder[a.type] ?? 999;
         const orderB = typeOrder[b.type] ?? 999;
@@ -1855,7 +1860,7 @@ export default function SolitaireEngine({
        const xOffset = (index - (totalCards - 1) / 2) * 45;
        handStyle = {
            position: 'absolute',
-           bottom: isSelected ? '40px' : '0px',
+           bottom: isSelected ? '40px' : '-32px',
            left: '50%',
            marginLeft: `${xOffset}px`,
            transform: 'translateY(0)',
@@ -1930,9 +1935,9 @@ export default function SolitaireEngine({
                      <div className="text-[5px] font-bold leading-tight text-purple-800 px-0.5">{visualCard.meta.name}</div>
                  </div>
              ) : visualCard.meta?.isWild ? (
-                 <div className="flex flex-col items-center justify-center h-full text-center bg-gradient-to-b from-blue-100 to-blue-200 rounded">
-                     <div className="text-xl">🃏</div>
-                     <div className="text-[6px] font-bold text-blue-800">WILD</div>
+                 <div className="relative h-full w-full rounded overflow-hidden">
+                     <img src="/icons/cleverdisguise.png" alt="Wild" className="absolute inset-0 w-full h-full object-cover" />
+                     <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-[6px] font-bold text-white text-center py-0.5">WILD</div>
                  </div>
              ) : (
                  <>
@@ -1990,8 +1995,13 @@ export default function SolitaireEngine({
     const requiredWidth = (tableauCount * cardWidth) + ((tableauCount - 1) * gap) + (margin * 2);
     zoomScale = Math.min(1, (screenWidth - 8) / requiredWidth); // -8 for some breathing room
   } else {
-    // Coronata mode: Apply zoom when more than 7 items
-    zoomScale = maxItems > 7 ? 7 / maxItems : 1;
+    // Coronata mode: Calculate zoom to fit tableaus with 3px gaps and 3px margins
+    const cardWidth = 44; // px
+    const gap = 3; // px
+    const margin = 3; // px per side = 6px total
+    const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 360;
+    const requiredWidth = (maxItems * cardWidth) + ((maxItems - 1) * gap) + (margin * 2);
+    zoomScale = Math.min(1, (screenWidth - 6) / requiredWidth);
   }
   const maxWidth = 'auto'; // Let it expand naturally
 
@@ -3149,9 +3159,9 @@ export default function SolitaireEngine({
                  <h2 className="text-2xl font-bold text-center text-purple-200">Choose Your Path</h2>
                  <div className="grid grid-cols-1 gap-4">
                     {gameState.wanderOptions.map(opt => (
-                       <button key={opt.id} type="button" onClick={() => chooseWanderOption(opt)} aria-label={`Wander option: ${opt.label}`} className="bg-slate-800/80 border border-slate-600 hover:border-purple-400 p-6 rounded-xl transition-all hover:scale-[1.02] shadow-xl text-left">
+                       <button key={opt.id} type="button" onClick={() => chooseWanderOption(opt)} aria-label={`Wander option: ${opt.label}`} className="bg-slate-800/80 border border-slate-600 hover:border-purple-400 p-6 rounded-xl transition-all hover:scale-[1.02] shadow-xl text-left group">
                           <h3 className="text-xl font-bold mb-2">{opt.label}</h3>
-                          <p className="text-slate-400 text-sm">{opt.description}</p>
+                          <p className="text-slate-400 text-sm hidden group-hover:block">{opt.description}</p>
                        </button>
                     ))}
                  </div>
@@ -3532,7 +3542,9 @@ export default function SolitaireEngine({
                                          className={`text-white px-2 py-1 rounded text-xs font-bold shrink-0 flex items-center gap-1 ${isOwned ? 'bg-red-600 cursor-not-allowed' : gameState.coins >= (item.cost || 50) ? 'bg-green-600 hover:bg-green-500' : 'bg-slate-600 cursor-not-allowed'}`}
                                          onClick={() => buyEffect(item)}
                                          disabled={gameState.coins < (item.cost || 50) || isOwned}>
-                                         {isOwned ? 'SOLD' : (
+                                         {isOwned ? (
+                                            <img src="/icons/destitution.png" alt="Sold out" className="w-5 h-5" />
+                                         ) : (
                                             <>
                                                <ResponsiveIcon name="coin" fallbackType="exploit" size={18} className="w-[18px] h-[18px]" alt="coin" />
                                                <span>Buy {item.cost || 50}</span>
@@ -3842,26 +3854,28 @@ export default function SolitaireEngine({
                                  const charges = gameState.charges[effect.id] ?? effect.maxCharges;
                                  const rarityColors = getRarityColor(effect.rarity);
                                  
-                                 const effectType = effect.type === 'curse' ? 'curse' : effect.type === 'fear' ? 'fear' : effect.type === 'danger' ? 'danger' : effect.type === 'blessing' ? 'blessing' : 'exploit';
+                                 const effectType = effect.type === 'curse' ? 'curse' : effect.type === 'fear' ? 'fear' : effect.type === 'danger' ? 'danger' : effect.type === 'blessing' ? 'blessing' : effect.type === 'passive' ? 'passive' : 'exploit';
                                  return (
                                     <button
                                        key={effect.id}
                                        type="button"
                                        onClick={() => {
-                                          // Curses (curse/fear/danger) cannot be toggled off
+                                          // Curses (curse/fear/danger) and passive triggers cannot be toggled off
                                           const isCurseType = ['curse', 'fear', 'danger'].includes(effect.type);
+                                          const isPassive = effect.type === 'passive';
                                           // Always-on exploits cannot be toggled off
                                           const alwaysOnIds = ['trust_fund', 'tax_loophole', 'breaking_entering', 'insider_trading', 'switcheroo'];
                                           const isAlwaysOn = alwaysOnIds.includes(effect.id);
-                                          if (isCurseType || isAlwaysOn) return;
+                                          if (isCurseType || isPassive || isAlwaysOn) return;
                                           toggleEffect(effect.id);
                                        }}
                                        aria-label={`Toggle effect ${effect.name}`}
-                                       className={`p-2 rounded border text-xs flex items-center gap-3 transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : `${rarityColors.bg} ${rarityColors.border}`} ${['curse', 'fear', 'danger'].includes(effect.type) || ['trust_fund', 'tax_loophole', 'breaking_entering', 'insider_trading', 'switcheroo'].includes(effect.id) ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                                       className={`p-2 rounded border text-xs flex items-center gap-3 transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : `${rarityColors.bg} ${rarityColors.border}`} ${['curse', 'fear', 'danger', 'passive'].includes(effect.type) || ['trust_fund', 'tax_loophole', 'breaking_entering', 'insider_trading', 'switcheroo'].includes(effect.id) ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                        <ResponsiveIcon name={effect.id || effect.name} fallbackType={effectType} size={32} className="w-8 h-8 rounded shrink-0" alt={effect.name} />
                                        <div className="flex-1 min-w-0 text-left">
                                            <div className="font-bold text-white flex gap-1 items-center flex-wrap">
                                                <span className="truncate">{effect.name}</span>
+                                               {effect.type === 'passive' && <span className="text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 bg-cyan-900/50 text-cyan-300 border border-cyan-500">Always On</span>}
                                                <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{effect.rarity || 'Common'}</span>
                                                {effect.maxCharges && <span className="text-[9px] bg-slate-600 px-1 rounded text-white shrink-0">{charges}/{effect.maxCharges}</span>}
                                            </div>
@@ -3922,49 +3936,44 @@ export default function SolitaireEngine({
             {!CLASSIC_GAMES[selectedMode] ? (
                <>
                   {/* Coronata Mode - Run Progress Bar */}
-                  <div className="flex justify-between px-2 mb-2 relative group">
+                  <div className="flex justify-between px-1 mb-2 gap-0.5 relative group">
                      {runPlan.map((enc, i) => {
                         const eff = effectsRegistry.find(e => e.id === enc.effectId);
                         const isCompleted = i < gameState.runIndex;
                         const isCurrent = i === gameState.runIndex;
                         const iconClass = isCompleted ? 'opacity-80' : isCurrent ? 'opacity-100' : 'opacity-40 grayscale';
                         const iconStyle = isCurrent ? { filter: 'brightness(1.5) saturate(1.5) hue-rotate(-15deg)' } : {};
+                        const isCurrentCurse = isCurrent && enc.type === 'curse';
                         return (
                            <button
                               key={i}
                               type="button"
-                              className={`w-7 h-7 rounded flex items-center justify-center ${isCompleted ? 'bg-green-500/30 border border-green-500' : isCurrent ? 'bg-orange-500/30 border border-orange-500 animate-pulse' : 'bg-slate-700/30 border border-slate-700'}`}
-                              onClick={() => alert(`${enc.type.toUpperCase()}: ${eff?.name || 'Level ' + (i+1)}\n${eff?.description || 'Score goal: ' + enc.goal}`)}
+                              className={`${isCurrentCurse ? 'w-10 h-10' : 'w-6 h-6'} rounded flex items-center justify-center transition-all ${isCompleted ? 'bg-green-500/30 border border-green-500' : isCurrent ? 'bg-orange-500/30 border border-orange-500 animate-pulse' : 'bg-slate-700/30 border border-slate-700'}`}
+                              onClick={() => isCurrentCurse ? toggleDrawer('curse') : alert(`${enc.type.toUpperCase()}: ${eff?.name || 'Level ' + (i+1)}\n${eff?.description || 'Score goal: ' + enc.goal}`)}
                               aria-label={`Encounter ${i + 1} ${enc.type} ${eff?.name ?? ''}`}>
-                              <ResponsiveIcon name={enc.effectId} fallbackType="curse" size={18} className={`w-[18px] h-[18px] ${iconClass}`} style={iconStyle} alt={eff?.name || ''} />
+                              <ResponsiveIcon name={enc.effectId} fallbackType="curse" size={isCurrentCurse ? 24 : 16} className={`${isCurrentCurse ? 'w-6 h-6' : 'w-4 h-4'} ${iconClass}`} style={iconStyle} alt={eff?.name || ''} />
                            </button>
                         );
                      })}
                   </div>
 
-                  {/* Coronata Mode - Score Bar and Buttons */}
+                  {/* Coronata Mode - Score Bar */}
                   <div className="flex items-center gap-2 mb-2">
-                     <button type="button" onClick={() => discardAndDrawHand()} aria-label="Draw from deck" className="shrink-0 p-2 bg-blue-900 hover:bg-blue-800 rounded text-blue-300 border border-blue-700 relative">
-                        <img src="/icons/foundation.png" alt="Draw" className="w-[18px] h-[18px]" />
-                        {gameState.piles.deck.cards.length > 0 && (
-                           <span className="absolute -top-1 -right-1 bg-slate-700 text-[8px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
-                        )}
-                     </button>
                      <div className="flex-1">
                         <div className="w-full bg-slate-800 h-6 rounded-full overflow-hidden border border-slate-700 relative flex items-center justify-center">
                            <div className="absolute inset-0 bg-emerald-500 h-full transition-all duration-500" style={{ width: `${Math.min(100, (gameState.score / gameState.currentScoreGoal) * 100)}%` }} />
                            <span className="relative z-10 text-[10px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{gameState.score} / {gameState.currentScoreGoal}</span>
                         </div>
                      </div>
-                     <button type="button" className="shrink-0 p-2 bg-slate-800 hover:bg-slate-700 rounded border border-slate-700 relative">
-                        <ResponsiveIcon name="coin" fallbackType="exploit" size={18} className="w-[18px] h-[18px]" alt="coins" />
-                        <span className={`absolute -top-1 -right-1 text-[8px] px-1 rounded-full border border-slate-500 leading-none font-bold ${gameState.coins < 0 ? 'bg-red-900 text-red-300 border-red-700' : 'bg-yellow-900 text-yellow-300 border-yellow-700'}`}>{gameState.coins}</span>
-                     </button>
                   </div>
 
                   {/* Coronata Mode - Effect Buttons */}
                   <div className="flex w-full gap-1">
                      <button onClick={() => toggleDrawer('pause')} className={`p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}><img src="/icons/pause.png" alt="Pause" className="w-[18px] h-[18px]" /></button>
+                     <button type="button" className="shrink-0 p-2 bg-slate-800 hover:bg-slate-700 rounded border border-slate-700 relative">
+                        <ResponsiveIcon name="coin" fallbackType="exploit" size={18} className="w-[18px] h-[18px]" alt="coins" />
+                        <span className={`absolute -top-1 -right-1 text-[8px] px-1 rounded-full border border-slate-500 leading-none font-bold ${gameState.coins < 0 ? 'bg-red-900 text-red-300 border-red-700' : 'bg-yellow-900 text-yellow-300 border-yellow-700'}`}>{gameState.coins}</span>
+                     </button>
                      {(['exploit', 'blessing'] as const).map((type) => {
                         const hasReady = effectsRegistry.some(e => e.type === type && isEffectReady(e.id, gameState) && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll));
                         return (
@@ -3975,9 +3984,11 @@ export default function SolitaireEngine({
                            </button>
                         );
                      })}
-                     <button type="button" onClick={() => toggleDrawer('curse')} aria-label={`Curses: ${currentThreat?.name || 'Active Curse'}`} className={`flex-1 py-1.5 rounded text-[10px] font-bold border flex flex-col items-center justify-center gap-0.5
-                        ${activeDrawer === 'curse' ? 'bg-slate-700 text-white' : currentThreat ? 'bg-red-900/30 border-red-500/50 text-red-300' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
-                        <ResponsiveIcon name={currentThreat?.id || 'curse'} fallbackType="curse" size={18} className="w-[18px] h-[18px]" />
+                     <button type="button" onClick={() => discardAndDrawHand()} aria-label="Draw from deck" className="shrink-0 p-2 bg-blue-900 hover:bg-blue-800 rounded text-blue-300 border border-blue-700 relative">
+                        <img src="/icons/foundation.png" alt="Draw" className="w-[18px] h-[18px]" />
+                        {gameState.piles.deck.cards.length > 0 && (
+                           <span className="absolute -top-1 -right-1 bg-slate-700 text-[8px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
+                        )}
                      </button>
                   </div>
                </>
