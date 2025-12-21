@@ -1,3 +1,4 @@
+import { PATTERN_DEFINITIONS } from './engine/definitions/patterns';
 import React, { useState, useCallback, useEffect } from 'react';
 import { LayoutGrid, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, HelpCircle, RefreshCw, X, Gift, Trophy, ArrowLeftRight, SkipBack, SkipForward, MessageSquare, FlaskConical, Save, Flag, Settings, ChevronDown, Pause, ShoppingCart, User, Unlock, Map as MapIcon, BarChart3, Link as LinkIcon, Bug, Clock, Menu } from 'lucide-react';
 import { Card, GameState, Pile, Rank, Suit, MoveContext, Encounter, GameEffect, Wander, WanderChoice, WanderState, MinigameResult, PlayerStats, RunHistoryEntry, RunEncounterRecord } from './types';
@@ -161,7 +162,7 @@ const ICON_SYNONYMS: Record<string, string> = {
    eattherich: 'eattherich',
    cagedbakeneko: 'cagedbakeneko',
    moodswings: 'moodswings',
-   fogofwar: 'fogofwar',
+   fogwar: 'fogofwar',
    revolvingdoor: 'revolvingdoor',
   coins: 'coin',
   coin: 'coin',
@@ -1067,9 +1068,9 @@ export default function SolitaireEngine({
          blessing: 6,
          passive: 7
       };
-      // Include passive triggers automatically + active effects
-      const passiveTriggerIds = effectsRegistry.filter(e => e.type === 'passive').map(e => e.id);
-      const allActiveIds = [...new Set([...passiveTriggerIds, ...activeEffects])];
+      // Include patterns automatically + active effects
+      const patternIds = effectsRegistry.filter(e => e.type === 'pattern').map(e => e.id);
+      const allActiveIds = [...new Set([...patternIds, ...activeEffects])];
 
       return effectsRegistry
          .filter(e => allActiveIds.includes(e.id))
@@ -2169,7 +2170,7 @@ export default function SolitaireEngine({
       </div>
       <div className="grid grid-cols-3 gap-8 w-full">
          <button onClick={() => setShowModes(true)} className="flex items-center justify-center"><Play fill="currentcolor" className="w-20 h-20"/></button>
-         <button onClick={() => setShowHowTo(true)} className="flex items-center justify-center"><img src="/icons/howto.png" alt="Glossary" className="w-20 h-20" /></button>
+         <button onClick={() => setShowHowTo(true)} className="flex items-center justify-center"><img src="/icons/howto.png" alt="How To" className="w-20 h-20" /></button>
          <button className="flex items-center justify-center" onClick={() => setShowGlossary(true)}><img src="/icons/glossary.png" alt="Glossary" className="w-20 h-20" /></button>
          <button onClick={() => setShowUpdates(true)} className="flex items-center justify-center"><RefreshCw size={65}/></button>
          <button onClick={() => setShowProfile(true)} className="flex items-center justify-center"><User size={65}/></button>
@@ -3224,23 +3225,25 @@ export default function SolitaireEngine({
                     ))}
                  </div>
                  <div className="flex-1 overflow-y-auto space-y-2">
-                 {glossaryTab === 'patterns' ? (
-                      <div className="overflow-y-auto max-h-96">
-                        <table className="min-w-full text-xs">
-                          <thead><tr><th className="text-left p-1">Pattern</th><th className="text-left p-1">Description</th></tr></thead>
-                          <tbody>
-                            <tr><td className="p-1 font-mono">alternate_descending</td><td className="p-1">Standard Solitaire: alternate color, descending rank</td></tr>
-                            <tr><td className="p-1 font-mono">alternate_ascending</td><td className="p-1">Reverse build: alternate color, ascending rank</td></tr>
-                            <tr><td className="p-1 font-mono">same_suit_ascending</td><td className="p-1">Foundation: same suit, ascending rank</td></tr>
-                            <tr><td className="p-1 font-mono">any_move</td><td className="p-1">Wild: any card can move</td></tr>
-                            <tr><td className="p-1 font-mono">single_card_only</td><td className="p-1">Only single cards can move</td></tr>
-                            <tr><td className="p-1 font-mono">stack_size_limit</td><td className="p-1">Stack size is limited</td></tr>
-                            <tr><td className="p-1 font-mono">force_face_up</td><td className="p-1">All cards face up</td></tr>
-                            <tr><td className="p-1 font-mono">force_face_down</td><td className="p-1">All cards face down</td></tr>
-                            {/* Add more patterns as needed */}
-                          </tbody>
-                        </table>
-                      </div>
+                          {glossaryTab === 'patterns' ? (
+                                  <div className="overflow-y-auto max-h-96 space-y-2">
+                                     {PATTERN_DEFINITIONS.map(p => {
+                                       // Use exploit style for patterns
+                                       const rarityColors = getRarityColor(p.rarity);
+                                       return (
+                                         <div key={p.id} className={`p-3 rounded border ${rarityColors?.bg || 'bg-slate-800'} ${rarityColors?.border || 'border-slate-700'} flex gap-3`}>
+                                           <ResponsiveIcon name={p.id || p.name} fallbackType="exploit" size={40} className="w-10 h-10 rounded shrink-0" alt={p.name} />
+                                           <div className="flex-1 min-w-0">
+                                             <div className="flex justify-between items-start gap-2">
+                                               <div className="font-bold text-white truncate">{p.name}</div>
+                                               <div className={`text-[10px] uppercase px-1.5 py-0.5 rounded font-bold shrink-0 ${rarityColors?.text || ''} ${rarityColors?.bg || ''} border ${rarityColors?.border || ''}`}>{p.rarity || 'Common'}</div>
+                                             </div>
+                                             <div className="text-slate-300 text-sm mt-1">{p.description}</div>
+                                           </div>
+                                         </div>
+                                       );
+                                     })}
+                                  </div>
                     ) : effectsRegistry.length === 0 ? (
                        <div className="text-center text-slate-500 py-8">No effects loaded</div>
                     ) : effectsRegistry.filter(e => {
@@ -3980,7 +3983,7 @@ export default function SolitaireEngine({
                                        key={effect.id}
                                        type="button"
                                        onClick={() => {
-                                          // Curses (curse/fear/danger) and passive triggers cannot be toggled off
+                                          // Curses (curse/fear/danger) and patterns cannot be toggled off
                                           const isCurseType = ['curse', 'fear', 'danger'].includes(effect.type);
                                           const isPassive = effect.type === 'passive';
                                           // Always-on exploits cannot be toggled off once active

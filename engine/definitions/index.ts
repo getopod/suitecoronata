@@ -11,7 +11,7 @@ import { compileEffect, compileEffects } from '../patterns/compiler';
 import { BLESSING_DEFINITIONS } from './blessings';
 import { EXPLOIT_DEFINITIONS } from './exploits';
 import { CURSE_DEFINITIONS } from './curses';
-import { PASSIVE_TRIGGER_DEFINITIONS } from './passiveTriggers';
+import { PATTERN_DEFINITIONS } from './patterns';
 
 // =============================================================================
 // All Definitions
@@ -24,7 +24,7 @@ export const EFFECT_DEFINITIONS = {
   blessings: BLESSING_DEFINITIONS,
   exploits: EXPLOIT_DEFINITIONS,
   curses: CURSE_DEFINITIONS,
-  passiveTriggers: PASSIVE_TRIGGER_DEFINITIONS,
+  patterns: PATTERN_DEFINITIONS,
 };
 
 /**
@@ -34,7 +34,7 @@ export const ALL_DEFINITIONS: EffectDefinition[] = [
   ...BLESSING_DEFINITIONS,
   ...EXPLOIT_DEFINITIONS,
   ...CURSE_DEFINITIONS,
-  ...PASSIVE_TRIGGER_DEFINITIONS,
+  ...PATTERN_DEFINITIONS,
 ];
 
 // =============================================================================
@@ -72,4 +72,4 @@ export function getCompiledEffectsByType(type: 'blessing' | 'exploit' | 'curse')
 export { BLESSING_DEFINITIONS } from './blessings';
 export { EXPLOIT_DEFINITIONS } from './exploits';
 export { CURSE_DEFINITIONS } from './curses';
-export { PASSIVE_TRIGGER_DEFINITIONS } from './passiveTriggers';
+export { PATTERN_DEFINITIONS } from './patterns';
