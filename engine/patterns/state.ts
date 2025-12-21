@@ -389,6 +389,7 @@ export function executeStateActions(
   let result: Partial<GameState> = {};
   let currentState = ctx.state;
 
+  if (!Array.isArray(actions)) return result;
   for (const { action, params } of actions) {
     const evaluator = stateActions[action];
     if (evaluator) {

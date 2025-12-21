@@ -18,47 +18,6 @@ const getCardColor = (suit: string) => {
 
 export const PASSIVE_TRIGGER_DEFINITIONS: EffectDefinition[] = [
   {
-    id: 'master_debater',
-    name: 'Master Debater',
-    type: 'passive',
-    description: 'Foundation cards can be played to tableaus. Consecutive same-suit plays stack +100% points each.',
-    effectState: {
-      schemerLastSuit: null,
-      schemerStreak: 0
-    },
-    custom: {
-      canMove: (cards, source, target, defaultAllowed) => {
-        // Allow moving from foundation to tableau
-        if (source.type === 'foundation' && target.type === 'tableau') {
-          const moving = cards[0];
-          const top = target.cards[target.cards.length - 1];
-          if (!top) return isHighestRank(moving.rank);
-          return getCardColor(moving.suit) !== getCardColor(top.suit) &&
-                 isNextLowerInOrder(moving.rank, top.rank);
-        }
-        return defaultAllowed;
-      },
-      calculateScore: (score, context, state) => {
-        const suit = context.cards[0].suit;
-        const last = state.effectState.schemerLastSuit;
-        const streak = Math.min(state.effectState.schemerStreak || 0, 10); // Cap at 10 to prevent overflow
-
-        if (last === suit) {
-          return score * (1 + streak); // +100% per streak
-        }
-        return score;
-      },
-      onMoveComplete: (state, context) => {
-        const suit = context.cards[0].suit;
-        const last = state.effectState.schemerLastSuit;
-        const streak = state.effectState.schemerStreak || 0;
-        const nextStreak = last === suit ? Math.min(streak + 1, 10) : 1; // Cap at 10
-        return { effectState: { ...state.effectState, schemerLastSuit: suit, schemerStreak: nextStreak } };
-      }
-    }
-  },
-
-  {
     id: 'high_society',
     name: 'High Society',
     type: 'passive',
@@ -138,6 +97,7 @@ export const PASSIVE_TRIGGER_DEFINITIONS: EffectDefinition[] = [
           });
 
         if (hasRoyalFlush && !state.effectState.jailTriggered) {
+          //onClick={() => setGameState(p => ({ ...p, score: p.currentScoreGoal
           return { isLevelComplete: true, effectState: { ...state.effectState, jailTriggered: true } };
         }
         return {};
@@ -198,10 +158,24 @@ export const PASSIVE_TRIGGER_DEFINITIONS: EffectDefinition[] = [
     id: 'insider_trading',
     name: 'Insider Trading',
     type: 'passive',
-    description: 'All face cards visible → x3 encounter reward.',
-    visuals: [
-      { pattern: 'face_cards_visible' }
-    ]
+    description: 'When all face cards are face up, gain x3 encounter reward on completion.',
+    custom: {
+      onEncounterComplete: (state, context) => {
+        // Check if all face cards (A, J, Q, K) are face up
+        let allVisible = true;
+        Object.values(state.piles).forEach(pile => {
+          pile.cards.forEach(card => {
+            if ((card.rank === 1 || card.rank === 11 || card.rank === 12 || card.rank === 13) && !card.faceUp) {
+              allVisible = false;
+            }
+          });
+        });
+        if (allVisible && context && typeof context.reward === 'number') {
+          return { coins: (state.coins ?? 0) + 2 * context.reward }; // x3 total (base + 2x)
+        }
+        return {};
+      }
+    }
   },
 
   {
