@@ -308,6 +308,7 @@ export default function SolitaireEngine({
   const [activeDrawer, setActiveDrawer] = useState<'pause' | 'exploit' | 'curse' | 'blessing' | 'shop' | 'feedback' | 'test' | 'settings' | 'resign' | 'blessing_select' | null>(null);
   const [shopInventory, setShopInventory] = useState<GameEffect[]>([]);
   const [blessingChoices, setBlessingChoices] = useState<GameEffect[]>([]);
+  const [patternDrawer, setPatternDrawer] = useState(false);
   const [showLevelComplete, setShowLevelComplete] = useState(false);
 
   // Animation state
@@ -453,7 +454,7 @@ export default function SolitaireEngine({
   const [showHowTo, setShowHowTo] = useState(false);
   const [howToPage, setHowToPage] = useState(0);
   const [selectedMode, setSelectedMode] = useState('coronata');
-  const [glossaryTab, setGlossaryTab] = useState<'blessings'|'exploits'|'curses'>('curses');
+  const [glossaryTab, setGlossaryTab] = useState<'blessings'|'exploits'|'curses'|'patterns'>('blessings');
   const [profileTab, setProfileTab] = useState<'stats'|'feats'|'recaps'>('stats');
   const [expandedAchievement, setExpandedAchievement] = useState<number | null>(null);
   const [expandedSettingsSection, setExpandedSettingsSection] = useState<string | null>(null);
@@ -807,18 +808,8 @@ export default function SolitaireEngine({
           wanderState: 'result', 
           wanderResultText: choice.result 
         }));
-      } else {
-        // Fallback if onChoose doesn't return proper result
-        setGameState(prev => ({ ...prev, wanderState: 'result', wanderResultText: choice.result }));
-      }
-    } else if (choice.effects) {
-      // Old-style effects array (for PLACEHOLDER_WANDERS)
-      resolveWanderEffect(choice.effects);
-      setGameState(prev => ({ ...prev, wanderState: 'result', wanderResultText: choice.result }));
-    } else {
-      // No effects or onChoose - just show result
-      setGameState(prev => ({ ...prev, wanderState: 'result', wanderResultText: choice.result }));
-    }
+      } 
+    } 
   };
   
   const finishWander = () => {
@@ -2170,21 +2161,20 @@ export default function SolitaireEngine({
      ];
 
      return (
-        <div className="h-screen w-full bg-slate-900 text-white flex flex-col items-center justify-center p-4 gap-8">
-           <div className="text-center space-y-2">
-              <img src="/logo-48x72.png" alt="Coronata" className="w-12 h-auto mx-auto mb-2" />
-              <h1 className="text-5xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-purple-400 to-blue-600">CORONATA</h1>
-              <p className="text-slate-400">Rogue-like Solitaire</p>
-           </div>
-           <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
-              <button onClick={startRun} className="col-span-2 bg-emerald-600 hover:bg-emerald-500 text-white py-4 rounded-xl font-bold text-xl shadow-lg shadow-emerald-900/50 flex items-center justify-center gap-2"><Play fill="currentColor" /> Play</button>
-              <button onClick={() => setShowModes(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2">Modes</button>
-              <button onClick={() => setShowHowTo(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2">How To</button>
-              <button className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2" onClick={() => setShowGlossary(true)}><img src="/icons/glossary.png" alt="Glossary" className="w-5 h-5" /></button>
-              <button onClick={() => setShowUpdates(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><RefreshCw size={18}/></button>
-              <button onClick={() => setShowProfile(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><User size={18}/></button>
-              <button onClick={() => setShowSettings(true)} className="bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"><img src="/icons/settings.png" alt="Settings" className="w-5 h-5" /></button>
-           </div>
+      <div className="h-screen w-full bg-slate-900 text-white flex flex-col items-center justify-center p-12 gap-8">
+      <div className="text-center space-y-6">
+         <img src="/icons/logo-48x72.png" alt="Coronata" className="w-20 h-auto mx-auto mb-2" />
+         <h1 className="text-5xl font-black ">CORONATA</h1>
+
+      </div>
+      <div className="grid grid-cols-3 gap-8 w-full">
+         <button onClick={() => setShowModes(true)} className="flex items-center justify-center"><Play fill="currentcolor" className="w-20 h-20"/></button>
+         <button onClick={() => setShowHowTo(true)} className="flex items-center justify-center"><img src="/icons/howto.png" alt="Glossary" className="w-20 h-20" /></button>
+         <button className="flex items-center justify-center" onClick={() => setShowGlossary(true)}><img src="/icons/glossary.png" alt="Glossary" className="w-20 h-20" /></button>
+         <button onClick={() => setShowUpdates(true)} className="flex items-center justify-center"><RefreshCw size={65}/></button>
+         <button onClick={() => setShowProfile(true)} className="flex items-center justify-center"><User size={65}/></button>
+         <button onClick={() => setShowSettings(true)} className="flex items-center justify-center"><img src="/icons/settings.png" alt="Settings" className="w-20 h-20" /></button>
+      </div>
 
            {/* MODES PANEL */}
            {showModes && (
@@ -2200,8 +2190,8 @@ export default function SolitaireEngine({
                           onClick={() => mode.unlocked && setSelectedMode(mode.id)}
                           className={`w-full p-4 rounded-xl border text-left transition-all cursor-pointer ${
                              selectedMode === mode.id 
-                                ? 'bg-purple-900/50 border-purple-500 ring-2 ring-purple-400' 
-                                : mode.unlocked 
+                             ? 'bg-purple-900/50 border-purple-500 ring- ring-purple-400' 
+                             : mode.unlocked 
                                    ? 'bg-slate-800 border-slate-700 hover:border-slate-500' 
                                    : 'bg-slate-800/50 border-slate-700/50 opacity-50 cursor-not-allowed pointer-events-none'
                           }`}>
@@ -2209,7 +2199,7 @@ export default function SolitaireEngine({
                              <div className="flex-1">
                                 <div className="font-bold text-white flex items-center gap-2">
                                    {mode.name}
-                                   {!mode.unlocked && <Lock size={14} className="text-slate-500" />}
+                                   {!mode.unlocked && <Lock size={10} className="text-slate-500" />}
                                    {selectedMode === mode.id}
                                 </div>
                                 <div className="text-sm text-slate-400">{mode.desc}</div>
@@ -2222,8 +2212,8 @@ export default function SolitaireEngine({
                     <div className="mt-4 p-4 rounded-xl border border-dashed border-slate-600 bg-slate-800/30">
                        <div className="text-center">
                           <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-slate-700 flex items-center justify-center"><RefreshCw size={18} className="text-slate-500" /></div>
-                          <div className="font-bold text-slate-400">More Modes Coming Soon</div>
-                          <div className="text-xs text-slate-500 mt-1">Daily challenges, endless mode, custom runs & more!</div>
+                          
+                          <div className="text-xs text-slate-500 mt-1">More coming soon!</div>
                        </div>
                     </div>
                  </div>
@@ -2231,7 +2221,7 @@ export default function SolitaireEngine({
                     <button 
                        onClick={() => { setShowModes(false); startRun(); }} 
                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-lg flex items-center justify-center gap-2">
-                       <Play fill="currentColor" /> Start {gameModes.find(m => m.id === selectedMode)?.name}
+                       <Play fill="currentColor" />{gameModes.find(m => m.id === selectedMode)?.name}
                     </button>
                  </div>
               </div>
@@ -3213,24 +3203,45 @@ export default function SolitaireEngine({
                  <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
                     <h2 className="text-2xl font-bold">Glossary</h2>
                     <button onClick={() => setShowGlossary(false)}><X /></button>
-                 </div>
-                 <div className="flex gap-1 overflow-x-auto pb-2 mb-2">
-                    {(['blessings', 'exploits', 'curses'] as const).map(cat => (
-                       <button 
-                          key={cat} 
-                          onClick={() => setGlossaryTab(cat)} 
-                          className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold flex flex-col items-center gap-1 transition-all ${
-                             glossaryTab === cat 
-                                ? 'bg-slate-700 text-white' 
-                                : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
-                          }`}>
-                          <img src={categoryIcons[cat]} alt="" className="w-6 h-6" />
+                    </div>
+                    <div className="flex gap-1 overflow-x-auto pb-2 mb-2">
+                       {(['blessings', 'exploits', 'curses', 'patterns'] as const).map(cat => (
+                          <button 
+                             key={cat} 
+                             onClick={() => setGlossaryTab(cat)} 
+                             className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold flex flex-col items-center gap-1 transition-all ${
+                                glossaryTab === cat 
+                                   ? 'bg-slate-700 text-white' 
+                                   : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
+                             }`}>
+                             {cat !== 'patterns' ? (
+                               <img src={categoryIcons[cat]} alt="" className="w-6 h-6" />
+                             ) : (
+                               <span className="w-6 h-6 flex items-center justify-center text-blue-300">𝌆</span>
+                             )}
                           <span className="capitalize">{cat}</span>
                        </button>
                     ))}
                  </div>
                  <div className="flex-1 overflow-y-auto space-y-2">
-                    {effectsRegistry.length === 0 ? (
+                 {glossaryTab === 'patterns' ? (
+                      <div className="overflow-y-auto max-h-96">
+                        <table className="min-w-full text-xs">
+                          <thead><tr><th className="text-left p-1">Pattern</th><th className="text-left p-1">Description</th></tr></thead>
+                          <tbody>
+                            <tr><td className="p-1 font-mono">alternate_descending</td><td className="p-1">Standard Solitaire: alternate color, descending rank</td></tr>
+                            <tr><td className="p-1 font-mono">alternate_ascending</td><td className="p-1">Reverse build: alternate color, ascending rank</td></tr>
+                            <tr><td className="p-1 font-mono">same_suit_ascending</td><td className="p-1">Foundation: same suit, ascending rank</td></tr>
+                            <tr><td className="p-1 font-mono">any_move</td><td className="p-1">Wild: any card can move</td></tr>
+                            <tr><td className="p-1 font-mono">single_card_only</td><td className="p-1">Only single cards can move</td></tr>
+                            <tr><td className="p-1 font-mono">stack_size_limit</td><td className="p-1">Stack size is limited</td></tr>
+                            <tr><td className="p-1 font-mono">force_face_up</td><td className="p-1">All cards face up</td></tr>
+                            <tr><td className="p-1 font-mono">force_face_down</td><td className="p-1">All cards face down</td></tr>
+                            {/* Add more patterns as needed */}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : effectsRegistry.length === 0 ? (
                        <div className="text-center text-slate-500 py-8">No effects loaded</div>
                     ) : effectsRegistry.filter(e => {
                        if (glossaryTab === 'blessings') return e.type === 'blessing';
@@ -3625,12 +3636,11 @@ export default function SolitaireEngine({
                      <div className="max-w-md mx-auto mt-2">
                         {activeDrawer === 'pause' ? (
                            <div className="grid grid-cols-5 gap-1">
-                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600"><img src="/icons/save.png" alt="" className="w-3 h-3" /><span className="text-[7px]">Save</span></button>
-                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('resign')}><img src="/icons/resign.png" alt="" className="w-3 h-3" /><span className="text-[7px]">Resign</span></button>
-                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('feedback')}><img src="/icons/feedback.png" alt="" className="w-3 h-3" /><span className="text-[7px]">Feedback</span></button>
-                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('test')}><FlaskConical size={12} /><span className="text-[7px]">Test</span></button>
-                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><img src="/icons/settings.png" alt="" className="w-3 h-3" /><span className="text-[7px]">Settings</span></button>
-                           </div>
+                           <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600"><img src="/icons/save.png" alt="" className="w-8 h-8" /><span className="text-[7px]">Save</span></button>
+                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('resign')}><img src="/icons/resign.png" alt="" className="w-8 h-8" /><span className="text-[7px]">Resign</span></button>
+                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('feedback')}><img src="/icons/feedback.png" alt="" className="w-8 h-8" /><span className="text-[7px]">Feedback</span></button>
+                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('test')}><FlaskConical size={32} /><span className="text-[7px]">Test</span></button>
+                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><img src="/icons/settings.png" alt="" className="w-8 h-8" /><span className="text-[7px]">Settings</span></button>                           </div>
                         ) : activeDrawer === 'shop' ? (
                            <div className="flex flex-col gap-2">
                               <div className="grid grid-cols-1 gap-2">
@@ -4089,7 +4099,7 @@ export default function SolitaireEngine({
                         <ResponsiveIcon name="coin" fallbackType="exploit" size={36} className="w-9 h-9" alt="coins" />
                         <span className={`absolute -top-1 -right-1 text-[8px] px-1 rounded-full border border-slate-500 leading-none font-bold ${gameState.coins < 0 ? 'bg-red-900 text-red-300 border-red-700' : 'bg-yellow-900 text-yellow-300 border-yellow-700'}`}>{gameState.coins}</span>
                      </button>
-                     {(['exploit', 'blessing'] as const).map((type) => {
+                     {(['exploit', 'blessing', 'patterns'] as const).map((type) => {
                         const hasReady = effectsRegistry.some(e => e.type === type && isEffectReady(e.id, gameState) && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll));
                         return (
                            <button key={type} onClick={() => toggleDrawer(type as any)}
