@@ -17,10 +17,7 @@ const getCardColor = (suit: string) => {
 };
 
 export const BLESSING_DEFINITIONS: EffectDefinition[] = [
-  // ===========================================================================
-  // Movement Modifiers
-  // ===========================================================================
-
+  // Blacksmith
   {
     id: 'blacksmith',
     name: 'Blacksmith',
@@ -28,27 +25,26 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     description: 'Tableau plays allow same or ±1 rank. Play buried face-up cards without moving their stack.',
     custom: {
       canMove: (cards, source, target, defaultAllowed) => {
-        // Thief's effect: allow playing buried face-up cards
+        // Allow playing buried face-up cards
         if (source.type === 'tableau' && cards.length === 1) {
           const card = cards[0];
           const idx = source.cards.findIndex(c => c.id === card.id);
           const isBuried = idx < source.cards.length - 1;
           if (isBuried && card.faceUp) return true;
         }
-
-        // Blacksmith's effect: tableau plays allow same or ±1 rank
+        // Allow same or ±1 rank for tableau plays
         if (target.type === 'tableau' && target.cards.length > 0) {
           const moving = cards[0];
           const top = target.cards[target.cards.length - 1];
           const step = Math.abs(moving.rank - top.rank) <= 1;
-          const isAlt = getCardColor(moving.suit) !== getCardColor(top.suit);
-          return isAlt && step;
+          return step;
         }
         return defaultAllowed;
       }
     }
   },
 
+  // Maneki-Neko
   {
     id: 'maneki_neko',
     name: 'Maneki-Neko',
@@ -59,11 +55,11 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
         const moving = cards[0];
         const top = target.cards[target.cards.length - 1];
         if (target.type === 'tableau') {
-          if (!top) return isHighestRank(moving.rank);
-          return isNextLowerInOrder(moving.rank, top.rank);
+          if (!top) return true;
+          return Math.abs(moving.rank - top.rank) === 1;
         }
         if (target.type === 'foundation') {
-          if (!top) return moving.rank === 1;
+          if (!top) return true;
           return moving.suit === top.suit;
         }
         return defaultAllowed;
@@ -71,6 +67,7 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     }
   },
 
+  // Tortoiseshell
   {
     id: 'tortoiseshell',
     name: 'Tortoiseshell',
@@ -79,52 +76,43 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     custom: {
       canMove: (cards, source, target, defaultAllowed) => {
         const moving = cards[0];
-        const top = target.cards[target.cards.length - 1];
+        // No duplicate rank+suit in same tableau
         if (target.type === 'tableau') {
-          // Check for duplicate rank+suit in target tableau
-          const hasDuplicate = target.cards.some(card =>
-            card.rank === moving.rank && card.suit === moving.suit
-          );
+          const hasDuplicate = target.cards.some(card => card.rank === moving.rank && card.suit === moving.suit);
           if (hasDuplicate) return false;
-
-          if (!top) return isHighestRank(moving.rank);
-          return getCardColor(moving.suit) !== getCardColor(top.suit);
+          return true;
         }
         if (target.type === 'foundation') {
-          if (!top) return moving.rank === 1;
-          return isNextHigherInOrder(moving.rank, top.rank);
+          if (!target.cards.length) return true;
+          return Math.abs(moving.rank - target.cards[target.cards.length - 1].rank) === 1;
         }
         return defaultAllowed;
       }
     }
   },
 
-  // ===========================================================================
-  // Pile Modifiers
-  // ===========================================================================
-
+  // Vagrant
   {
     id: 'vagrant',
     name: 'Vagrant',
     type: 'blessing',
-    description: '+2 tableaus. Build foundations in any order once aces are placed.',
+    description: '+2 tableaus. Allows playing buried face-up cards while moving their stack.',
     onActivate: [
       { action: 'add_piles', params: { type: 'tableau', count: 2 } }
     ],
     custom: {
       canMove: (cards, source, target, defaultAllowed) => {
-        if (target.type === 'foundation') {
-          const moving = cards[0];
-          const top = target.cards[target.cards.length - 1];
-          if (!top) return moving.rank === 1;
-          return moving.suit === top.suit && (isNextHigherInOrder(moving.rank, top.rank) ||
-                 isNextLowerInOrder(moving.rank, top.rank));
+        // Allow playing buried face-up cards while moving their stack
+        if (source.type === 'tableau') {
+          const idx = source.cards.findIndex(c => c.id === cards[0].id);
+          if (idx < source.cards.length - 1 && cards.every(c => c.faceUp)) return true;
         }
         return defaultAllowed;
       }
     }
   },
 
+  // Wizard
   {
     id: 'wizard',
     name: 'Wizard',
@@ -138,56 +126,21 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
         if (target.type === 'tableau' && target.cards.length > 0) {
           const moving = cards[0];
           const top = target.cards[target.cards.length - 1];
-          const isAlt = getCardColor(moving.suit) !== getCardColor(top.suit);
-          return isAlt && (isNextHigherInOrder(moving.rank, top.rank) || isNextLowerInOrder(moving.rank, top.rank));
+          return Math.abs(moving.rank - top.rank) === 1;
         }
         return defaultAllowed;
       }
     }
   },
 
-  // ===========================================================================
-  // Scoring Modifiers
-  // ===========================================================================
-
-  {
-    id: 'schemer',
-    name: 'Schemer',
-    type: 'blessing',
-    description: 'All tableau cards face up. +1 wild foundation.',
-    visuals: [
-      { pattern: 'force_face_up', appliesTo: ['tableau'] }
-    ],
-    custom: {
-      onActivate: (state) => {
-        const fid = `foundation-wild-${Date.now()}`;
-        const newPile: Pile = { id: fid, type: 'foundation', cards: [], meta: { isWildFoundation: true } };
-        const newPiles = { ...state.piles, [fid]: newPile };
-        return { piles: newPiles };
-      },
-      canMove: (cards, source, target, defaultAllowed) => {
-        // Wild foundation logic
-        if (target.meta?.isWildFoundation) {
-          const top = target.cards[target.cards.length - 1];
-          if (!top) return cards[0].rank === 1 || cards[0].meta?.isWild;
-          return isNextHigherInOrder(cards[0].rank, top.rank);
-        }
-        return defaultAllowed;
-      }
-    }
-  },
-
-  // ===========================================================================
-  // Special Cards
-  // ===========================================================================
-
+  // Jester
   {
     id: 'jester',
     name: 'Jester',
     type: 'blessing',
-    description: '+20% coin from all sources. Add a wild card to your hand (3 charges).',
+    description: '+50% coin from all sources. Add a wild card to your hand (3 charges).',
     coins: [
-      { pattern: 'coin_multiplier', params: { allMultiplier: 1.2 } }
+      { pattern: 'coin_multiplier', params: { allMultiplier: 1.5 } }
     ],
     custom: {
       onActivate: (state) => {
@@ -211,11 +164,15 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     }
   },
 
+  // Trickster
   {
     id: 'trickster',
     name: 'Trickster',
     type: 'blessing',
-    description: 'Add a key to your hand (3 charges). Allows playing buried face-up cards while moving their stack.',
+    description: 'All tableau cards face up. Add a key to your hand (3 charges).',
+    visuals: [
+      { pattern: 'force_face_up', appliesTo: ['tableau'] }
+    ],
     custom: {
       onActivate: (state) => {
         const hand = state.piles['hand'];
@@ -232,65 +189,23 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
             hand: { ...hand, cards: [...hand.cards, tricksterKey] }
           }
         };
-      },
-      canMove: (cards, source, target, defaultAllowed, state) => {
-        // Check if trickster key is in hand with charges
-        const hand = state.piles['hand'];
-        const tricksterKey = hand?.cards.find(c => c.meta?.isTricksterKey && (c.meta.charges || 0) > 0);
-
-        if (tricksterKey && source.type === 'tableau') {
-          // Allow moving any face-up card along with all cards on top of it
-          const sourceCards = source.cards;
-          const firstCardIndex = sourceCards.findIndex(c => c.id === cards[0].id);
-
-          if (firstCardIndex >= 0 && sourceCards[firstCardIndex].faceUp) {
-            return true; // Allow the move
-          }
-        }
-
-        return defaultAllowed;
       }
     }
   },
 
-  // ===========================================================================
-  // Complex Effects (require custom handlers)
-  // ===========================================================================
-
+  // Klabautermann
   {
     id: 'klabautermann',
     name: 'Klabautermann',
     type: 'blessing',
-    description: 'Block 1 ability trigger or gain 1 advantage per encounter.',
-    effectState: {
-      klabautermannUsed: false,
-      masterDebaterCharges: 1,
-      fleshWoundBandages: 0,
-      cagedBakenekoBonusKeys: 0,
-      streetSmartsCoinSaved: 0,
-      fogOfWarBlocked: false,
-      threeRulesDelayPlays: 0,
-      moodSwingsStartingRank: null,
-      eatTheRichCoinReduction: 0
-    },
+    description: 'Block 1 ability trigger or gain 1 advantage per encounter. (blocks 1 flip on Reverse Psychology, adds 1 extra bandage on Flesh Wound, adds 1 key on Caged Bakeneko, doubles the coin kept on Street Smarts, blocks shift once on Fog of War, allows picking starting preference on Mood Swings, gives +1 coin per move on Eat the Rich, & gives 3 play head start on 3 rules of 3)',
+    effectState: {},
     custom: {
-      onEncounterStart: (state) => ({
-        effectState: {
-          ...state.effectState,
-          klabautermannUsed: false,
-          masterDebaterCharges: 1,
-          fleshWoundBandages: 0,
-          cagedBakenekoBonusKeys: 0,
-          streetSmartsCoinSaved: 0,
-          fogOfWarBlocked: false,
-          threeRulesDelayPlays: 0,
-          moodSwingsStartingRank: null,
-          eatTheRichCoinReduction: 0
-        }
-      })
+      // Implement per-curse logic in their respective handlers
     }
   },
 
+  // Martyr
   {
     id: 'martyr',
     name: 'Martyr',
@@ -299,9 +214,8 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     effectState: { lastPlayedCards: [], martyrTimekeeperUsed: false },
     custom: {
       onActivate: (state) => {
-        // Check if we're using the timekeeper ability
         if (state.effectState.martyrTimekeeperUsed) {
-          // Use the sacrifice foundation ability
+          // Sacrifice 1 foundation
           const fids = Object.keys(state.piles).filter(k => k.startsWith('foundation') && state.piles[k].cards.length > 0);
           if (fids.length === 0) return {};
           const fid = fids[0];
@@ -317,7 +231,7 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
             }
           };
         } else {
-          // Use the timekeeper ability
+          // Return last 5 cards you played to your hand (1 charge)
           const lastFive: Card[] = (state.effectState.lastPlayedCards || []).slice(-5);
           const hand = state.piles['hand'];
           const clean = lastFive.map(c => ({ ...c, faceUp: true }));
@@ -335,5 +249,16 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     }
   },
 
+  // Whore
+  {
+    id: 'whore',
+    name: 'Whore',
+    type: 'blessing',
+    description: 'Convert between points & coins (4:1 or 1:5). Pay 2× score goal to skip encounter (no coin rewards).',
+    effectState: {},
+    custom: {
+      // Conversion and skip logic handled in UI/game flow
+    }
+  },
 ];
 // Merchant blessing removed - merged into Trust Fund exploit

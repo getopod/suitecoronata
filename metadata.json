@@ -1,5 +1,5 @@
 {
-  "name": "Solitaire Rogue",
-  "description": "A roguelike solitaire deck-builder where you cheat, break rules, and battle RNG.",
+  "name": "Coronata v2",
+  "description": "A roguelike solitaire based on Klondike.",
   "requestFramePermissions": []
 }
