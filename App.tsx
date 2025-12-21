@@ -774,31 +774,31 @@ export default function SolitaireEngine({
         }
         
         // Map inventory back to ownedEffects and activeEffects
-        if (resultState.run?.inventory) {
-          const inv = resultState.run.inventory;
-          const newOwned = new Set(gameState.ownedEffects);
-          const newActive = new Set(activeEffects);
+            if (resultState.run?.inventory) {
+               const inv = resultState.run.inventory;
+               const newOwned = new Set<string>(gameState.ownedEffects);
+               const newActive = new Set<string>(activeEffects);
           
-          if (inv.exploits) inv.exploits.forEach((id) => { newOwned.add(id); newActive.add(id); });
-          if (inv.curses) inv.curses.forEach((id) => { newOwned.add(id); newActive.add(id); });
-          if (inv.blessings) inv.blessings.forEach((id) => newOwned.add(id));
+               if (inv.exploits) inv.exploits.forEach((id: string) => { newOwned.add(id); newActive.add(id); });
+               if (inv.curses) inv.curses.forEach((id: string) => { newOwned.add(id); newActive.add(id); });
+               if (inv.blessings) inv.blessings.forEach((id: string) => newOwned.add(id));
           
-          updates.ownedEffects = Array.from(newOwned);
-          setActiveEffects(Array.from(newActive));
+               updates.ownedEffects = Array.from(newOwned);
+               setActiveEffects(Array.from(newActive));
           
-          // Map items, fortunes, etc.
-          updates.run = {
-            ...gameState.run,
-            inventory: {
-              items: inv.items || gameState.run?.inventory?.items || [],
-              fortunes: inv.fortunes || gameState.run?.inventory?.fortunes || [],
-            },
-            unlockedWanders: resultState.run.unlockedWanders || gameState.run?.unlockedWanders || [],
-            activeQuests: resultState.run.activeQuests || gameState.run?.activeQuests || [],
-            statuses: resultState.run.statuses || gameState.run?.statuses || [],
-            forcedCurse: resultState.run.forcedCurse,
-          };
-        }
+               // Map items, fortunes, etc.
+               updates.run = {
+                  ...gameState.run,
+                  inventory: {
+                     items: inv.items || gameState.run?.inventory?.items || [],
+                     fortunes: inv.fortunes || gameState.run?.inventory?.fortunes || [],
+                  },
+                  unlockedWanders: resultState.run.unlockedWanders || gameState.run?.unlockedWanders || [],
+                  activeQuests: resultState.run.activeQuests || gameState.run?.activeQuests || [],
+                  statuses: resultState.run.statuses || gameState.run?.statuses || [],
+                  forcedCurse: resultState.run.forcedCurse,
+               };
+            }
         
         // Apply updates and set result text
         setGameState(prev => ({ 
@@ -1064,29 +1064,34 @@ export default function SolitaireEngine({
   };
 
   // Sort effects by type: curse → exploit → blessing for predictable execution order
-  const getEffects = useCallback(() => {
-    const typeOrder: Record<string, number> = {
-      curse: 0,
-      exploit: 1,
-      blessing: 2,
-      passive: 3,
-      epic: 4,
-      legendary: 5,
-      rare: 6,
-      uncommon: 7
-    };
-    // Include passive triggers automatically + active effects
-    const passiveTriggerIds = effectsRegistry.filter(e => e.type === 'passive').map(e => e.id);
-    const allActiveIds = [...new Set([...passiveTriggerIds, ...activeEffects])];
+   const getEffects = useCallback(() => {
+      // Improved effect sorting: curse → exploit → epic → legendary → rare → uncommon → blessing → passive
+      const typeOrder: Record<string, number> = {
+         curse: 0,
+         exploit: 1,
+         epic: 2,
+         legendary: 3,
+         rare: 4,
+         uncommon: 5,
+         blessing: 6,
+         passive: 7
+      };
+      // Include passive triggers automatically + active effects
+      const passiveTriggerIds = effectsRegistry.filter(e => e.type === 'passive').map(e => e.id);
+      const allActiveIds = [...new Set([...passiveTriggerIds, ...activeEffects])];
 
-    return effectsRegistry
-      .filter(e => allActiveIds.includes(e.id))
-      .sort((a, b) => {
-        const orderA = typeOrder[a.type] ?? 999;
-        const orderB = typeOrder[b.type] ?? 999;
-        return orderA - orderB;
-      });
-  }, [activeEffects, effectsRegistry]);
+      return effectsRegistry
+         .filter(e => allActiveIds.includes(e.id))
+         .sort((a, b) => {
+            const orderA = typeOrder[a.type] ?? 999;
+            const orderB = typeOrder[b.type] ?? 999;
+            // If same type, sort by name for consistency
+            if (orderA === orderB) {
+               return (a.name || '').localeCompare(b.name || '');
+            }
+            return orderA - orderB;
+         });
+   }, [activeEffects, effectsRegistry]);
 
   // Find valid move destinations for a card/stack
   const findValidMoves = useCallback((movingCardIds: string[], sourcePileId: string): { tableauIds: string[]; foundationIds: string[] } => {
@@ -1164,45 +1169,47 @@ export default function SolitaireEngine({
 
     if (!stackValid) return { tableauIds: [], foundationIds: [] };
 
-    Object.entries(gameState.piles).forEach(([pileId, pile]) => {
-      if (pile && pile.type === 'tableau' && pileId !== sourcePileId) {
-        if (!pile.locked) {
-          let valid = isStandardMoveValid(movingCards, pile, settings.supportPatriarchy);
-          // Apply effect canMove hooks
-          effects.forEach(eff => {
-            if (eff.canMove) {
-              try {
-                const res = eff.canMove(movingCards, sourcePile, pile, valid, gameState);
-                if (res !== undefined) valid = res;
-              } catch (e) { /* ignore */ }
-            }
-          });
-          if (valid) tableauIds.push(pileId);
-        }
-      }
-    });
-
-    // Check foundation destinations (only for single cards)
-    if (movingCards.length === 1) {
       Object.entries(gameState.piles).forEach(([pileId, pile]) => {
-        if (pile && pile.type === 'foundation') {
-          let valid = isStandardMoveValid(movingCards, pile, settings.supportPatriarchy);
-          console.log(`[findValidMoves] Foundation ${pileId}: card=${movingCards[0]?.rank}${movingCards[0]?.suit}, topCard=${pile.cards[pile.cards.length-1]?.rank}${pile.cards[pile.cards.length-1]?.suit}, valid=${valid}`);
-          effects.forEach(eff => {
-            if (eff.canMove) {
-              try {
-                const res = eff.canMove(movingCards, sourcePile, pile, valid, gameState);
-                if (res !== undefined) {
-                  console.log(`[findValidMoves] Effect ${eff.id} changed valid from ${valid} to ${res}`);
-                  valid = res;
-                }
-              } catch (e) { /* ignore */ }
+         const pileTyped = pile as Pile;
+         if (pileTyped && pileTyped.type === 'tableau' && pileId !== sourcePileId) {
+            if (!pileTyped.locked) {
+               let valid = isStandardMoveValid(movingCards, pileTyped, settings.supportPatriarchy);
+               // Apply effect canMove hooks
+               effects.forEach(eff => {
+                  if (eff.canMove) {
+                     try {
+                        const res = eff.canMove(movingCards, sourcePile, pileTyped, valid, gameState);
+                        if (res !== undefined) valid = res;
+                     } catch (e) { /* ignore */ }
+                  }
+               });
+               if (valid) tableauIds.push(pileId);
             }
-          });
-          if (valid) foundationIds.push(pileId);
-        }
+         }
       });
-    }
+
+      // Check foundation destinations (only for single cards)
+      if (movingCards.length === 1) {
+         Object.entries(gameState.piles).forEach(([pileId, pile]) => {
+            const pileTyped = pile as Pile;
+            if (pileTyped && pileTyped.type === 'foundation') {
+               let valid = isStandardMoveValid(movingCards, pileTyped, settings.supportPatriarchy);
+               console.log(`[findValidMoves] Foundation ${pileId}: card=${movingCards[0]?.rank}${movingCards[0]?.suit}, topCard=${pileTyped.cards[pileTyped.cards.length-1]?.rank}${pileTyped.cards[pileTyped.cards.length-1]?.suit}, valid=${valid}`);
+               effects.forEach(eff => {
+                  if (eff.canMove) {
+                     try {
+                        const res = eff.canMove(movingCards, sourcePile, pileTyped, valid, gameState);
+                        if (res !== undefined) {
+                           console.log(`[findValidMoves] Effect ${eff.id} changed valid from ${valid} to ${res}`);
+                           valid = res;
+                        }
+                     } catch (e) { /* ignore */ }
+                  }
+               });
+               if (valid) foundationIds.push(pileId);
+            }
+         });
+      }
 
     return { tableauIds, foundationIds };
   }, [gameState, getEffects, settings.supportPatriarchy, selectedMode]);
@@ -1273,7 +1280,10 @@ export default function SolitaireEngine({
         }));
      } else if (type === 'unlock' && current >= 5) {
         // Unlock random tableau
-        const locked = Object.values(gameState.piles).filter((p): p is Pile => p && p.type === 'tableau' && p.locked);
+       const locked = Object.values(gameState.piles).filter((p): p is Pile => {
+          const pileTyped = p as Pile;
+          return pileTyped && pileTyped.type === 'tableau' && pileTyped.locked;
+       });
         if (locked.length > 0) {
            const target = locked[Math.floor(Math.random() * locked.length)];
            setGameState(prev => ({
@@ -2004,62 +2014,63 @@ export default function SolitaireEngine({
       );
     }
 
-    // For classic games, don't apply positioning here (handled by parent container)
-    const isClassicGame = CLASSIC_GAMES[selectedMode];
-    const cardStyle = pileId === 'hand' ? handStyle :
-                      isClassicGame ? { zIndex: index } :
-                      { top: `${pileId.includes('tableau') ? index * 18 : 0}px`, zIndex: index };
+      // For classic games, don't apply positioning here (handled by parent container)
+      const isClassicGame = CLASSIC_GAMES[selectedMode];
+      const cardStyle = pileId === 'hand' ? handStyle :
+                                 isClassicGame ? { zIndex: index } :
+                                 { top: `${pileId.includes('tableau') ? index * 18 : 0}px`, zIndex: index };
 
-    const cardAnimClass = animatingCards.get(card.id) || '';
+      // Improved animation class logic
+      const cardAnimClass = animatingCards.get(card.id)
+         ? `animated-card ${animatingCards.get(card.id)}`
+         : '';
 
-    return (
-         <button
-            key={`${card.id}-${pileId}-${index}`}
-            type="button"
-            className={`${isClassicGame ? 'relative' : 'absolute'} w-11 max-w-[44px] h-16 max-h-[64px] bg-transparent perspective-1000 select-none transition-transform hover:scale-105 hover:brightness-110 cursor-pointer ${cardAnimClass}`}
-            style={cardStyle}
-            onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
-            onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick(pileId, index); }}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); handleDoubleClick(pileId, index); } }}
-            aria-label={`${getRankDisplay(visualCard.rank)} ${visualCard.suit} card`}
-         >
-        <div className={`relative w-full h-full transform-style-3d ${settings.cardAnimations ? 'duration-500 transition-transform' : ''} ${visualCard.faceUp ? 'rotate-y-0' : 'rotate-y-180'}`}>
-            <div className={`absolute inset-0 backface-hidden bg-white rounded shadow-md flex flex-col items-center justify-between p-0.5 border border-gray-300 ${ringColor ? `ring-2 ${ringColor}` : ''}`}
-               style={{ opacity: visualCard.meta?.disabled ? 0.5 : 1, filter: visualCard.meta?.hiddenDimension ? 'grayscale(100%) blur(2px)' : 'none' }}>
-             
-             {/* Special Blessing Card Rendering */}
-             {visualCard.meta?.isBlessing ? (
-                 <div className="flex flex-col items-center justify-center h-full text-center bg-gradient-to-b from-purple-100 to-purple-200 rounded">
-                     <ResponsiveIcon name={visualCard.meta.effectId || visualCard.meta.name || ''} fallbackType="blessing" size={24} className="mb-0.5" />
-                     <div className="text-[5px] font-bold leading-tight text-purple-800 px-0.5">{visualCard.meta.name}</div>
-                 </div>
-             ) : visualCard.meta?.isWild ? (
-                 <div className="relative h-full w-full rounded overflow-hidden">
-                     <img src="/icons/cleverdisguise.png" alt="Wild" className="absolute inset-0 w-full h-full object-cover" />
-                     <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-[6px] font-bold text-white text-center py-0.5">WILD</div>
-                 </div>
-             ) : (
-                 <>
-                    <div className={`w-full flex justify-between font-bold text-[10px] leading-none ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}><span>{getRankDisplay(visualCard.rank)}</span></div>
-                    {visualCard.meta?.hideSuitIcon ? (
-                     <div className={`text-sm md:text-2xl ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}>?</div>
+      return (
+             <button
+                  key={`${card.id}-${pileId}-${index}`}
+                  type="button"
+                  className={`${isClassicGame ? 'relative' : 'absolute'} w-11 max-w-[44px] h-16 max-h-[64px] bg-transparent perspective-1000 select-none transition-transform hover:scale-105 hover:brightness-110 cursor-pointer ${cardAnimClass}`}
+                  style={cardStyle}
+                  onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
+                  onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick(pileId, index); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); handleDoubleClick(pileId, index); } }}
+                  aria-label={`${getRankDisplay(visualCard.rank)} ${visualCard.suit} card`}
+             >
+            <div className={`relative w-full h-full transform-style-3d ${settings.cardAnimations ? 'duration-500 transition-transform' : ''} ${visualCard.faceUp ? 'rotate-y-0' : 'rotate-y-180'}`}>
+                  <div className={`absolute inset-0 backface-hidden bg-white rounded shadow-md flex flex-col items-center justify-between p-0.5 border border-gray-300 ${ringColor ? `ring-2 ${ringColor}` : ''}`}
+                      style={{ opacity: visualCard.meta?.disabled ? 0.5 : 1, filter: visualCard.meta?.hiddenDimension ? 'grayscale(100%) blur(2px)' : 'none' }}>
+                   {/* Special Blessing Card Rendering */}
+                   {visualCard.meta?.isBlessing ? (
+                         <div className="flex flex-col items-center justify-center h-full text-center bg-gradient-to-b from-purple-100 to-purple-200 rounded">
+                               <ResponsiveIcon name={visualCard.meta.effectId || visualCard.meta.name || ''} fallbackType="blessing" size={24} className="mb-0.5" />
+                               <div className="text-[5px] font-bold leading-tight text-purple-800 px-0.5">{visualCard.meta.name}</div>
+                         </div>
+                   ) : visualCard.meta?.isWild ? (
+                         <div className="relative h-full w-full rounded overflow-hidden">
+                               <img src="/icons/cleverdisguise.png" alt="Wild" className="absolute inset-0 w-full h-full object-cover" />
+                               <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-[6px] font-bold text-white text-center py-0.5">WILD</div>
+                         </div>
                    ) : (
-                     <div className={`text-sm md:text-2xl ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}>{visualCard.suit === 'hearts' ? '♥' : visualCard.suit === 'diamonds' ? '♦' : visualCard.suit === 'clubs' ? '♣' : '♠'}</div>
+                         <>
+                              <div className={`w-full flex justify-between font-bold text-[10px] leading-none ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}><span>{getRankDisplay(visualCard.rank)}</span></div>
+                              {visualCard.meta?.hideSuitIcon ? (
+                               <div className={`text-sm md:text-2xl ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}>?</div>
+                            ) : (
+                               <div className={`text-sm md:text-2xl ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}>{visualCard.suit === 'hearts' ? '♥' : visualCard.suit === 'diamonds' ? '♦' : visualCard.suit === 'clubs' ? '♣' : '♠'}</div>
+                            )}
+                              <div className={`w-full flex justify-between font-bold text-[10px] leading-none rotate-180 ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}><span>{getRankDisplay(visualCard.rank)}</span></div>
+                         </>
                    )}
-                    <div className={`w-full flex justify-between font-bold text-[10px] leading-none rotate-180 ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}><span>{getRankDisplay(visualCard.rank)}</span></div>
-                 </>
-             )}
-             
-             {visualCard.meta?.showLock && <div className="absolute top-0 right-0 text-red-500"><Lock size={10} /></div>}
-             {visualCard.meta?.showKey && <div className="absolute top-0 left-0 text-yellow-500"><Key size={10} /></div>}
-             {visualCard.meta?.showWild && <div className="absolute top-0 left-0 text-fuchsia-500"><Smile size={10} /></div>}
-             {visualCard.meta?.showFake && <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none"><Skull size={24} className="text-red-900" /></div>}
-          </div>
-          <div className="absolute inset-0 backface-hidden rotate-y-180 rounded border border-slate-700 shadow-md overflow-hidden">
-             <img src={`/icons/${settings.cardBack}.png`} alt="Card back" className="w-full h-full object-cover" />
-          </div>
-            </div>
-         </button>
+                   {visualCard.meta?.showLock && <div className="absolute top-0 right-0 text-red-500"><Lock size={10} /></div>}
+                   {visualCard.meta?.showKey && <div className="absolute top-0 left-0 text-yellow-500"><Key size={10} /></div>}
+                   {visualCard.meta?.showWild && <div className="absolute top-0 left-0 text-fuchsia-500"><Smile size={10} /></div>}
+                   {visualCard.meta?.showFake && <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none"><Skull size={24} className="text-red-900" /></div>}
+               </div>
+               <div className="absolute inset-0 backface-hidden rotate-y-180 rounded border border-slate-700 shadow-md overflow-hidden">
+                   <img src={`/icons/${settings.cardBack}.png`} alt="Card back" className="w-full h-full object-cover" />
+               </div>
+                  </div>
+             </button>
       );
   };
   
@@ -2077,32 +2088,32 @@ export default function SolitaireEngine({
       return aNum - bNum; // same type, sort by number
    });
 
-  // Calculate dynamic zoom based on actual tableau count and foundation count
-  const tableauCount = tableauPiles.length;
-  const visibleTableauCount = tableauPiles.filter(p => !p.hidden).length;
-  const foundationCount = foundationPiles.length + (gameState.piles['shadow-realm'] ? 1 : 0);
-  const maxItems = Math.max(tableauCount, foundationCount);
+   // Calculate dynamic zoom based on actual tableau count and foundation count
+   const tableauCount = tableauPiles.length;
+   const visibleTableauCount = tableauPiles.filter(p => !p.hidden).length;
+   const foundationCount = foundationPiles.length + (gameState.piles['shadow-realm'] ? 1 : 0);
+   const maxItems = Math.max(tableauCount, foundationCount);
 
-  // Different zoom logic for classic vs coronata
-  let zoomScale = 1;
-  if (CLASSIC_GAMES[selectedMode]) {
-    // Classic mode: Calculate zoom to fit tableaus with 3px gaps and 3px margins
-    const cardWidth = 44; // px
-    const gap = 3; // px
-    const margin = 3; // px per side = 6px total
-    const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 360;
-    const requiredWidth = (tableauCount * cardWidth) + ((tableauCount - 1) * gap) + (margin * 2);
-    zoomScale = Math.min(1, (screenWidth - 8) / requiredWidth); // -8 for some breathing room
-  } else {
-    // Coronata mode: Calculate zoom to fit tableaus with 3px gaps and 3px margins
-    const cardWidth = 44; // px
-    const gap = 3; // px
-    const margin = 3; // px per side = 6px total
-    const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 360;
-    const requiredWidth = (maxItems * cardWidth) + ((maxItems - 1) * gap) + (margin * 2);
-    zoomScale = Math.min(1, (screenWidth - 6) / requiredWidth);
-  }
-  const maxWidth = 'auto'; // Let it expand naturally
+   // Improved zoom logic for classic/coronata modes
+   let zoomScale = 1;
+   if (CLASSIC_GAMES[selectedMode]) {
+      // Classic mode: fit tableaus with 2px gaps and 2px margins
+      const cardWidth = 44;
+      const gap = 2;
+      const margin = 2;
+      const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 360;
+      const requiredWidth = (tableauCount * cardWidth) + ((tableauCount - 1) * gap) + (margin * 2);
+      zoomScale = Math.min(1, (screenWidth - 4) / requiredWidth);
+   } else {
+      // Coronata mode: fit maxItems with 2px gaps and 2px margins
+      const cardWidth = 44;
+      const gap = 2;
+      const margin = 2;
+      const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 360;
+      const requiredWidth = (maxItems * cardWidth) + ((maxItems - 1) * gap) + (margin * 2);
+      zoomScale = Math.min(1, (screenWidth - 4) / requiredWidth);
+   }
+   const maxWidth = 'auto';
 
   const currentEncounter = runPlan[gameState.runIndex];
   const currentThreat = effectsRegistry.find(e => e.id === currentEncounter?.effectId);
@@ -2427,7 +2438,7 @@ export default function SolitaireEngine({
                                          </div>
                                          <div className="flex flex-wrap gap-1">
                                             {run.exploits.map((effectId, i) => (
-                                               <ResponsiveIcon name={effectId} fallbackType="exploit" size={20} className="rounded" key={i} />
+                                               <ResponsiveIcon name={effectId} fallbackType="exploit" size={20} className="rounded" />
                                             ))}
                                          </div>
                                       </div>
@@ -2439,7 +2450,7 @@ export default function SolitaireEngine({
                                          </div>
                                          <div className="flex flex-wrap gap-1">
                                             {run.curses.map((effectId, i) => (
-                                               <ResponsiveIcon name={effectId} fallbackType="curse" size={20} className="rounded" key={i} />
+                                               <ResponsiveIcon name={effectId} fallbackType="curse" size={20} className="rounded" />
                                             ))}
                                          </div>
                                       </div>
@@ -2451,7 +2462,7 @@ export default function SolitaireEngine({
                                          </div>
                                          <div className="flex flex-wrap gap-1">
                                             {run.blessings.map((effectId, i) => (
-                                               <ResponsiveIcon name={effectId} fallbackType="blessing" size={20} className="w-5 h-5 rounded" key={i} />
+                                               <ResponsiveIcon name={effectId} fallbackType="blessing" size={20} className="w-5 h-5 rounded" />
                                             ))}
                                          </div>
                                       </div>
@@ -3970,7 +3981,7 @@ export default function SolitaireEngine({
                                        }}
                                        aria-label={`Toggle effect ${effect.name}`}
                                        className={`p-2 rounded border text-xs flex items-center gap-3 transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : `${rarityColors.bg} ${rarityColors.border}`} ${['curse', 'fear', 'danger', 'passive'].includes(effect.type) || (['trust_fund', 'tax_loophole', 'breaking_entering', 'insider_trading', 'switcheroo'].includes(effect.id) && isActive) ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                                       <ResponsiveIcon name={effect.id || effect.name} fallbackType={effectType} size={32} className="w-8 h-8 rounded shrink-0" alt={effect.name} />
+                                       <ResponsiveIcon name={effect.id || effect.name} fallbackType={effectType === 'passive' ? 'exploit' : effectType} size={32} className="w-8 h-8 rounded shrink-0" alt={effect.name} />
                                        <div className="flex-1 min-w-0 text-left">
                                            <div className="font-bold text-white flex gap-1 items-center flex-wrap">
                                                <span className="truncate">{effect.name}</span>
@@ -4050,7 +4061,9 @@ export default function SolitaireEngine({
                               className={`w-8 h-8 rounded flex items-center justify-center transition-all ${isCompleted ? 'bg-green-500/10 border-2 border-green-500' : isCurrent ? 'bg-orange-500/10 border-2 border-orange-500 animate-pulse' : 'bg-slate-700/10 border-2 border-slate-700'}`}
                               onClick={() => isCurrentCurse ? toggleDrawer('curse') : alert(`${enc.type.toUpperCase()}: ${eff?.name || 'Level ' + (i+1)}\n${eff?.description || 'Score goal: ' + enc.goal}`)}
                               aria-label={`Encounter ${i + 1} ${enc.type} ${eff?.name ?? ''}`}>
-                              <ResponsiveIcon name={enc.effectId} fallbackType="curse" size={32} className={`w-8 h-8 object-contain aspect-square stroke-2 fill-none ${iconClass}`} style={{ ...iconStyle, stroke: 'currentColor', fill: 'none' }} alt={eff?.name || ''} />
+                                             <span className={`w-8 h-8 object-contain aspect-square stroke-2 fill-none ${iconClass}`} style={{ ...iconStyle, stroke: 'currentColor', fill: 'none' }}>
+                                                <ResponsiveIcon name={enc.effectId} fallbackType="curse" size={32} className="w-8 h-8" alt={eff?.name || ''} />
+                                             </span>
                            </button>
                         );
                      })}
