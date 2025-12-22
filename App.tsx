@@ -1,5 +1,4 @@
-import { PATTERN_DEFINITIONS } from './engine/definitions/patterns';
-import React, { useState, useCallback, useEffect } from 'react';
+
 import { LayoutGrid, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, HelpCircle, RefreshCw, X, Gift, Trophy, ArrowLeftRight, SkipBack, SkipForward, MessageSquare, FlaskConical, Save, Flag, Settings, ChevronDown, Pause, ShoppingCart, User, Unlock, Map as MapIcon, BarChart3, Link as LinkIcon, Bug, Clock, Menu } from 'lucide-react';
 import { Card, GameState, Pile, Rank, Suit, MoveContext, Encounter, GameEffect, Wander, WanderChoice, WanderState, MinigameResult, PlayerStats, RunHistoryEntry, RunEncounterRecord } from './types';
 import { getCardColor, generateNewBoard, EFFECTS_REGISTRY, setEffectsRng, resetEffectsRng } from './data/effects';
@@ -275,12 +274,11 @@ const categoryIcons: Record<string, string> = {
    curse: '/icons/curse.png',
    curses: '/icons/curse.png'
 };
-
+}
 export default function SolitaireEngine({ 
    effectsRegistry = EFFECTS_REGISTRY, 
    wanderRegistry = WANDER_REGISTRY 
-}: SolitaireEngineProps = {}) {
-   // Placeholder undo function. Replace with real undo logic as needed.
+}: SolitaireEngineProps = {})
    function undoLastMove() {
       alert('Undo not yet implemented.');
    }
@@ -2063,9 +2061,7 @@ export default function SolitaireEngine({
              </button>
       );
   };
-  
-  // ... (Rest of Component - Render Logic - Identical) ...
-  // ...
+
    const foundationPiles = (Object.values(gameState.piles) as Pile[]).filter(p => p.type === 'foundation').sort((a, b) => a.id.localeCompare(b.id));
    const tableauPiles = (Object.values(gameState.piles) as Pile[]).filter(p => p.type === 'tableau').sort((a, b) => {
       // Sort tableau piles: regular tableau (0-6) first, then babel piles (0-3)
@@ -2164,8 +2160,6 @@ export default function SolitaireEngine({
       <div className="text-center space-y-6">
          <img src="/icons/logo-48x72.png" alt="Coronata" className="w-20 h-auto mx-auto mb-2" />
          <h1 className="text-5xl font-black ">CORONATA</h1>
-
-      
       <div className="grid grid-cols-3 gap-8 w-full">
          <button onClick={() => setShowModes(true)} className="flex items-center justify-center"><Play fill="currentcolor" className="w-20 h-20"/></button>
          <button onClick={() => setShowHowTo(true)} className="flex items-center justify-center"><img src="/icons/howto.png" alt="How To" className="w-20 h-20" /></button>
@@ -3155,7 +3149,6 @@ export default function SolitaireEngine({
                  </div>
               </div>
            )}
-      
 
   if (gameState.wanderState !== 'none') {
      return (
@@ -3514,11 +3507,8 @@ export default function SolitaireEngine({
          {/* Hand cards - positioned relative to bottom panel */}
 
 
-// ...existing logic, hooks, and functions above...
-
 return (
    <>
-      {/* ...existing JSX above... */}
 
       {/* Bottom control bar - always at bottom, with drawer expanding up from its top */}
       <div className={`bg-slate-900 border-t border-slate-800 p-2 w-full max-w-md mx-auto relative pointer-events-auto overflow-visible`}>
@@ -3557,7 +3547,7 @@ return (
          )}
          {/* ...rest of bottom bar content... */}
       
-      {/* ...existing JSX below... */}
+
    </>
 );
                                     const itemType = item.type === 'curse' ? 'curse' : item.type === 'blessing' ? 'blessing' : 'exploit';
@@ -4355,5 +4345,6 @@ return (
          </div>
       )}
     </div>
-  );
+  
+   };
 }
