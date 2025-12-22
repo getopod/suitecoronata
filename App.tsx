@@ -293,8 +293,10 @@ export default function SolitaireEngine({
   const [runPlan, setRunPlan] = useState<Encounter[]>([]);
   const [gameState, setGameState] = useState<GameState>(initialGameState());
   const [activeEffects, setActiveEffects] = useState<string[]>([]);
-  const [selectedPileId, setSelectedPileId] = useState<string | null>(null);
+   const [selectedPileId, setSelectedPileId] = useState<string | null>(null);
    const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
+   // Track selected key for unlock
+   const [selectedKey, setSelectedKey] = useState<{ pileId: string; cardIdx: number } | null>(null);
    const [hintTargets, setHintTargets] = useState<string[]>([]);
    const [selectionColor, setSelectionColor] = useState<'none' | 'green' | 'yellow' | 'red'>('none');
    const [highlightedMoves, setHighlightedMoves] = useState<{ tableauIds: string[]; foundationIds: string[] }>({ tableauIds: [], foundationIds: [] });
@@ -1987,13 +1989,14 @@ export default function SolitaireEngine({
     if (visualCard.meta?.isKey && visualCard.faceUp) {
       const charges = visualCard.meta?.charges;
       const isTricksterKey = visualCard.meta?.isTricksterKey;
+      const isSelectedKey = selectedKey && selectedKey.pileId === pileId && selectedKey.cardIdx === index;
       return (
          <button
             key={`${card.id}-${pileId}-${index}`}
             type="button"
-            className={`absolute w-11 max-w-[44px] h-11 bg-transparent select-none flex items-end justify-center ${isSelected ? 'ring-4 ring-yellow-400' : ''} relative`}
+            className={`absolute w-11 max-w-[44px] h-11 bg-transparent select-none flex items-end justify-center ${isSelectedKey ? 'ring-4 ring-yellow-400' : ''} relative`}
             style={pileId === 'hand' ? handStyle : { top: `${pileId.includes('tableau') ? index * 12 : 0}px`, zIndex: index }}
-            onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
+            onClick={(e) => { e.stopPropagation(); setSelectedKey({ pileId, cardIdx: index }); }}
             aria-label={isTricksterKey ? `Trickster Key (${charges} charges)` : "Key - Click to select, then click locked tableau to unlock"}
          >
             <img src="/icons/key.png" alt="Key" className="w-8 h-8 drop-shadow-lg" />
@@ -3526,14 +3529,37 @@ export default function SolitaireEngine({
 
           <div className="flex justify-center">
             <div className="grid gap-x-[3px] h-full" style={{ gridTemplateColumns: `repeat(${tableauCount}, minmax(0, 44px))` }}>
-                 {tableauPiles.map(pile => {
-                    const isLinked = activeEffects.includes('linked_fates') && gameState.effectState?.linkedTableaus?.includes(pile.id);
-                    const isLinkedTurn = isLinked && gameState.effectState?.lastLinkedPlayed !== pile.id;
-                    const isParasite = activeEffects.includes('parasite_pile') && gameState.effectState?.parasiteTarget === pile.id;
-                    const isHighlighted = highlightedMoves.tableauIds.includes(pile.id);
-
-                    return (
-                    <div key={pile.id} data-pile-id={pile.id} className={`relative w-full h-full ${isLinked ? 'border-t-2 border-purple-500/50 rounded-t-lg pt-1' : ''} ${isParasite ? 'border-t-2 border-green-500/50 rounded-t-lg pt-1' : ''} ${pile.hidden ? 'invisible pointer-events-none' : ''}`}>
+                         {tableauPiles.map(pile => {
+                              const isLinked = activeEffects.includes('linked_fates') && gameState.effectState?.linkedTableaus?.includes(pile.id);
+                              const isLinkedTurn = isLinked && gameState.effectState?.lastLinkedPlayed !== pile.id;
+                              const isParasite = activeEffects.includes('parasite_pile') && gameState.effectState?.parasiteTarget === pile.id;
+                              const isHighlighted = highlightedMoves.tableauIds.includes(pile.id);
+                              // Key unlock logic
+                              const handleTableauClick = () => {
+                                 if (selectedKey && pile.locked) {
+                                    // Unlock tableau and decrement/remove key
+                                    setGameState(prev => {
+                                       const hand = prev.piles['hand'];
+                                       const keyCard = hand.cards[selectedKey.cardIdx];
+                                       if (!keyCard || !keyCard.meta?.isKey) return prev;
+                                       let newHandCards = [...hand.cards];
+                                       let newKeyCard = { ...keyCard };
+                                       if (newKeyCard.meta.charges && newKeyCard.meta.charges > 1) {
+                                          newKeyCard.meta.charges -= 1;
+                                          newHandCards[selectedKey.cardIdx] = newKeyCard;
+                                       } else {
+                                          newHandCards.splice(selectedKey.cardIdx, 1);
+                                       }
+                                       const newPiles = { ...prev.piles, hand: { ...hand, cards: newHandCards }, [pile.id]: { ...pile, locked: false } };
+                                       return { ...prev, piles: newPiles };
+                                    });
+                                    setSelectedKey(null);
+                                 }
+                              };
+                              return (
+                              <div key={pile.id} data-pile-id={pile.id} className={`relative w-full h-full ${isLinked ? 'border-t-2 border-purple-500/50 rounded-t-lg pt-1' : ''} ${isParasite ? 'border-t-2 border-green-500/50 rounded-t-lg pt-1' : ''} ${pile.hidden ? 'invisible pointer-events-none' : ''}`}
+                                 onClick={handleTableauClick}
+                              >
                         {/* Linked Fates Indicator */}
                         {isLinked && (
                            <div className={`absolute -top-7 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center ${isLinkedTurn ? 'text-purple-400 animate-pulse' : 'text-slate-600 opacity-50'}`}>
@@ -3552,7 +3578,15 @@ export default function SolitaireEngine({
                            </div>
                         )}
 
-                        {pile.locked && <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-20 text-red-500"><Lock size={10} /></div>}
+                                    {pile.locked && (
+                                       <>
+                                          <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-20 text-red-500"><Lock size={10} /></div>
+                                          <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-10 rounded">
+                                             <Lock size={24} className="mb-1 text-red-400" />
+                                             <span className="text-[10px] text-red-200 font-bold">Locked</span>
+                                          </div>
+                                       </>
+                                    )}
                         {pile.cards.length === 0 && (() => {
                            const ringColor = selectionColor === 'green' ? 'ring-green-400' : selectionColor === 'yellow' ? 'ring-amber-300' : 'ring-red-400';
                            return (
@@ -3597,13 +3631,129 @@ export default function SolitaireEngine({
 
       <div className="fixed bottom-0 left-0 w-full z-50 flex flex-col justify-end pointer-events-none">
          {/* Hand cards - positioned relative to bottom panel */}
-         <div className="w-full flex justify-center pointer-events-none">
-             <div className="relative w-full max-w-md h-0">
-                 <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-0 pointer-events-auto">
-                    {gameState.piles.hand.cards.map((c, i) => renderCard(c, i, 'hand', gameState.piles.hand.cards.length))}
-                 </div>
+             {/* Hand row with card-shaped action and deck/discard buttons */}
+             <div className="w-full flex justify-center items-end pointer-events-none">
+                <div className="relative w-full max-w-md flex items-end justify-center gap-2">
+                   {/* Left: Action card button */}
+                   <div className="pointer-events-auto">
+                      <button
+                         type="button"
+                         className="relative w-11 max-w-[44px] h-16 max-h-[64px] bg-white rounded shadow-md border border-gray-300 flex flex-col items-center justify-center hover:scale-105 transition-transform"
+                         style={{ zIndex: 2 }}
+                         onClick={() => setShowEffectActions(v => !v)}
+                         aria-label="Show effect actions"
+                      >
+                         <img src="/icons/cleverdisguise.png" alt="Actions" className="w-8 h-8 object-cover" />
+                         <span className="absolute bottom-0 left-0 right-0 bg-black/50 text-[8px] font-bold text-white text-center py-0.5">ACTIONS</span>
+                      </button>
+                      {/* Floating effect action buttons */}
+                      {showEffectActions && (
+                         <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 flex flex-col gap-2 z-50 animate-in fade-in slide-in-from-bottom-2">
+                            {effectsRegistry.filter(eff => eff.custom && eff.custom.onActivate && (gameState.ownedEffects.includes(eff.id) || gameState.debugUnlockAll)).map(eff => (
+                               <button
+                                  key={eff.id}
+                                  className="w-32 px-2 py-1 rounded bg-pink-700 hover:bg-pink-500 text-white text-xs font-bold shadow-lg border border-pink-900 flex items-center gap-2"
+                                  onClick={() => handleEffectAction(eff.id)}
+                               >
+                                  <ResponsiveIcon name={eff.id} fallbackType={eff.type} size={18} className="shrink-0" />
+                                  {eff.name}
+                               </button>
+                            ))}
+                         </div>
+                      )}
+                   </div>
+                   {/* Hand cards */}
+                   <div className="flex-1 flex justify-center items-end gap-1">
+                      {gameState.piles.hand.cards.map((c, i) => renderCard(c, i, 'hand', gameState.piles.hand.cards.length))}
+                   </div>
+                   {/* Right: Deck/Discard card button */}
+                   <div className="pointer-events-auto">
+                      <button
+                         type="button"
+                         className="relative w-11 max-w-[44px] h-16 max-h-[64px] bg-white rounded shadow-md border border-gray-300 flex flex-col items-center justify-center hover:scale-105 transition-transform"
+                         style={{ zIndex: 2 }}
+                         onClick={discardAndDrawHand}
+                         aria-label="Draw/discard deck"
+                      >
+                         <img src="/icons/foundation.png" alt="Deck" className="w-8 h-8 object-cover" />
+                         <span className="absolute bottom-0 left-0 right-0 bg-blue-900 text-[8px] font-bold text-blue-200 text-center py-0.5">{gameState.piles.deck.cards.length} DECK</span>
+                      </button>
+                   </div>
+                </div>
              </div>
-         </div>
+
+// State for effect actions floating menu
+const [showEffectActions, setShowEffectActions] = useState(false);
+
+// Handler for effect action button click
+const handleEffectAction = (effectId: string) => {
+   setShowEffectActions(false);
+   // Wire up each effect to its real logic
+   if (effectId === 'whore') {
+      setActiveDrawer('whore');
+      // Optionally, scroll to the whore effect in the drawer or highlight it
+   } else if (effectId === 'metrocard') {
+      // Metrocard: Buy a key for 25% of your coin
+      if (gameState.coins > 0) {
+         const cost = Math.floor(gameState.coins * 0.25);
+         const hand = gameState.piles['hand'];
+         const key = { id: `key-${Date.now()}`, suit: 'special', rank: 0, faceUp: true, meta: { isKey: true, universal: true } };
+         setGameState(prev => ({
+            ...prev,
+            coins: prev.coins - cost,
+            piles: { ...prev.piles, hand: { ...hand, cards: [...hand.cards, key] } }
+         }));
+      }
+   } else if (effectId === 'jester') {
+      // Jester: Add a wild card to hand (3 charges)
+      setGameState(prev => {
+         const hand = prev.piles['hand'];
+         const wildIdx = hand.cards.findIndex(c => c.meta?.isWild);
+         if (wildIdx !== -1) {
+            // Increment charges
+            const cards = hand.cards.map((c, i) => i === wildIdx ? { ...c, meta: { ...c.meta, charges: (c.meta.charges || 0) + 3 } } : c);
+            return { ...prev, piles: { ...prev.piles, hand: { ...hand, cards } } };
+         } else {
+            // Add new wild card
+            const wildCard = {
+               id: `jester-wild-${Date.now()}`,
+               suit: 'special',
+               rank: 0,
+               faceUp: true,
+               meta: { isWild: true, charges: 3 }
+            };
+            return { ...prev, piles: { ...prev.piles, hand: { ...hand, cards: [...hand.cards, wildCard] } } };
+         }
+      });
+   } else if (effectId === 'trickster') {
+      // Trickster: Add a key to hand (3 charges)
+      setGameState(prev => {
+         const hand = prev.piles['hand'];
+         const keyIdx = hand.cards.findIndex(c => c.meta?.isTricksterKey);
+         if (keyIdx !== -1) {
+            // Increment charges
+            const cards = hand.cards.map((c, i) => i === keyIdx ? { ...c, meta: { ...c.meta, charges: (c.meta.charges || 0) + 3 } } : c);
+            return { ...prev, piles: { ...prev.piles, hand: { ...hand, cards } } };
+         } else {
+            // Add new trickster key
+            const tricksterKey = {
+               id: `trickster-key-${Date.now()}`,
+               suit: 'special',
+               rank: 0,
+               faceUp: true,
+               meta: { isTricksterKey: true, charges: 3 }
+            };
+            return { ...prev, piles: { ...prev.piles, hand: { ...hand, cards: [...hand.cards, tricksterKey] } } };
+         }
+      });
+   } else if (effectId === 'switcheroo') {
+      // Switcheroo: Open the effect drawer for switcheroo
+      setActiveDrawer('switcheroo');
+   } else {
+      // Default: open the effect drawer for the effect
+      setActiveDrawer(effectId);
+   }
+};
          
          {/* Bottom control bar - always at bottom, with drawer expanding up from its top */}
          <div className={`bg-slate-900 border-t border-slate-800 p-2 w-full max-w-md mx-auto relative pointer-events-auto overflow-visible`}>
@@ -4003,42 +4153,213 @@ export default function SolitaireEngine({
                                                {effect.maxCharges && <span className="text-[9px] bg-slate-600 px-1 rounded text-white shrink-0">{charges}/{effect.maxCharges}</span>}
                                            </div>
                                            <div className="text-slate-400 text-[10px]">{effect.description}</div>
-                                           {effect.id === 'trust_fund' && isActive && (
-                                              <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
-                                                <button
-                                                  onClick={convertScoreToCoin}
-                                                  disabled={gameState.score < 5}
-                                                  className="text-[10px] px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
-                                                  5 Score → 1 Coin
-                                                </button>
-                                                <button
-                                                  onClick={convertCoinToScore}
-                                                  disabled={gameState.coins < 1}
-                                                  className="text-[10px] px-2 py-1 rounded bg-green-600 hover:bg-green-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
-                                                  1 Coin → 4 Score
-                                                </button>
-                                              </div>
-                                           )}
-                                           {effect.id === 'tax_loophole' && isActive && (
-                                              <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
-                                                <button
-                                                  onClick={buyKeyWithTaxLoophole}
-                                                  disabled={gameState.coins <= 0}
-                                                  className="text-[10px] px-2 py-1 rounded bg-yellow-600 hover:bg-yellow-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
-                                                  Buy Key (25% Coin)
-                                                </button>
-                                              </div>
-                                           )}
-                                           {effect.id === 'switcheroo' && isActive && (
-                                              <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
-                                                <button
-                                                  onClick={undoWithSwitcheroo}
-                                                  disabled={gameState.coins < Math.floor(gameState.coins * 0.2) || (gameState.effectState?.lastSnapshots || []).length < 3}
-                                                  className="text-[10px] px-2 py-1 rounded bg-purple-600 hover:bg-purple-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
-                                                  Undo (20% Coin)
-                                                </button>
-                                              </div>
-                                           )}
+                                                                {effect.id === 'trust_fund' && isActive && (
+                                                                     <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+                                                                        <button
+                                                                           onClick={convertScoreToCoin}
+                                                                           disabled={gameState.score < 5}
+                                                                           className="text-[10px] px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
+                                                                           5 Score → 1 Coin
+                                                                        </button>
+                                                                        <button
+                                                                           onClick={convertCoinToScore}
+                                                                           disabled={gameState.coins < 1}
+                                                                           className="text-[10px] px-2 py-1 rounded bg-green-600 hover:bg-green-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
+                                                                           1 Coin → 4 Score
+                                                                        </button>
+                                                                     </div>
+                                                                )}
+                                                                {effect.id === 'tax_loophole' && isActive && (
+                                                                     <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+                                                                        <button
+                                                                           onClick={buyKeyWithTaxLoophole}
+                                                                           disabled={gameState.coins <= 0}
+                                                                           className="text-[10px] px-2 py-1 rounded bg-yellow-600 hover:bg-yellow-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
+                                                                           Buy Key (25% Coin)
+                                                                        </button>
+                                                                     </div>
+                                                                )}
+                                                                {effect.id === 'switcheroo' && isActive && (
+                                                                     <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+                                                                        <button
+                                                                           onClick={undoWithSwitcheroo}
+                                                                           disabled={gameState.coins < Math.floor(gameState.coins * 0.2) || (gameState.effectState?.lastSnapshots || []).length < 3}
+                                                                           className="text-[10px] px-2 py-1 rounded bg-purple-600 hover:bg-purple-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
+                                                                           Undo (20% Coin)
+                                                                        </button>
+                                                                     </div>
+                                                                )}
+                                                                {/* Custom action buttons for Whore, Jester, Trickster, Martyr, Metrocard */}
+                                                                {effect.id === 'whore' && isActive && (
+                                                                     <div className="flex gap-2 mt-2" onClick={e => e.stopPropagation()}>
+                                                                        <button
+                                                                           onClick={() => {
+                                                                              if (gameState.score >= 4) {
+                                                                                 setGameState(prev => ({ ...prev, score: prev.score - 4, coins: prev.coins + 1 }));
+                                                                              }
+                                                                           }}
+                                                                           disabled={gameState.score < 4}
+                                                                           className="text-[10px] px-2 py-1 rounded bg-pink-600 hover:bg-pink-500 text-white disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
+                                                                           4 Score → 1 Coin
+                                                                        </button>
+                                                                        <button
+                                                                           onClick={() => {
+                                                                              if (gameState.coins >= 1) {
+                                                                                 setGameState(prev => ({ ...prev, coins: prev.coins - 1, score: prev.score + 5 }));
+                                                                              }
+                                                                           }}
+                                                                           disabled={gameState.coins < 1}
+                                                                           className="text-[10px] px-2 py-1 rounded bg-pink-700 hover:bg-pink-600 text-white disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
+                                                                           1 Coin → 5 Score
+                                                                        </button>
+                                                                          <button
+                                                                             onClick={() => {
+                                                                                // Whore: Skip current encounter (advance runIndex, lose 1 coin)
+                                                                                if (gameState.coins >= 1 && gameState.runIndex < runPlan.length - 1) {
+                                                                                   setGameState(prev => ({
+                                                                                      ...prev,
+                                                                                      coins: prev.coins - 1,
+                                                                                      runIndex: prev.runIndex + 1,
+                                                                                      // Optionally, mark the encounter as skipped in runHistory
+                                                                                      runHistory: [
+                                                                                         ...(prev.runHistory || []),
+                                                                                         { ...runPlan[prev.runIndex], skipped: true }
+                                                                                      ]
+                                                                                   }));
+                                                                                }
+                                                                             }}
+                                                                             disabled={gameState.coins < 1 || gameState.runIndex >= runPlan.length - 1}
+                                                                             className="text-[10px] px-2 py-1 rounded bg-pink-400 hover:bg-pink-300 text-white disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
+                                                                             Skip Encounter (1 Coin)
+                                                                          </button>
+                                                                     </div>
+                                                                )}
+                                                                {effect.id === 'jester' && isActive && (
+                                                                     <div className="flex gap-2 mt-2" onClick={e => e.stopPropagation()}>
+                                                                        <button
+                                                                           onClick={() => {
+                                                                              // Jester: Stack wild cards in hand, persist until used
+                                                                              setGameState(prev => {
+                                                                                 const hand = prev.piles['hand'];
+                                                                                 // Find existing wild card
+                                                                                 const wildIdx = hand.cards.findIndex(c => c.meta?.isWild);
+                                                                                 if (wildIdx !== -1) {
+                                                                                    // Increment charges
+                                                                                    const cards = hand.cards.map((c, i) => i === wildIdx ? { ...c, meta: { ...c.meta, charges: (c.meta.charges || 0) + 3 } } : c);
+                                                                                    return { ...prev, piles: { ...prev.piles, hand: { ...hand, cards } } };
+                                                                                 } else {
+                                                                                    // Add new wild card
+                                                                                    const wildCard = {
+                                                                                       id: `jester-wild-${Date.now()}`,
+                                                                                       suit: 'special',
+                                                                                       rank: 0,
+                                                                                       faceUp: true,
+                                                                                       meta: { isWild: true, charges: 3 }
+                                                                                    };
+                                                                                    return { ...prev, piles: { ...prev.piles, hand: { ...hand, cards: [...hand.cards, wildCard] } } };
+                                                                                 }
+                                                                              });
+                                                                           }}
+                                                                           className="text-[10px] px-2 py-1 rounded bg-orange-600 hover:bg-orange-500 text-white disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
+                                                                           Add Wild Card (3 charges)
+                                                                        </button>
+                                                                     </div>
+                                                                )}
+                                                                {effect.id === 'trickster' && isActive && (
+                                                                     <div className="flex gap-2 mt-2" onClick={e => e.stopPropagation()}>
+                                                                        <button
+                                                                           onClick={() => {
+                                                                              // Trickster: Stack keys in hand, persist until used
+                                                                              setGameState(prev => {
+                                                                                 const hand = prev.piles['hand'];
+                                                                                 // Find existing trickster key
+                                                                                 const keyIdx = hand.cards.findIndex(c => c.meta?.isTricksterKey);
+                                                                                 if (keyIdx !== -1) {
+                                                                                    // Increment charges
+                                                                                    const cards = hand.cards.map((c, i) => i === keyIdx ? { ...c, meta: { ...c.meta, charges: (c.meta.charges || 0) + 3 } } : c);
+                                                                                    return { ...prev, piles: { ...prev.piles, hand: { ...hand, cards } } };
+                                                                                 } else {
+                                                                                    // Add new trickster key
+                                                                                    const tricksterKey = {
+                                                                                       id: `trickster-key-${Date.now()}`,
+                                                                                       suit: 'special',
+                                                                                       rank: 0,
+                                                                                       faceUp: true,
+                                                                                       meta: { isTricksterKey: true, charges: 3 }
+                                                                                    };
+                                                                                    return { ...prev, piles: { ...prev.piles, hand: { ...hand, cards: [...hand.cards, tricksterKey] } } };
+                                                                                 }
+                                                                              });
+                                                                           }}
+                                                                           className="text-[10px] px-2 py-1 rounded bg-fuchsia-600 hover:bg-fuchsia-500 text-white disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
+                                                                           Add Key (3 charges)
+                                                                        </button>
+                                                                     </div>
+                                                                )}
+                                                                {effect.id === 'martyr' && isActive && (
+                                                                     <div className="flex gap-2 mt-2" onClick={e => e.stopPropagation()}>
+                                                                        <button
+                                                                           onClick={() => {
+                                                                              // Martyr: Sacrifice 1 foundation or return last 5 played cards
+                                                                              setGameState(prev => {
+                                                                                 const used = prev.effectState?.martyrTimekeeperUsed;
+                                                                                 if (used) {
+                                                                                    // Sacrifice 1 foundation
+                                                                                    const fids = Object.keys(prev.piles).filter(k => k.startsWith('foundation') && prev.piles[k].cards.length > 0);
+                                                                                    if (fids.length === 0) return prev;
+                                                                                    const fid = fids[0];
+                                                                                    const deck = prev.piles['deck'];
+                                                                                    const returned = prev.piles[fid].cards.map(c => ({ ...c, faceUp: false }));
+                                                                                    const newDeck = [...deck.cards, ...returned];
+                                                                                    newDeck.sort(() => Math.random() - 0.5);
+                                                                                    return {
+                                                                                       ...prev,
+                                                                                       piles: {
+                                                                                          ...prev.piles,
+                                                                                          [fid]: { ...prev.piles[fid], cards: [] },
+                                                                                          deck: { ...deck, cards: newDeck }
+                                                                                       }
+                                                                                    };
+                                                                                 } else {
+                                                                                    // Return last 5 played cards to hand
+                                                                                    const lastFive = (prev.effectState?.lastPlayedCards || []).slice(-5);
+                                                                                    const hand = prev.piles['hand'];
+                                                                                    const clean = lastFive.map(c => ({ ...c, faceUp: true }));
+                                                                                    return {
+                                                                                       ...prev,
+                                                                                       effectState: { ...prev.effectState, martyrTimekeeperUsed: true },
+                                                                                       piles: { ...prev.piles, hand: { ...hand, cards: [...hand.cards, ...clean] } }
+                                                                                    };
+                                                                                 }
+                                                                              });
+                                                                           }}
+                                                                           className="text-[10px] px-2 py-1 rounded bg-red-700 hover:bg-red-500 text-white disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
+                                                                           Use Martyr
+                                                                        </button>
+                                                                     </div>
+                                                                )}
+                                                                {effect.id === 'metrocard' && isActive && (
+                                                                     <div className="flex gap-2 mt-2" onClick={e => e.stopPropagation()}>
+                                                                        <button
+                                                                           onClick={() => {
+                                                                              // Metrocard: Buy a key for 25% of your coin
+                                                                              setGameState(prev => {
+                                                                                 if (prev.coins <= 0) return prev;
+                                                                                 const cost = Math.floor(prev.coins * 0.25);
+                                                                                 const hand = prev.piles['hand'];
+                                                                                 const key = { id: `key-${Date.now()}`, suit: 'special', rank: 0, faceUp: true, meta: { isKey: true, universal: true } };
+                                                                                 return {
+                                                                                    ...prev,
+                                                                                    coins: prev.coins - cost,
+                                                                                    piles: { ...prev.piles, hand: { ...hand, cards: [...hand.cards, key] } }
+                                                                                 };
+                                                                              });
+                                                                           }}
+                                                                           className="text-[10px] px-2 py-1 rounded bg-blue-700 hover:bg-blue-500 text-white disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
+                                                                           Buy Key (25% Coin)
+                                                                        </button>
+                                                                     </div>
+                                                                )}
                                        </div>
                                        {isActive && <div className="w-2 h-2 bg-green-400 rounded-full shrink-0"></div>}
                                     </button>
