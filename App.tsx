@@ -3254,22 +3254,24 @@ export default function SolitaireEngine({
                        if (glossaryTab === 'exploits') return ['exploit', 'epic', 'legendary', 'rare', 'uncommon'].includes(e.type);
                        if (glossaryTab === 'curses') return e.type === 'curse';
                        return false;
-                    }).map(e => {
-                       const rarityColors = getRarityColor(e.rarity);
-                       const effectType = e.type === 'blessing' ? 'blessing' : e.type === 'curse' ? 'curse' : 'exploit';
-                       return (
-                       <div key={e.id} className={`p-3 rounded border ${rarityColors.bg} ${rarityColors.border} flex gap-3`}>
-                          <ResponsiveIcon name={e.id || e.name} fallbackType={effectType} size={40} className="w-10 h-10 rounded shrink-0" alt={e.name} />
-                          <div className="flex-1 min-w-0">
-                             <div className="flex justify-between items-start gap-2">
-                               <div className="font-bold text-white truncate">{e.name}</div>
-                               <div className={`text-[10px] uppercase px-1.5 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} ${rarityColors.bg} border ${rarityColors.border}`}>{e.rarity || 'Common'}</div>
-                             </div>
-                             <div className="text-slate-300 text-sm mt-1">{e.description}</div>
-                             {Boolean(e.cost) && <div className="text-xs text-yellow-500 mt-1 flex items-center gap-1"><Coins size={10}/> {e.cost}</div>}
-                          </div>
-                       </div>
-                    );})}
+                              }).map(e => {
+                                  const rarityColors = getRarityColor(e.rarity);
+                                  const effectType = e.type === 'blessing' ? 'blessing' : e.type === 'curse' ? 'curse' : 'exploit';
+                                  return (
+                                     <div key={e.id} className={`p-3 rounded border ${rarityColors.bg} ${rarityColors.border} flex gap-3`}>
+                                        <ResponsiveIcon name={e.id || e.name} fallbackType={effectType} size={40} className="w-10 h-10 rounded shrink-0" alt={e.name} />
+                                        <div className="flex-1 min-w-0">
+                                           <div className="flex justify-between items-start gap-2">
+                                              <div className="font-bold text-white truncate">{e.name}</div>
+                                              <div className={`text-[10px] uppercase px-1.5 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} ${rarityColors.bg} border ${rarityColors.border}`}>{e.rarity || 'Common'}</div>
+                                           </div>
+                                           <div className="text-slate-300 text-sm mt-1">{e.description}</div>
+                                           {Boolean(e.cost) && <div className="text-xs text-yellow-500 mt-1 flex items-center gap-1"><Coins size={10}/> {e.cost}</div>}
+                                        </div>
+                                     </div>
+                                  );
+                              })}
+                                 
                  </div>
               </div>
            )}
@@ -3630,175 +3632,56 @@ export default function SolitaireEngine({
       )}
 
       <div className="fixed bottom-0 left-0 w-full z-50 flex flex-col justify-end pointer-events-none">
+
          {/* Hand cards - positioned relative to bottom panel */}
-             {/* Hand row with card-shaped action and deck/discard buttons */}
-             <div className="w-full flex justify-center items-end pointer-events-none">
-                <div className="relative w-full max-w-md flex items-end justify-center gap-2">
-                   {/* Left: Action card button */}
-                   <div className="pointer-events-auto">
-                      <button
-                         type="button"
-                         className="relative w-11 max-w-[44px] h-16 max-h-[64px] bg-white rounded shadow-md border border-gray-300 flex flex-col items-center justify-center hover:scale-105 transition-transform"
-                         style={{ zIndex: 2 }}
-                         onClick={() => setShowEffectActions(v => !v)}
-                         aria-label="Show effect actions"
-                      >
-                         <img src="/icons/cleverdisguise.png" alt="Actions" className="w-8 h-8 object-cover" />
-                         <span className="absolute bottom-0 left-0 right-0 bg-black/50 text-[8px] font-bold text-white text-center py-0.5">ACTIONS</span>
-                      </button>
-                      {/* Floating effect action buttons */}
-                      {showEffectActions && (
-                         <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 flex flex-col gap-2 z-50 animate-in fade-in slide-in-from-bottom-2">
-                            {effectsRegistry.filter(eff => eff.custom && eff.custom.onActivate && (gameState.ownedEffects.includes(eff.id) || gameState.debugUnlockAll)).map(eff => (
-                               <button
-                                  key={eff.id}
-                                  className="w-32 px-2 py-1 rounded bg-pink-700 hover:bg-pink-500 text-white text-xs font-bold shadow-lg border border-pink-900 flex items-center gap-2"
-                                  onClick={() => handleEffectAction(eff.id)}
-                               >
-                                  <ResponsiveIcon name={eff.id} fallbackType={eff.type} size={18} className="shrink-0" />
-                                  {eff.name}
-                               </button>
-                            ))}
-                         </div>
-                      )}
-                   </div>
-                   {/* Hand cards */}
-                   <div className="flex-1 flex justify-center items-end gap-1">
-                      {gameState.piles.hand.cards.map((c, i) => renderCard(c, i, 'hand', gameState.piles.hand.cards.length))}
-                   </div>
-                   {/* Right: Deck/Discard card button */}
-                   <div className="pointer-events-auto">
-                      <button
-                         type="button"
-                         className="relative w-11 max-w-[44px] h-16 max-h-[64px] bg-white rounded shadow-md border border-gray-300 flex flex-col items-center justify-center hover:scale-105 transition-transform"
-                         style={{ zIndex: 2 }}
-                         onClick={discardAndDrawHand}
-                         aria-label="Draw/discard deck"
-                      >
-                         <img src="/icons/foundation.png" alt="Deck" className="w-8 h-8 object-cover" />
-                         <span className="absolute bottom-0 left-0 right-0 bg-blue-900 text-[8px] font-bold text-blue-200 text-center py-0.5">{gameState.piles.deck.cards.length} DECK</span>
-                      </button>
-                   </div>
-                </div>
-             </div>
 
-// State for effect actions floating menu
-const [showEffectActions, setShowEffectActions] = useState(false);
 
-// Handler for effect action button click
-const handleEffectAction = (effectId: string) => {
-   setShowEffectActions(false);
-   // Wire up each effect to its real logic
-   if (effectId === 'whore') {
-      setActiveDrawer('whore');
-      // Optionally, scroll to the whore effect in the drawer or highlight it
-   } else if (effectId === 'metrocard') {
-      // Metrocard: Buy a key for 25% of your coin
-      if (gameState.coins > 0) {
-         const cost = Math.floor(gameState.coins * 0.25);
-         const hand = gameState.piles['hand'];
-         const key = { id: `key-${Date.now()}`, suit: 'special', rank: 0, faceUp: true, meta: { isKey: true, universal: true } };
-         setGameState(prev => ({
-            ...prev,
-            coins: prev.coins - cost,
-            piles: { ...prev.piles, hand: { ...hand, cards: [...hand.cards, key] } }
-         }));
-      }
-   } else if (effectId === 'jester') {
-      // Jester: Add a wild card to hand (3 charges)
-      setGameState(prev => {
-         const hand = prev.piles['hand'];
-         const wildIdx = hand.cards.findIndex(c => c.meta?.isWild);
-         if (wildIdx !== -1) {
-            // Increment charges
-            const cards = hand.cards.map((c, i) => i === wildIdx ? { ...c, meta: { ...c.meta, charges: (c.meta.charges || 0) + 3 } } : c);
-            return { ...prev, piles: { ...prev.piles, hand: { ...hand, cards } } };
-         } else {
-            // Add new wild card
-            const wildCard = {
-               id: `jester-wild-${Date.now()}`,
-               suit: 'special',
-               rank: 0,
-               faceUp: true,
-               meta: { isWild: true, charges: 3 }
-            };
-            return { ...prev, piles: { ...prev.piles, hand: { ...hand, cards: [...hand.cards, wildCard] } } };
-         }
-      });
-   } else if (effectId === 'trickster') {
-      // Trickster: Add a key to hand (3 charges)
-      setGameState(prev => {
-         const hand = prev.piles['hand'];
-         const keyIdx = hand.cards.findIndex(c => c.meta?.isTricksterKey);
-         if (keyIdx !== -1) {
-            // Increment charges
-            const cards = hand.cards.map((c, i) => i === keyIdx ? { ...c, meta: { ...c.meta, charges: (c.meta.charges || 0) + 3 } } : c);
-            return { ...prev, piles: { ...prev.piles, hand: { ...hand, cards } } };
-         } else {
-            // Add new trickster key
-            const tricksterKey = {
-               id: `trickster-key-${Date.now()}`,
-               suit: 'special',
-               rank: 0,
-               faceUp: true,
-               meta: { isTricksterKey: true, charges: 3 }
-            };
-            return { ...prev, piles: { ...prev.piles, hand: { ...hand, cards: [...hand.cards, tricksterKey] } } };
-         }
-      });
-   } else if (effectId === 'switcheroo') {
-      // Switcheroo: Open the effect drawer for switcheroo
-      setActiveDrawer('switcheroo');
-   } else {
-      // Default: open the effect drawer for the effect
-      setActiveDrawer(effectId);
-   }
-};
-         
-         {/* Bottom control bar - always at bottom, with drawer expanding up from its top */}
-         <div className={`bg-slate-900 border-t border-slate-800 p-2 w-full max-w-md mx-auto relative pointer-events-auto overflow-visible`}>
-            {/* Drawer Content - positioned absolutely above the bottom bar, grows up until screen top then scrolls */}
-            {activeDrawer && (
-               <div className="absolute bottom-full left-0 w-full max-h-[calc(100vh-140px)] overflow-y-auto bg-slate-800 border-t border-slate-700 animate-in slide-in-from-bottom-10 z-50">
-                  <div className="p-4">
-                     {activeDrawer === 'shop' && (
-                        <div className="w-full mb-2">
-                           <div className="grid grid-cols-3 gap-2">
-                              <button onClick={() => setShopTab('buy')} className={`py-2 rounded font-bold ${shopTab === 'buy' ? 'bg-yellow-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Buy</button>
-                              <button onClick={() => setShopTab('sell')} className={`py-2 rounded font-bold ${shopTab === 'sell' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Sell</button>
-                              <button onClick={() => { setShopTab('continue'); startWanderPhase(); }} className={`py-2 rounded font-bold ${shopTab === 'continue' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Continue</button>
-                           </div>
+// ...existing logic, hooks, and functions above...
+
+return (
+   <>
+      {/* ...existing JSX above... */}
+
+      {/* Bottom control bar - always at bottom, with drawer expanding up from its top */}
+      <div className={`bg-slate-900 border-t border-slate-800 p-2 w-full max-w-md mx-auto relative pointer-events-auto overflow-visible`}>
+         {/* Drawer Content - positioned absolutely above the bottom bar, grows up until screen top then scrolls */}
+         {activeDrawer && (
+            <div className="absolute bottom-full left-0 w-full max-h-[calc(100vh-140px)] overflow-y-auto bg-slate-800 border-t border-slate-700 animate-in slide-in-from-bottom-10 z-50">
+               <div className="p-4">
+                  {activeDrawer === 'shop' && (
+                     <div className="w-full mb-2">
+                        <div className="grid grid-cols-3 gap-2">
+                           <button onClick={() => setShopTab('buy')} className={`py-2 rounded font-bold ${shopTab === 'buy' ? 'bg-yellow-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Buy</button>
+                           <button onClick={() => setShopTab('sell')} className={`py-2 rounded font-bold ${shopTab === 'sell' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Sell</button>
+                           <button onClick={() => { setShopTab('continue'); startWanderPhase(); }} className={`py-2 rounded font-bold ${shopTab === 'continue' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Continue</button>
                         </div>
-                     )}
-                     <div className="flex justify-between items-center">
-                        <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">
-                           {activeDrawer === 'pause' ? 'Menu' 
-                            : activeDrawer === 'shop' ? 'The Trade' 
-                            : activeDrawer === 'feedback' ? 'Feedback' 
-                            : activeDrawer === 'test' ? 'Test UI' 
-                            : activeDrawer === 'settings' ? 'Settings' 
-                            : activeDrawer === 'blessing_select' ? 'Select a Blessing' 
-                            : activeDrawer.charAt(0).toUpperCase() + activeDrawer.slice(1)}
-                        </h3>
-                        {nonClosableDrawer === activeDrawer ? (
-                           <div style={{ width: 28 }} />
-                        ) : (
-                           <button onClick={() => { setActiveDrawer(null); setNonClosableDrawer(null); }}><ChevronDown className="text-slate-500" /></button>
-                        )}
                      </div>
-                     <div className="max-w-md mx-auto mt-2">
-                        {activeDrawer === 'pause' ? (
-                           <div className="grid grid-cols-5 gap-1">
-                           <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600"><img src="/icons/save.png" alt="" className="w-8 h-8" /><span className="text-[7px]">Save</span></button>
-                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('resign')}><img src="/icons/resign.png" alt="" className="w-8 h-8" /><span className="text-[7px]">Resign</span></button>
-                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('feedback')}><img src="/icons/feedback.png" alt="" className="w-8 h-8" /><span className="text-[7px]">Feedback</span></button>
-                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('test')}><FlaskConical size={32} /><span className="text-[7px]">Test</span></button>
-                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><img src="/icons/settings.png" alt="" className="w-8 h-8" /><span className="text-[7px]">Settings</span></button>                           </div>
-                        ) : activeDrawer === 'shop' ? (
-                           <div className="flex flex-col gap-2">
-                              <div className="grid grid-cols-1 gap-2">
-                                {shopTab === 'buy' && shopInventory.map(item => {
-                                    const rarityColors = getRarityColor(item.rarity);
+                  )}
+                  <div className="flex justify-between items-center">
+                     <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">
+                        {activeDrawer === 'pause' ? 'Menu'
+                           : activeDrawer === 'shop' ? 'The Trade'
+                           : activeDrawer === 'feedback' ? 'Feedback'
+                           : activeDrawer === 'test' ? 'Test UI'
+                           : activeDrawer === 'settings' ? 'Settings'
+                           : activeDrawer === 'blessing_select' ? 'Select a Blessing'
+                           : activeDrawer.charAt(0).toUpperCase() + activeDrawer.slice(1)}
+                     </h3>
+                     {nonClosableDrawer === activeDrawer ? (
+                        <div style={{ width: 28 }} />
+                     ) : (
+                        <button onClick={() => { setActiveDrawer(null); setNonClosableDrawer(null); }}><ChevronDown className="text-slate-500" /></button>
+                     )}
+                  </div>
+                  {/* ...rest of drawer content... */}
+               </div>
+            </div>
+         )}
+         {/* ...rest of bottom bar content... */}
+      </div>
+      {/* ...existing JSX below... */}
+   </>
+);
                                     const itemType = item.type === 'curse' ? 'curse' : item.type === 'blessing' ? 'blessing' : 'exploit';
                                     const isOwned = gameState.ownedEffects.includes(item.id);
                                     return (
@@ -3825,7 +3708,7 @@ const handleEffectAction = (effectId: string) => {
                                          )}
                                        </button>
                                     </div>
-                                 );})}
+                                 ))
 
                                 {shopTab === 'sell' && (() => {
                                    const ownedExploits = effectsRegistry.filter(e => (['exploit','epic','legendary','rare','uncommon'].includes(e.type)) && gameState.ownedEffects.includes(e.id));
@@ -3855,7 +3738,8 @@ const handleEffectAction = (effectId: string) => {
                                 })()}
                               </div>
                            </div>
-                        ) : activeDrawer === 'feedback' ? (
+                                    ) : null}
+                                    {activeDrawer === 'feedback' ? (
                            <div className="flex flex-col gap-3">
                               <div className="flex gap-2">
                                  {['bug', 'ui', 'effect', 'request'].map(t => (
@@ -4377,8 +4261,97 @@ const handleEffectAction = (effectId: string) => {
             )}
 
             {/* Bottom Bar - Different for Classic vs Coronata modes */}
-            {!CLASSIC_GAMES[selectedMode] ? (
-               <>
+                  {!CLASSIC_GAMES[selectedMode] ? (
+                     <>
+                        {/* Coronata Mode - Run Progress Bar */}
+                        <div className="flex justify-between px-1 mb-2 gap-0.5 relative group">
+                           {runPlan.map((enc, i) => {
+                              const eff = effectsRegistry.find(e => e.id === enc.effectId);
+                              const isCompleted = i < gameState.runIndex;
+                              const isCurrent = i === gameState.runIndex;
+                              const iconClass = isCompleted ? 'opacity-80' : isCurrent ? 'opacity-100' : 'opacity-40 grayscale';
+                              const iconStyle = isCurrent ? { filter: 'brightness(1.5) saturate(1.5) hue-rotate(-15deg)' } : {};
+                              const isCurrentCurse = isCurrent && enc.type === 'curse';
+                              return (
+                                 <button
+                                    key={i}
+                                    type="button"
+                                    className={`w-8 h-8 rounded flex items-center justify-center transition-all ${isCompleted ? 'bg-green-500/10 border-2 border-green-500' : isCurrent ? 'bg-orange-500/10 border-2 border-orange-500 animate-pulse' : 'bg-slate-700/10 border-2 border-slate-700'}`}
+                                    onClick={() => isCurrentCurse ? toggleDrawer('curse') : alert(`${enc.type.toUpperCase()}: ${eff?.name || 'Level ' + (i+1)}\n${eff?.description || 'Score goal: ' + enc.goal}`)}
+                                    aria-label={`Encounter ${i + 1} ${enc.type} ${eff?.name ?? ''}`}>
+                                    <span className={`w-8 h-8 object-contain aspect-square stroke-2 fill-none ${iconClass}`} style={{ ...iconStyle, stroke: 'currentColor', fill: 'none' }}>
+                                       <ResponsiveIcon name={enc.effectId} fallbackType="curse" size={32} className="w-8 h-8" alt={eff?.name || ''} />
+                                    </span>
+                                 </button>
+                              );
+                           })}
+                        </div>
+                        <div className="flex items-center gap-2 mb-2">
+                           <div className="flex-1">
+                              <div className="w-full bg-slate-800 h-5 rounded-full overflow-hidden border border-slate-700 relative flex items-center justify-center px-1">
+                                 <div className="absolute inset-0 bg-emerald-500 h-full transition-all duration-500" style={{ width: `${Math.min(100, (gameState.score / gameState.currentScoreGoal) * 100)}%` }} />
+                                 <span className="relative z-10 text-[9px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{gameState.score} / {gameState.currentScoreGoal}</span>
+                              </div>
+                           </div>
+                        </div>
+                        <div className="flex w-full gap-1">
+                           <button onClick={() => toggleDrawer('pause')} className={`w-11 h-11 flex items-center justify-center bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}><img src="/icons/pause.png" alt="Pause" className="w-9 h-9" /></button>
+                           <button type="button" onClick={undoLastMove} aria-label="Undo" className="shrink-0 w-11 h-11 flex items-center justify-center bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700">
+                              <img src="/icons/back.png" alt="Undo" className="w-9 h-9" />
+                           </button>
+                           <button type="button" className="shrink-0 w-11 h-11 flex items-center justify-center bg-transparent hover:bg-slate-700 rounded relative">
+                              <ResponsiveIcon name="coin" fallbackType="exploit" size={36} className="w-9 h-9" alt="coins" />
+                              <span className={`absolute -top-1 -right-1 text-[8px] px-1 rounded-full border border-slate-500 leading-none font-bold ${gameState.coins < 0 ? 'bg-red-900 text-red-300 border-red-700' : 'bg-yellow-900 text-yellow-300 border-yellow-700'}`}>{gameState.coins}</span>
+                           </button>
+                           {(['exploit', 'blessing', 'patterns'] as const).map((type) => {
+                              const hasReady = effectsRegistry.some(e => e.type === type && isEffectReady(e.id, gameState) && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll));
+                              return (
+                                 <button key={type} onClick={() => toggleDrawer(type as any)}
+                                    className={`w-11 h-11 flex items-center justify-center rounded text-[10px] font-bold border flex-col gap-0.5
+                                    ${activeDrawer === type ? 'bg-slate-700 text-white border-slate-600' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+                                    <img src={categoryIcons[type]} alt="" className="w-9 h-9" />
+                                 </button>
+                              );
+                           })}
+                           <button type="button" onClick={() => discardAndDrawHand()} aria-label="Draw from deck" className="shrink-0 w-11 h-11 flex items-center justify-center bg-blue-900 hover:bg-blue-800 rounded text-blue-300 border border-blue-700 relative">
+                              <img src="/icons/foundation.png" alt="Draw" className="w-9 h-9" />
+                              {gameState.piles.deck.cards.length > 0 && (
+                                 <span className="absolute -top-1 -right-1 bg-slate-700 text-[8px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
+                              )}
+                           </button>
+                        </div>
+                     </>
+                  ) : (
+                     <>
+                        {/* Classic Mode - Single Row with all buttons */}
+                        <div className="flex w-full gap-1">
+                           <button onClick={() => toggleDrawer('pause')} className={`p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}>
+                              <img src="/icons/pause.png" alt="Pause" className="w-[18px] h-[18px]" />
+                           </button>
+                           <button type="button" onClick={() => {/* TODO: Undo logic */}} className="p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700">
+                              <img src="/icons/back.png" alt="Undo" className="w-[18px] h-[18px]" />
+                           </button>
+                           <button type="button" onClick={() => discardAndDrawHand()} aria-label="Draw from deck" className="p-2 bg-blue-900 hover:bg-blue-800 rounded text-blue-300 border border-blue-700 relative">
+                              <img src="/icons/foundation.png" alt="Draw" className="w-[18px] h-[18px]" />
+                              {gameState.piles.deck?.cards?.length > 0 && (
+                                 <span className="absolute -top-1 -right-1 bg-slate-700 text-[8px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
+                              )}
+                           </button>
+                           <button className="flex-1 py-1.5 rounded text-[10px] font-bold border border-slate-700 bg-slate-800 text-slate-400 flex flex-col items-center justify-center gap-0.5">
+                              <Clock size={18} />
+                              <span>{formatTime(elapsedTime)}</span>
+                           </button>
+                           <button className="flex-1 py-1.5 rounded text-[10px] font-bold border border-slate-700 bg-slate-800 text-slate-400 flex flex-col items-center justify-center gap-0.5">
+                              <span className="text-[18px]">📊</span>
+                              <span>{gameState.score}</span>
+                           </button>
+                           <button className="flex-1 py-1.5 rounded text-[10px] font-bold border border-slate-700 bg-slate-800 text-slate-400 flex flex-col items-center justify-center gap-0.5">
+                              <Play size={18} />
+                              <span>{gameState.moves}</span>
+                           </button>
+                        </div>
+                     </>
+                  )}
                   {/* Coronata Mode - Run Progress Bar */}
                   <div className="flex justify-between px-1 mb-2 gap-0.5 relative group">
                      {runPlan.map((enc, i) => {
