@@ -12,7 +12,6 @@ import { useEffectDebugger } from './hooks/useEffectDebugger';
 import { detectConflicts } from './utils/effectDebug';
 import { CLASSIC_GAMES } from './src/classic/games';
 import { convertCoronataPilesToClassic, convertClassicPilesToCoronata } from './src/classic/types';
-
 // ==========================================
 // INJECTABLE REGISTRIES (defaults to empty for decoupled UI)
 // ==========================================
@@ -37,7 +36,8 @@ const createSeededRng = (seed: number) => {
       s = (s * 1664525 + 1013904223) >>> 0;
       return s / 4294967296;
    };
-};
+}
+
 
 const shuffleArray = <T,>(arr: T[], rng?: () => number): T[] => {
    const out = arr.slice();
@@ -111,7 +111,6 @@ const isStandardMoveValid = (movingCards: Card[], targetPile: Pile, patriarchyMo
     if (!targetTop) {
       // Aces can only go to their matching suit foundation
       return leader.rank === 1 && targetPile.id === `foundation-${leader.suit}`;
-    }
     // Must match suit of foundation's first card and be next rank (foundation uses normal rank order A,2,3...K)
     return leader.suit === targetTop.suit && leader.rank === targetTop.rank + 1;
   }
@@ -274,12 +273,8 @@ const categoryIcons: Record<string, string> = {
    exploit: '/icons/exploit.png',
    exploits: '/icons/exploit.png',
    curse: '/icons/curse.png',
-   curses: '/icons/curse.png',
+   curses: '/icons/curse.png'
 };
-
-// ==========================================
-// 5. COMPONENT: APP
-// ==========================================
 
 export default function SolitaireEngine({ 
    effectsRegistry = EFFECTS_REGISTRY, 
@@ -2004,7 +1999,7 @@ export default function SolitaireEngine({
               <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-purple-400">
                 {charges}
               </span>
-            )}
+             )}
          </button>
       );
     }
@@ -2170,7 +2165,7 @@ export default function SolitaireEngine({
          <img src="/icons/logo-48x72.png" alt="Coronata" className="w-20 h-auto mx-auto mb-2" />
          <h1 className="text-5xl font-black ">CORONATA</h1>
 
-      </div>
+      
       <div className="grid grid-cols-3 gap-8 w-full">
          <button onClick={() => setShowModes(true)} className="flex items-center justify-center"><Play fill="currentcolor" className="w-20 h-20"/></button>
          <button onClick={() => setShowHowTo(true)} className="flex items-center justify-center"><img src="/icons/howto.png" alt="How To" className="w-20 h-20" /></button>
@@ -2178,7 +2173,7 @@ export default function SolitaireEngine({
          <button onClick={() => setShowUpdates(true)} className="flex items-center justify-center"><RefreshCw size={65}/></button>
          <button onClick={() => setShowProfile(true)} className="flex items-center justify-center"><User size={65}/></button>
          <button onClick={() => setShowSettings(true)} className="flex items-center justify-center"><img src="/icons/settings.png" alt="Settings" className="w-20 h-20" /></button>
-      </div>
+      
 
            {/* MODES PANEL */}
            {showModes && (
@@ -2188,37 +2183,37 @@ export default function SolitaireEngine({
                     <button onClick={() => setShowModes(false)}><X /></button>
                  </div>
                  <div className="flex-1 overflow-y-auto space-y-3">
-                    {gameModes.map(mode => (
-                       <div 
-                          key={mode.id}
-                          onClick={() => mode.unlocked && setSelectedMode(mode.id)}
-                          className={`w-full p-4 rounded-xl border text-left transition-all cursor-pointer ${
-                             selectedMode === mode.id 
-                             ? 'bg-purple-900/50 border-purple-500 ring- ring-purple-400' 
-                             : mode.unlocked 
-                                   ? 'bg-slate-800 border-slate-700 hover:border-slate-500' 
-                                   : 'bg-slate-800/50 border-slate-700/50 opacity-50 cursor-not-allowed pointer-events-none'
-                          }`}>
-                          <div className="flex items-center gap-3">
-                             <div className="flex-1">
-                                <div className="font-bold text-white flex items-center gap-2">
-                                   {mode.name}
-                                   {!mode.unlocked && <Lock size={10} className="text-slate-500" />}
-                                   {selectedMode === mode.id}
-                                </div>
-                                <div className="text-sm text-slate-400">{mode.desc}</div>
-                             </div>
-
-                          </div>
-                       </div>
-                    ))}
+                              {gameModes.map(mode => (
+                                 (
+                                    <div 
+                                       key={mode.id}
+                                       onClick={() => mode.unlocked && setSelectedMode(mode.id)}
+                                       className={`w-full p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                                          selectedMode === mode.id 
+                                             ? 'bg-purple-900/50 border-purple-500 ring- ring-purple-400' 
+                                             : mode.unlocked 
+                                                ? 'bg-slate-800 border-slate-700 hover:border-slate-500' 
+                                                : 'bg-slate-800/50 border-slate-700/50 opacity-50 cursor-not-allowed pointer-events-none'
+                                       }`}>
+                                       <div className="flex items-center gap-3">
+                                          <div className="flex-1">
+                                             <div className="font-bold text-white flex items-center gap-2">
+                                                {mode.name}
+                                                {!mode.unlocked && <Lock size={10} className="text-slate-500" />}
+                                                {selectedMode === mode.id ? <span className="ml-2 text-emerald-400">(Selected)</span> : null}
+                                             </div>
+                                             <div className="text-sm text-slate-400">{mode.desc}</div>
+                                          </div>
+                                       </div>
+                                    </div>
+                                 )
+                              ))}
                     {/* Coming Soon */}
                     <div className="mt-4 p-4 rounded-xl border border-dashed border-slate-600 bg-slate-800/30">
                        <div className="text-center">
                           <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-slate-700 flex items-center justify-center"><RefreshCw size={18} className="text-slate-500" /></div>
                           
                           <div className="text-xs text-slate-500 mt-1">More coming soon!</div>
-                       </div>
                     </div>
                  </div>
                  <div className="pt-4 border-t border-slate-700 mt-4">
@@ -2229,7 +2224,6 @@ export default function SolitaireEngine({
                     </button>
                  </div>
               </div>
-           )}
 
            {/* PROFILE PANEL */}
            {showProfile && (
@@ -2897,121 +2891,7 @@ export default function SolitaireEngine({
                                       setShowParentsPopup(true);
                                       setCallParentsCount(0);
                                    }
-                    {/* Advanced - Collapsible (joke settings) */}
-                    <div className="bg-slate-800/50 rounded-lg overflow-hidden">
-                       <button 
-                          onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'advanced' ? null : 'advanced')}
-                          className="w-full flex items-center justify-between p-3 hover:bg-slate-800">
-                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Advanced</h3>
-                          <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'advanced' ? 'rotate-180' : ''}`} />
-                       </button>
-                       {expandedSettingsSection === 'advanced' && (
-                          <div className="space-y-3 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
-                             <div className="p-3 bg-slate-700/50 rounded-lg">
-                                <div className="flex justify-between mb-2"><span className="text-sm">Sarcasm Level</span><span className="text-slate-400 text-sm">{settings.sarcasmLevel}%</span></div>
-                                <input type="range" min="0" max="100" value={settings.sarcasmLevel} onChange={(e) => setSettings(s => ({...s, sarcasmLevel: Number(e.target.value)}))} className="w-full h-2 bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-purple-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
-                                <div className="text-xs text-slate-500 mt-1 italic">
-                                   {settings.sarcasmLevel < 25 ? "Wow, so sincere." : 
-                                    settings.sarcasmLevel < 50 ? "Okay, moderately sarcastic." :
-                                    settings.sarcasmLevel < 75 ? "Now we're talking." :
-                                    "Oh, you're one of THOSE people."}
-                                </div>
-                             </div>
-                             <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                                <div><div className="font-medium text-sm">Hogwarts House</div><div className="text-xs text-slate-400">Very important for gameplay</div></div>
-                                <select value={settings.hogwartsHouse} onChange={(e) => setSettings(s => ({...s, hogwartsHouse: e.target.value}))} className="bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm">
-                                   <option value="undecided">Undecided</option>
-                                   <option value="gryffindor">🦁 Gryffindor</option>
-                                   <option value="slytherin">🐍 Slytherin</option>
-                                   <option value="ravenclaw">🦅 Ravenclaw</option>
-                                   <option value="hufflepuff">🦡 Hufflepuff</option>
-                                </select>
-                             </div>
-                             <div className="p-3 bg-slate-700/50 rounded-lg">
-                               <>
-                                 <div className="font-medium text-sm mb-1">Feeling Lucky?</div>
-                                 <input 
-                                    type="text" 
-                                    value={settings.cheatCode} 
-                                    onChange={(e) => setSettings(s => ({...s, cheatCode: e.target.value}))} 
-                                    placeholder=""
-                                    className="flex-1 bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm"
-                                 />
-                                 <button 
-                                    onClick={() => {
-                                       const code = settings.cheatCode.toLowerCase().trim();
-                                       const responses: Record<string, string> = {
-                                          'iddqd': "This isn't DOOM, but nice try.",
-                                          'hesoyam': "GTA doesn't work here either.",
-                                          'konami': "↑↑↓↓←→←→BA... nothing happened.",
-                                          'motherlode': "The Sims called, they want their cheat back.",
-                                          'rosebud': "Seriously? That's ancient.",
-                                          'money': "Wouldn't that be nice.",
-                                          'god': "You wish.",
-                                          'win': "That's not how this works.",
-                                          'help': "No.",
-                                          'please': "Manners won't help you here.",
-                                          '': "You have to actually type something.",
-                                       };
-                                       setCheatResponse(responses[code] || "Nice try, but that's not a real cheat code.");
-                                       setSettings(s => ({...s, cheatCode: ''}));
-                                    }}
-                                    className="bg-purple-600 hover:bg-purple-500 px-3 py-1 rounded text-sm font-bold"
-                                 >
-                                    Try
-                                 </button>
-                                 {cheatResponse && <div className="text-xs text-purple-400 mt-2 italic">{cheatResponse}</div>}
-                               </>
-                             </div>
-                          </div>
-                       )}
-                    </div>
 
-                    {/* Data - Collapsible */}
-                    <div className="bg-slate-800/50 rounded-lg overflow-hidden">
-                       <button 
-                          onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'data' ? null : 'data')}
-                          className="w-full flex items-center justify-between p-3 hover:bg-slate-800">
-                          <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Data</h3>
-                          <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'data' ? 'rotate-180' : ''}`} />
-                       </button>
-                       {expandedSettingsSection === 'data' && (
-                          <div className="space-y-2 p-3 pt-0 animate-in fade-in slide-in-from-top-2">
-                             <button className="w-full p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
-                                <span className="text-sm">Export Save Data</span>
-                                <span className="text-slate-500">→</span>
-                             </button>
-                             <button className="w-full p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
-                                <span className="text-sm">Import Save Data</span>
-                                <span className="text-slate-500">→</span>
-                             </button>
-                             <button 
-                                onClick={() => {
-                                   const newCount = callParentsCount + 1;
-                                   setCallParentsCount(newCount);
-                                   if (newCount >= 3) {
-                                      setShowParentsPopup(true);
-                                      setCallParentsCount(0);
-                                   }
-                                }}
-                                className="w-full p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
-                                <span className="text-sm">Call Your Parents</span>
-                                <span className="text-slate-500"></span>
-                             </button>
-                             <div className="border-t border-slate-600 pt-2 mt-2">
-                                <div className="text-xs text-slate-400 uppercase mb-2">Danger Zone</div>
-                                <div className="space-y-2">
-                                   <button className="w-full p-3 bg-orange-900/30 border border-orange-800 rounded-lg text-left hover:bg-orange-900/50 text-orange-300 text-sm">
-                                      Reset Statistics Only
-                                   </button>
-                                   <button className="w-full p-3 bg-red-900/30 border border-red-800 rounded-lg text-left hover:bg-red-900/50 text-red-300 text-sm">
-                                      Reset All Progress
-                                   </button>
-                                </div>
-                             </div>
-                          </div>
-                       )}
-                    </div>
 
                                 }}
                                 className="w-full p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 flex justify-between items-center">
@@ -3275,9 +3155,7 @@ export default function SolitaireEngine({
                  </div>
               </div>
            )}
-        </div>
-     );
-  }
+      
 
   if (gameState.wanderState !== 'none') {
      return (
@@ -3648,26 +3526,26 @@ return (
          {activeDrawer && (
             <div className="absolute bottom-full left-0 w-full max-h-[calc(100vh-140px)] overflow-y-auto bg-slate-800 border-t border-slate-700 animate-in slide-in-from-bottom-10 z-50">
                <div className="p-4">
-                  {activeDrawer === 'shop' && (
-                     <div className="w-full mb-2">
-                        <div className="grid grid-cols-3 gap-2">
-                           <button onClick={() => setShopTab('buy')} className={`py-2 rounded font-bold ${shopTab === 'buy' ? 'bg-yellow-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Buy</button>
-                           <button onClick={() => setShopTab('sell')} className={`py-2 rounded font-bold ${shopTab === 'sell' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Sell</button>
-                           <button onClick={() => { setShopTab('continue'); startWanderPhase(); }} className={`py-2 rounded font-bold ${shopTab === 'continue' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Continue</button>
-                        </div>
-                     </div>
-                  )}
-                  <div className="flex justify-between items-center">
-                     <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">
-                        {activeDrawer === 'pause' ? 'Menu'
-                           : activeDrawer === 'shop' ? 'The Trade'
-                           : activeDrawer === 'feedback' ? 'Feedback'
-                           : activeDrawer === 'test' ? 'Test UI'
-                           : activeDrawer === 'settings' ? 'Settings'
-                           : activeDrawer === 'blessing_select' ? 'Select a Blessing'
-                           : activeDrawer.charAt(0).toUpperCase() + activeDrawer.slice(1)}
-                     </h3>
-                     {nonClosableDrawer === activeDrawer ? (
+                              {activeDrawer === 'shop' && (
+                                 <div className="w-full mb-2">
+                                    <div className="grid grid-cols-3 gap-2">
+                                       <button onClick={() => setShopTab('buy')} className={`py-2 rounded font-bold ${shopTab === 'buy' ? 'bg-yellow-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Buy</button>
+                                       <button onClick={() => setShopTab('sell')} className={`py-2 rounded font-bold ${shopTab === 'sell' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Sell</button>
+                                       <button onClick={() => { setShopTab('continue'); startWanderPhase(); }} className={`py-2 rounded font-bold ${shopTab === 'continue' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-200'}`}>Continue</button>
+                                    </div>
+                                 </div>
+                              )}
+                              <div className="flex justify-between items-center">
+                                 <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">
+                                    {activeDrawer === 'pause' ? 'Menu'
+                                       : activeDrawer === 'shop' ? 'The Trade'
+                                       : activeDrawer === 'feedback' ? 'Feedback'
+                                       : activeDrawer === 'test' ? 'Test UI'
+                                       : activeDrawer === 'settings' ? 'Settings'
+                                       : activeDrawer === 'blessing_select' ? 'Select a Blessing'
+                                       : activeDrawer.charAt(0).toUpperCase() + activeDrawer.slice(1)}
+                                 </h3>
+                                 {nonClosableDrawer === activeDrawer ? (
                         <div style={{ width: 28 }} />
                      ) : (
                         <button onClick={() => { setActiveDrawer(null); setNonClosableDrawer(null); }}><ChevronDown className="text-slate-500" /></button>
@@ -3678,7 +3556,7 @@ return (
             </div>
          )}
          {/* ...rest of bottom bar content... */}
-      </div>
+      
       {/* ...existing JSX below... */}
    </>
 );
@@ -3738,8 +3616,8 @@ return (
                                 })()}
                               </div>
                            </div>
-                                    ) : null}
-                                    {activeDrawer === 'feedback' ? (
+                        )}
+                        {activeDrawer === 'feedback' ? (
                            <div className="flex flex-col gap-3">
                               <div className="flex gap-2">
                                  {['bug', 'ui', 'effect', 'request'].map(t => (
@@ -4253,9 +4131,7 @@ return (
                            </div>
                         )}
                      </div>
-                  </div>
-               </div>
-            )}
+                  )}
             {gameState.interactionMode === 'discard_select' && (
                <div className="bg-orange-900/80 text-orange-200 text-xs text-center p-1 mb-1 rounded animate-pulse">Select a card in HAND to discard</div>
             )}
