@@ -1,10 +1,3 @@
-/**
- * Pattern Effect Definitions
- *
- * Patterns are always-available effects that modify scoring, coins, or gameplay
- * based on normal game actions. Unlike exploits, these don't need to be purchased or activated.
- * They trigger automatically during gameplay.
- */
 
 import { EffectDefinition } from '../patterns/types';
 import { isHighestRank, isNextLowerInOrder } from '../../utils/rankOrder';

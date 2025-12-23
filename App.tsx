@@ -153,6 +153,8 @@ const getRarityColor = (rarity?: string): { bg: string; text: string; border: st
    }
 };
 
+  
+
 // Small synonyms map for common registry keys vs actual filenames
 const ICON_SYNONYMS: Record<string, string> = {
    // --- Explicit curse icon mappings for missing icons ---
@@ -610,11 +612,6 @@ export default function SolitaireEngine({
     }
   }, [currentView]);
 
-  const isEffectReady = (id: string, state: GameState) => {
-     if (id === 'lobbyist') return state.coins >= 100;
-     return true;
-  };
-
   const resolveWanderEffect = (effects: any[]) => {
     console.log('resolveWanderEffect called with:', effects);
     let updates: Partial<GameState> = {};
@@ -637,10 +634,6 @@ export default function SolitaireEngine({
             const curse = effectsRegistry.filter(e => e.type === 'curse')[Math.floor(Math.random() * 5)]; 
             if (curse && !newOwned.includes(curse.id)) { newOwned.push(curse.id); newActive.push(curse.id); } 
         }
-        if (eff.type === 'add_specific_curse') {
-            const cid = eff.params[0];
-            if (!newOwned.includes(cid)) { newOwned.push(cid); newActive.push(cid); }
-        }
       if (eff.type === 'add_random_blessing') { 
          const b = effectsRegistry.filter(e => e.type === 'blessing')[Math.floor(Math.random() * 5)]; 
          if (b && !newOwned.includes(b.id)) { newOwned.push(b.id); if (!newActive.includes(b.id)) newActive.push(b.id); }
@@ -652,13 +645,6 @@ export default function SolitaireEngine({
         if (eff.type === 'add_random_exploit') { 
             const x = effectsRegistry.filter(e => e.type === 'exploit')[Math.floor(Math.random() * 5)]; 
             if (x && !newOwned.includes(x.id)) { newOwned.push(x.id); newActive.push(x.id); } 
-        }
-        if (eff.type === 'remove_curse') { 
-            const curses = newActive.filter(id => effectsRegistry.find(e => e.id === id)?.type === 'curse'); 
-            if (curses.length > 0) {
-                const toRemove = curses[Math.floor(Math.random() * curses.length)];
-                newActive = newActive.filter(id => id !== toRemove); 
-            }
         }
         if (eff.type === 'random_outcome') { 
             if (Math.random() < eff.params[0]) apply(eff.params[1]); else apply(eff.params[2]); 
@@ -1237,62 +1223,6 @@ export default function SolitaireEngine({
      setGameState(prev => ({ ...prev, activeMinigame: null, minigameResult: null }));
   };
 
-  const handleShadowRealmClick = () => {
-     const shadowPile = gameState.piles['shadow-realm'];
-     if (!shadowPile || shadowPile.cards.length === 0) return;
-     
-     // Cost to summon: 10 coins
-     const cost = 10;
-     if (gameState.coins >= cost) {
-        const card = shadowPile.cards[shadowPile.cards.length - 1];
-        const newShadowCards = shadowPile.cards.slice(0, -1);
-        const hand = gameState.piles['hand'];
-        const newHandCards = [...hand.cards, card];
-        
-        setGameState(prev => ({
-           ...prev,
-           coins: prev.coins - cost,
-           piles: {
-              ...prev.piles,
-              'shadow-realm': { ...shadowPile, cards: newShadowCards },
-              hand: { ...hand, cards: newHandCards }
-           }
-        }));
-     }
-  };
-
-  const spendMomentum = (type: 'wild' | 'unlock' | 'pts') => {
-     const current = gameState.effectState?.momentum || 0;
-     if (type === 'wild' && current >= 3) {
-        const wild: Card = { id: `momentum-wild-${Math.random()}`, rank: 0, suit: 'special', faceUp: true, meta: { isWild: true } };
-        setGameState(prev => ({
-           ...prev,
-           piles: { ...prev.piles, hand: { ...prev.piles.hand, cards: [...prev.piles.hand.cards, wild] } },
-           effectState: { ...prev.effectState, momentum: current - 3 }
-        }));
-     } else if (type === 'unlock' && current >= 5) {
-        // Unlock random tableau
-       const locked = Object.values(gameState.piles).filter((p): p is Pile => {
-          const pileTyped = p as Pile;
-          return pileTyped && pileTyped.type === 'tableau' && pileTyped.locked;
-       });
-        if (locked.length > 0) {
-           const target = locked[Math.floor(Math.random() * locked.length)];
-           setGameState(prev => ({
-              ...prev,
-              piles: { ...prev.piles, [target.id]: { ...target, locked: false } },
-              effectState: { ...prev.effectState, momentum: current - 5 }
-           }));
-        }
-     } else if (type === 'pts' && current >= 1) {
-        setGameState(prev => ({
-           ...prev,
-           score: prev.score + 100,
-           effectState: { ...prev.effectState, momentum: current - 1 }
-        }));
-     }
-  };
-
    const clearSelection = () => {
       setGameState(prev => ({ ...prev, selectedCardIds: null }));
       setSelectedPileId(null);
@@ -1812,12 +1742,6 @@ export default function SolitaireEngine({
 
        // Always show shop (use placeholder items if empty)
        let shopItems = [...exploits];
-       if (shopItems.length === 0) {
-          shopItems = [
-             { id: 'placeholder_exploit_1', name: 'Card Counter', type: 'exploit', description: 'See the next card in the deck.', rarity: 'common', cost: 50 },
-             { id: 'placeholder_exploit_2', name: 'Deep Pockets', type: 'exploit', description: 'Start with extra coins each encounter.', rarity: 'uncommon', cost: 75 },
-          ] as GameEffect[];
-       }
        setShopInventory(shopItems);
        setShopTab('buy');
        setActiveDrawer('shop');
@@ -1840,7 +1764,7 @@ export default function SolitaireEngine({
                return e?.type === 'curse';
             });
             const isEncounter10 = gameState.runIndex === 9;
-            const maxCurses = isEncounter10 ? 2 : 1;
+            const maxCurses = isEncounter10 ? 3 : 1;
             if (activeCurses.length >= maxCurses) return prev;
          }
          
@@ -1861,9 +1785,23 @@ export default function SolitaireEngine({
 
   const canAfford = (cost: number) => gameState.coins >= cost;
 
-  // Trust Fund conversion functions
+  // Determine whether an effect is currently activatable given the game state.
+  // This is a lightweight guard used by the UI to gray-out unavailable effects.
+  const isEffectReady = (id: string, state: GameState): boolean => {
+     const eff = effectsRegistry.find(e => e.id === id);
+     if (!eff) return false;
+     // If effect has a coin cost, ensure player can afford it
+     if (typeof eff.cost === 'number' && (state.coins ?? 0) < eff.cost) return false;
+     // If effect uses charges, require at least one charge available
+     if (typeof eff.maxCharges === 'number') {
+        const c = state.charges?.[id];
+        if (c === undefined || c <= 0) return false;
+     }
+     return true;
+  };
+
   const convertScoreToCoin = () => {
-    if (!activeEffects.includes('trust_fund')) return;
+    if (!activeEffects.includes('whore')) return;
     if (gameState.score < 5) return; // Need at least 5 score
     const converted = Math.floor(gameState.score / 5);
     setGameState(prev => ({
@@ -1874,7 +1812,7 @@ export default function SolitaireEngine({
   };
 
   const convertCoinToScore = () => {
-    if (!activeEffects.includes('trust_fund')) return;
+    if (!activeEffects.includes('whore')) return;
     if (gameState.coins < 1) return; // Need at least 1 coin
     setGameState(prev => ({
       ...prev,
@@ -1883,9 +1821,9 @@ export default function SolitaireEngine({
     }));
   };
 
-  // Tax Loophole - buy a key for 25% of coins
+  // Metrocard - buy a key for 25% of coins
   const buyKeyWithTaxLoophole = () => {
-    if (!activeEffects.includes('tax_loophole')) return;
+    if (!activeEffects.includes('metrocard')) return;
     if (gameState.coins <= 0) return;
     const cost = Math.floor(gameState.coins * 0.25);
     const hand = gameState.piles['hand'];
@@ -1926,8 +1864,8 @@ export default function SolitaireEngine({
           ownedEffects: [...p.ownedEffects, effect.id] 
        }));
 
-       // Auto-activate all purchased effects (blessings now activate immediately)
-       toggleEffect(effect.id, true);
+      // Auto-activate all purchased effects (blessings now activate immediately)
+      toggleEffect(effect.id, true);
   };
 
   const renderCard = (card: Card, index: number, pileId: string, totalCards: number = 0) => {
@@ -3987,13 +3925,13 @@ export default function SolitaireEngine({
                                           const isCurseType = ['curse', 'fear', 'danger'].includes(effect.type);
                                           const isPassive = effect.type === 'passive';
                                           // Always-on exploits cannot be toggled off once active
-                                          const alwaysOnIds = ['trust_fund', 'tax_loophole', 'breaking_entering', 'insider_trading', 'switcheroo'];
+                                          const alwaysOnIds = ['whore', 'metrocard', 'breaking_entering', 'insider_trading', 'switcheroo'];
                                           const isAlwaysOn = alwaysOnIds.includes(effect.id) && isActive;
                                           if (isCurseType || isPassive || isAlwaysOn) return;
                                           toggleEffect(effect.id);
                                        }}
                                        aria-label={`Toggle effect ${effect.name}`}
-                                       className={`p-2 rounded border text-xs flex items-center gap-3 transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : `${rarityColors.bg} ${rarityColors.border}`} ${['curse', 'fear', 'danger', 'passive'].includes(effect.type) || (['trust_fund', 'tax_loophole', 'breaking_entering', 'insider_trading', 'switcheroo'].includes(effect.id) && isActive) ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                                       className={`p-2 rounded border text-xs flex items-center gap-3 transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : `${rarityColors.bg} ${rarityColors.border}`} ${['curse', 'fear', 'danger', 'passive'].includes(effect.type) || (['whore', 'metrocard', 'breaking_entering', 'insider_trading', 'switcheroo'].includes(effect.id) && isActive) ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                        <ResponsiveIcon name={effect.id || effect.name} fallbackType={effectType === 'passive' ? 'exploit' : effectType} size={32} className="w-8 h-8 rounded shrink-0" alt={effect.name} />
                                        <div className="flex-1 min-w-0 text-left">
                                            <div className="font-bold text-white flex gap-1 items-center flex-wrap">
@@ -4003,7 +3941,7 @@ export default function SolitaireEngine({
                                                {effect.maxCharges && <span className="text-[9px] bg-slate-600 px-1 rounded text-white shrink-0">{charges}/{effect.maxCharges}</span>}
                                            </div>
                                            <div className="text-slate-400 text-[10px]">{effect.description}</div>
-                                           {effect.id === 'trust_fund' && isActive && (
+                                           {effect.id === 'whore' && isActive && (
                                               <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
                                                 <button
                                                   onClick={convertScoreToCoin}
@@ -4019,7 +3957,7 @@ export default function SolitaireEngine({
                                                 </button>
                                               </div>
                                            )}
-                                           {effect.id === 'tax_loophole' && isActive && (
+                                           {effect.id === 'metrocard' && isActive && (
                                               <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
                                                 <button
                                                   onClick={buyKeyWithTaxLoophole}

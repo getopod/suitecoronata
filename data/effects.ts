@@ -1,40 +1,17 @@
-/**
- * Effects Registry
- *
- * This file exports effects compiled from the pattern-based engine.
- * All effects are defined declaratively in engine/definitions/.
- */
-
 import { GameEffect, Suit, Card, Rank, Pile, GameState } from '../types';
 import { compileAllEffects } from '../engine';
 import { CLASSIC_GAMES } from '../src/classic/games';
 import { convertClassicPilesToCoronata } from '../src/classic/types';
 
-// =============================================================================
-// Effects RNG Control
-// =============================================================================
-
-// Allows the app to inject a seeded RNG for deterministic runs.
 const __ORIG_MATH_RANDOM = Math.random;
 export const setEffectsRng = (fn: () => number) => { (Math as any).random = fn; };
 export const resetEffectsRng = () => { (Math as any).random = __ORIG_MATH_RANDOM; };
-
-// =============================================================================
-// Utility Functions
-// =============================================================================
 
 export const getCardColor = (suit: Suit) => {
   if (suit === 'special') return 'purple';
   return (suit === 'hearts' || suit === 'diamonds' ? 'red' : 'black');
 };
 
-// =============================================================================
-// Board Generation
-// =============================================================================
-
-/**
- * Generate a new game board with standard solitaire layout
- */
 export const generateNewBoard = (
   currentScore: number,
   currentCoins: number,
@@ -173,29 +150,12 @@ export const generateNewBoard = (
   };
 };
 
-// =============================================================================
-// Effects Registry
-// =============================================================================
-
-/**
- * Compiled effects from the pattern-based engine definitions
- */
 export const EFFECTS_REGISTRY: GameEffect[] = compileAllEffects();
 
-// =============================================================================
-// Utility Exports
-// =============================================================================
-
-/**
- * Get an effect by ID
- */
 export function getEffectById(id: string): GameEffect | undefined {
   return EFFECTS_REGISTRY.find(e => e.id === id);
 }
 
-/**
- * Get effects by type
- */
 export function getEffectsByType(type: 'blessing' | 'exploit' | 'curse'): GameEffect[] {
   return EFFECTS_REGISTRY.filter(e => e.type === type);
 }

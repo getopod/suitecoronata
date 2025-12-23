@@ -1,5 +1,3 @@
-// Auto-generated merged icon mappings (existing + fuzzy suggestions)
-// Keep this file checked in; regenerate via scripts/fuzzy-icon-mapping.cjs
 export const ADDITIONAL_ICON_SYNONYMS: Record<string, string> = {
   // === Core Effects ===
   alchemist: 'alchemist',
@@ -140,7 +138,7 @@ export const ADDITIONAL_ICON_SYNONYMS: Record<string, string> = {
   tortoiseshell: 'tortoiseshell',
   tower_of_power: 'Tower of Power',
   trickster: 'trickster',
-  trust_fund: 'trustfund',
+  whore: 'trustfund',
   uncle_timmy_boo: 'Uncle Timmy Boo',
   vagrant: 'vagrant',
   veil_uncertainty: 'Veil of Uncertainty',

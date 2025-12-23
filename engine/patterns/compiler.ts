@@ -72,17 +72,65 @@ export function compileEffect(definition: EffectDefinition): GameEffect {
   }
 
   // Compile onActivate handler
-  if (definition.onActivate?.length || definition.effectState) {
-    effect.onActivate = compileOnActivate(definition.onActivate || [], definition.effectState);
+  // Support both declarative StateAction[] and direct function form used in some definitions
+  if (typeof definition.onActivate === 'function') {
+    effect.onActivate = (state, activeEffects) => {
+      const ctx: StateContext = { state, activeEffects };
+      let result: Partial<GameState> = {};
+      if (definition.effectState) {
+        result.effectState = { ...state.effectState, ...definition.effectState };
+      }
+      try {
+        const changes = (definition.onActivate as any)(state, activeEffects);
+        if (changes) {
+          result = {
+            ...result,
+            ...changes,
+            effectState: { ...result.effectState, ...(changes.effectState || {}) },
+          };
+        }
+      } catch (e) {
+        // Protect engine from user-defined function errors
+        // eslint-disable-next-line no-console
+        console.error('Error running onActivate for', definition.id, e);
+      }
+      return result;
+    };
+  } else if (Array.isArray(definition.onActivate) && definition.onActivate.length > 0) {
+    effect.onActivate = compileOnActivate(definition.onActivate, definition.effectState);
+  } else if (definition.effectState) {
+    // Only initial effect state provided
+    effect.onActivate = (state) => ({ effectState: { ...state.effectState, ...definition.effectState } });
   }
 
   // Compile onMoveComplete handler
-  if (definition.onMove?.length) {
+  // Accept either an array of StateAction or a direct function (legacy definitions)
+  if (typeof definition.onMove === 'function') {
+    effect.onMoveComplete = (state, context) => {
+      try {
+        return (definition.onMove as any)(state, context) || {};
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('Error running onMove for', definition.id, e);
+        return {};
+      }
+    };
+  } else if (Array.isArray(definition.onMove) && definition.onMove.length > 0) {
     effect.onMoveComplete = compileOnMove(definition.onMove);
   }
 
   // Compile onEncounterStart handler
-  if (definition.onEncounterStart?.length) {
+  if (typeof definition.onEncounterStart === 'function') {
+    effect.onEncounterStart = (state) => {
+      try {
+        return (definition.onEncounterStart as any)(state) || {};
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('Error running onEncounterStart for', definition.id, e);
+        return {};
+      }
+    };
+  } else if (Array.isArray(definition.onEncounterStart) && definition.onEncounterStart.length > 0) {
     effect.onEncounterStart = compileOnEncounterStart(definition.onEncounterStart);
   }
 
