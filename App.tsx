@@ -153,8 +153,6 @@ const getRarityColor = (rarity?: string): { bg: string; text: string; border: st
    }
 };
 
-  
-
 // Small synonyms map for common registry keys vs actual filenames
 const ICON_SYNONYMS: Record<string, string> = {
    // --- Explicit curse icon mappings for missing icons ---
@@ -278,10 +276,6 @@ const categoryIcons: Record<string, string> = {
    curse: '/icons/curse.png',
    curses: '/icons/curse.png',
 };
-
-// ==========================================
-// 5. COMPONENT: APP
-// ==========================================
 
 export default function SolitaireEngine({ 
    effectsRegistry = EFFECTS_REGISTRY, 
@@ -3560,10 +3554,10 @@ export default function SolitaireEngine({
                      )}
                      <div className="flex justify-between items-center">
                         <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">
-                           {activeDrawer === 'pause' ? 'Menu' 
-                            : activeDrawer === 'shop' ? 'The Trade' 
+                           {activeDrawer === 'pause' ? '' 
+                            : activeDrawer === 'shop' ? '' 
                             : activeDrawer === 'feedback' ? 'Feedback' 
-                            : activeDrawer === 'test' ? 'Test UI' 
+                            : activeDrawer === 'test' ? '' 
                             : activeDrawer === 'settings' ? 'Settings' 
                             : activeDrawer === 'blessing_select' ? 'Select a Blessing' 
                             : activeDrawer.charAt(0).toUpperCase() + activeDrawer.slice(1)}
@@ -3574,14 +3568,14 @@ export default function SolitaireEngine({
                            <button onClick={() => { setActiveDrawer(null); setNonClosableDrawer(null); }}><ChevronDown className="text-slate-500" /></button>
                         )}
                      </div>
-                     <div className="max-w-md mx-auto mt-2">
+                     <div className="max-w-md mx-auto">
                         {activeDrawer === 'pause' ? (
                            <div className="grid grid-cols-5 gap-1">
-                           <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600"><img src="/icons/save.png" alt="" className="w-8 h-8" /><span className="text-[7px]">Save</span></button>
-                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('resign')}><img src="/icons/resign.png" alt="" className="w-8 h-8" /><span className="text-[7px]">Resign</span></button>
-                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('feedback')}><img src="/icons/feedback.png" alt="" className="w-8 h-8" /><span className="text-[7px]">Feedback</span></button>
-                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('test')}><FlaskConical size={32} /><span className="text-[7px]">Test</span></button>
-                              <button className="p-1 bg-slate-700 rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><img src="/icons/settings.png" alt="" className="w-8 h-8" /><span className="text-[7px]">Settings</span></button>                           </div>
+                           <button className=" rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600"><img src="/icons/save.png" alt="" className="w-8 h-8" /></button>
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('resign')}><img src="/icons/resign.png" alt="" className="w-8 h-8" /></button>
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('feedback')}><img src="/icons/feedback.png" alt="" className="w-8 h-8" /></button>
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('test')}><FlaskConical size={32} /></button>
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><img src="/icons/settings.png" alt="" className="w-8 h-8" /></button>                           </div>
                         ) : activeDrawer === 'shop' ? (
                            <div className="flex flex-col gap-2">
                               <div className="grid grid-cols-1 gap-2">
@@ -3617,7 +3611,7 @@ export default function SolitaireEngine({
 
                                 {shopTab === 'sell' && (() => {
                                    const ownedExploits = effectsRegistry.filter(e => (['exploit','epic','legendary','rare','uncommon'].includes(e.type)) && gameState.ownedEffects.includes(e.id));
-                                   if (ownedExploits.length === 0) return <div className="text-center text-slate-500 text-xs py-4">No exploitable items to sell.</div>;
+                                   if (ownedExploits.length === 0) return <div className="text-center text-slate-500 text-xs py-4">Nothing to sell!</div>;
                                    return ownedExploits.map(item => {
                                       const rarityColors = getRarityColor(item.rarity);
                                       const sellPrice = Math.floor((item.cost || 50) / 2);
