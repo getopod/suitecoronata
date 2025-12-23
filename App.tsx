@@ -307,6 +307,10 @@ export default function SolitaireEngine({
   const [blessingChoices, setBlessingChoices] = useState<GameEffect[]>([]);
   const [patternDrawer, setPatternDrawer] = useState(false);
   const [showLevelComplete, setShowLevelComplete] = useState(false);
+   // Left-floating menu state (new bottom HUD controls)
+   const [leftMenuOpen, setLeftMenuOpen] = useState(false);
+   const [leftSubMenu, setLeftSubMenu] = useState<'exploits' | 'blessings' | 'patterns' | 'options' | null>(null);
+   const [optionsSubMenu, setOptionsSubMenu] = useState<'settings' | null>(null);
 
   // Animation state
   const [floatingElements, setFloatingElements] = useState<Array<{ id: number; text: string; x: number; y: number; color: string; isMult?: boolean }>>([]);
@@ -4024,32 +4028,127 @@ export default function SolitaireEngine({
                      </div>
                   </div>
 
-                  {/* Coronata Mode - Effect Buttons */}
-                  <div className="flex w-full gap-1">
-                     <button onClick={() => toggleDrawer('pause')} className={`w-11 h-11 flex items-center justify-center bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}><img src="/icons/pause.png" alt="Pause" className="w-9 h-9" /></button>
-                     <button type="button" onClick={undoLastMove} aria-label="Undo" className="shrink-0 w-11 h-11 flex items-center justify-center bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700">
-                        <img src="/icons/back.png" alt="Undo" className="w-9 h-9" />
-                     </button>
-                     <button type="button" className="shrink-0 w-11 h-11 flex items-center justify-center bg-transparent hover:bg-slate-700 rounded relative">
-                        <ResponsiveIcon name="coin" fallbackType="exploit" size={36} className="w-9 h-9" alt="coins" />
-                        <span className={`absolute -top-1 -right-1 text-[8px] px-1 rounded-full border border-slate-500 leading-none font-bold ${gameState.coins < 0 ? 'bg-red-900 text-red-300 border-red-700' : 'bg-yellow-900 text-yellow-300 border-yellow-700'}`}>{gameState.coins}</span>
-                     </button>
-                     {(['exploit', 'blessing', 'patterns'] as const).map((type) => {
-                        const hasReady = effectsRegistry.some(e => e.type === type && isEffectReady(e.id, gameState) && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll));
-                        return (
-                           <button key={type} onClick={() => toggleDrawer(type as any)}
-                              className={`w-11 h-11 flex items-center justify-center rounded text-[10px] font-bold border flex-col gap-0.5
-                              ${activeDrawer === type ? 'bg-slate-700 text-white border-slate-600' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
-                              <img src={categoryIcons[type]} alt="" className="w-9 h-9" />
-                           </button>
-                        );
-                     })}
-                     <button type="button" onClick={() => discardAndDrawHand()} aria-label="Draw from deck" className="shrink-0 w-11 h-11 flex items-center justify-center bg-blue-900 hover:bg-blue-800 rounded text-blue-300 border border-blue-700 relative">
-                        <img src="/icons/foundation.png" alt="Draw" className="w-9 h-9" />
-                        {gameState.piles.deck.cards.length > 0 && (
-                           <span className="absolute -top-1 -right-1 bg-slate-700 text-[8px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
+                  {/* Coronata Mode - Compact HUD: left menu card, centered hand (rendered above), right discard card */}
+                  <div className="flex w-full items-end justify-between gap-2">
+                     {/* Left card-shaped menu button */}
+                     <div className="relative">
+                        <button onClick={() => { setLeftMenuOpen(prev => !prev); if (!leftMenuOpen) setLeftSubMenu(null); setOptionsSubMenu(null); }} className={`relative w-11 max-w-[44px] h-16 max-h-[64px] rounded border border-slate-700 shadow-md overflow-hidden bg-transparent pointer-events-auto`} aria-label="Menu">
+                           <img src={`/icons/${settings.cardBack}.png`} alt="Menu card" className="w-full h-full object-cover" />
+                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <img src={categoryIcons['exploit']} alt="exploit" className="w-6 h-6 opacity-90" />
+                           </div>
+                        </button>
+
+                        {/* Floating mini buttons (icons) above the card */}
+                        {leftMenuOpen && (
+                           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 flex items-center gap-2 pointer-events-auto z-50">
+                              <button onClick={() => setLeftSubMenu(leftSubMenu === 'exploits' ? null : 'exploits')} className={`w-9 h-9 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center text-white`} aria-label="Exploits">
+                                 <ResponsiveIcon name="exploit" fallbackType="exploit" size={18} className="w-5 h-5" />
+                              </button>
+                              <button onClick={() => setLeftSubMenu(leftSubMenu === 'blessings' ? null : 'blessings')} className={`w-9 h-9 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center text-white`} aria-label="Blessings">
+                                 <ResponsiveIcon name="blessing" fallbackType="blessing" size={18} className="w-5 h-5" />
+                              </button>
+                              <button onClick={() => setLeftSubMenu(leftSubMenu === 'patterns' ? null : 'patterns')} className={`w-9 h-9 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center text-white`} aria-label="Patterns">
+                                 <ResponsiveIcon name="pattern_scoring" fallbackType="exploit" size={18} className="w-5 h-5" />
+                              </button>
+                              <button onClick={() => setLeftSubMenu(leftSubMenu === 'options' ? null : 'options')} className={`w-9 h-9 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center text-white`} aria-label="Options">
+                                 <ResponsiveIcon name="settings" fallbackType="exploit" size={18} className="w-5 h-5" />
+                              </button>
+                           </div>
                         )}
-                     </button>
+
+                        {/* Expanded panel showing lists / options */}
+                        {leftMenuOpen && leftSubMenu && (
+                           <div className="absolute bottom-full left-0 mb-2 w-72 bg-slate-800 border border-slate-700 rounded p-2 z-50 shadow-lg pointer-events-auto">
+                              <div className="max-h-48 overflow-y-auto text-sm">
+                                 {/* Exploits list */}
+                                 {leftSubMenu === 'exploits' && (() => {
+                                    const ownedExploits = effectsRegistry.filter(e => (['exploit','epic','legendary','rare','uncommon'].includes(e.type)) && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll));
+                                    if (ownedExploits.length === 0) return <div className="text-xs text-slate-400">No exploits owned.</div>;
+                                    return ownedExploits.map(e => (
+                                       <div key={e.id} className="flex items-start gap-2 p-2 rounded hover:bg-slate-700/50">
+                                          <ResponsiveIcon name={e.id || e.name} fallbackType="exploit" size={28} className="w-7 h-7" />
+                                          <div className="flex-1">
+                                             <div className="font-bold text-xs truncate">{e.name}</div>
+                                             <div className="text-[11px] text-slate-400">{e.description}</div>
+                                          </div>
+                                          <button onClick={() => toggleEffect(e.id)} className={`text-xs px-2 py-1 rounded ${activeEffects.includes(e.id) ? 'bg-green-600' : 'bg-blue-600'}`}>{activeEffects.includes(e.id) ? 'On' : 'Use'}</button>
+                                       </div>
+                                    ));
+                                 })()}
+
+                                 {/* Blessings list */}
+                                 {leftSubMenu === 'blessings' && (() => {
+                                    const ownedBlessings = effectsRegistry.filter(e => e.type === 'blessing' && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll));
+                                    if (ownedBlessings.length === 0) return <div className="text-xs text-slate-400">No blessings owned.</div>;
+                                    return ownedBlessings.map(e => (
+                                       <div key={e.id} className="flex items-start gap-2 p-2 rounded hover:bg-slate-700/50">
+                                          <ResponsiveIcon name={e.id || e.name} fallbackType="blessing" size={28} className="w-7 h-7" />
+                                          <div className="flex-1">
+                                             <div className="font-bold text-xs truncate">{e.name}</div>
+                                             <div className="text-[11px] text-slate-400">{e.description}</div>
+                                          </div>
+                                          <button onClick={() => toggleEffect(e.id, true)} className={`text-xs px-2 py-1 rounded ${activeEffects.includes(e.id) ? 'bg-green-600' : 'bg-blue-600'}`}>{activeEffects.includes(e.id) ? 'Active' : 'Activate'}</button>
+                                       </div>
+                                    ));
+                                 })()}
+
+                                 {/* Patterns list */}
+                                 {leftSubMenu === 'patterns' && (() => {
+                                    if (!PATTERN_DEFINITIONS || PATTERN_DEFINITIONS.length === 0) return <div className="text-xs text-slate-400">No patterns defined.</div>;
+                                    return PATTERN_DEFINITIONS.map(p => (
+                                       <div key={p.id} className="flex items-start gap-2 p-2 rounded hover:bg-slate-700/50">
+                                          <div className="w-7 h-7 bg-slate-700 rounded flex items-center justify-center text-[12px]">🔷</div>
+                                          <div className="flex-1">
+                                             <div className="font-bold text-xs truncate">{p.name}</div>
+                                             <div className="text-[11px] text-slate-400">{p.description}</div>
+                                          </div>
+                                       </div>
+                                    ));
+                                 })()}
+
+                                 {/* Options */}
+                                 {leftSubMenu === 'options' && (
+                                    <div className="space-y-2">
+                                       {!optionsSubMenu && (
+                                          <>
+                                             <button onClick={() => { localStorage.setItem('coronata_quick_save', JSON.stringify(gameState)); alert('Game saved'); }} className="w-full text-left p-2 rounded bg-slate-700 text-xs">Save</button>
+                                             <button onClick={() => setActiveDrawer('resign')} className="w-full text-left p-2 rounded bg-slate-700 text-xs">Quit</button>
+                                             <button onClick={() => setActiveDrawer('test')} className="w-full text-left p-2 rounded bg-slate-700 text-xs">Testing</button>
+                                             <button onClick={() => setActiveDrawer('feedback')} className="w-full text-left p-2 rounded bg-slate-700 text-xs">Feedback</button>
+                                             <button onClick={() => setOptionsSubMenu('settings')} className="w-full text-left p-2 rounded bg-slate-700 text-xs">Settings</button>
+                                          </>
+                                       )}
+
+                                       {optionsSubMenu === 'settings' && (
+                                          <div className="space-y-2">
+                                             <div className="flex items-center justify-between"><span className="text-xs">Sound Effects</span><button onClick={() => setSettings(s => ({...s, sfxEnabled: !s.sfxEnabled}))} className={`w-10 h-5 ${settings.sfxEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full ${settings.sfxEnabled ? 'right-0.5' : 'left-0.5'}`}></div></button></div>
+                                             <div className="flex items-center justify-between"><span className="text-xs">Music</span><button onClick={() => setSettings(s => ({...s, musicEnabled: !s.musicEnabled}))} className={`w-10 h-5 ${settings.musicEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full ${settings.musicEnabled ? 'right-0.5' : 'left-0.5'}`}></div></button></div>
+                                             <div className="flex items-center justify-between"><span className="text-xs">Theme</span><button onClick={() => setSettings(s => ({...s, theme: s.theme === 'dark' ? 'light' : 'dark'}))} className={`w-20 h-6 ${settings.theme === 'dark' ? 'bg-slate-700' : 'bg-amber-400'} rounded-full text-xs`}>{settings.theme === 'dark' ? 'Dark' : 'Light'}</button></div>
+                                          </div>
+                                       )}
+                                    </div>
+                                 )}
+                              </div>
+                           </div>
+                        )}
+                     </div>
+
+                     {/* Spacer - center hand is rendered above and positioned absolute; keep spacer to center left/right cards */}
+                     <div className="flex-1" />
+
+                     {/* Right card-shaped discard/draw button */}
+                     <div>
+                        <button type="button" onClick={() => discardAndDrawHand()} aria-label="Discard/Draw" className="relative w-11 max-w-[44px] h-16 max-h-[64px] rounded border border-blue-700 shadow-md overflow-hidden bg-blue-900 flex items-center justify-center pointer-events-auto hover:brightness-110">
+                           <img src={`/icons/${settings.cardBack}.png`} alt="Discard card" className="w-full h-full object-cover" />
+                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <img src="/icons/foundation.png" alt="Discard" className="w-6 h-6 opacity-90" />
+                           </div>
+                           {gameState.piles.deck.cards.length > 0 && (
+                              <span className="absolute -top-1 -right-1 bg-slate-700 text-[10px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
+                           )}
+                        </button>
+                     </div>
                   </div>
                </>
             ) : (
