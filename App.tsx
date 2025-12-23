@@ -272,13 +272,13 @@ const categoryIcons: Record<string, string> = {
    exploit: '/icons/exploit.png',
    exploits: '/icons/exploit.png',
    curse: '/icons/curse.png',
-   curses: '/icons/curse.png'
+   curses: '/icons/curses.png'
 };
-}
+
 export default function SolitaireEngine({ 
    effectsRegistry = EFFECTS_REGISTRY, 
    wanderRegistry = WANDER_REGISTRY 
-}: SolitaireEngineProps = {})
+}: SolitaireEngineProps = {}) {
    function undoLastMove() {
       alert('Undo not yet implemented.');
    }
