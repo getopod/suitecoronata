@@ -239,14 +239,19 @@ export interface GameEffect {
   onMoveComplete?: (
     gameState: GameState,
     context: MoveContext
-  ) => Partial<GameState> & { triggerMinigame?: string };
+  ) => Partial<GameState> & { triggerMinigame?: string; isLevelComplete?: boolean };
 
   onEncounterStart?: (
     gameState: GameState
   ) => Partial<GameState>;
 
+  onEncounterComplete?: (
+    gameState: GameState,
+    context?: { reward?: number }
+  ) => Partial<GameState>;
+
   calculateScore?: (
-    currentScore: number, 
+    currentScore: number,
     context: MoveContext,
     gameState: GameState
   ) => number;

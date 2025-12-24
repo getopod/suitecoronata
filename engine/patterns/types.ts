@@ -395,7 +395,7 @@ export interface EffectDefinition {
   /** Display name */
   name: string;
   /** Effect type */
-  type: 'blessing' | 'exploit' | 'curse' | 'pattern';
+  type: 'blessing' | 'exploit' | 'curse' | 'pattern' | 'passive';
   /** Description shown to player */
   description: string;
   /** Rarity tier */
@@ -464,9 +464,10 @@ export interface EffectDefinition {
   custom?: {
     canMove?: (cards: Card[], source: Pile, target: Pile, defaultAllowed: boolean, state: GameState) => boolean | undefined;
     interceptMove?: (context: MoveContext, state: GameState) => Partial<MoveContext> | undefined;
-    onMoveComplete?: (state: GameState, context: MoveContext) => Partial<GameState> & { triggerMinigame?: string };
+    onMoveComplete?: (state: GameState, context: MoveContext) => Partial<GameState> & { triggerMinigame?: string; isLevelComplete?: boolean };
     onActivate?: (state: GameState, activeEffects: string[]) => Partial<GameState> & { newActiveEffects?: string[] };
     onEncounterStart?: (state: GameState) => Partial<GameState>;
+    onEncounterComplete?: (state: GameState, context?: { reward?: number }) => Partial<GameState>;
     calculateScore?: (currentScore: number, context: MoveContext, state: GameState) => number;
     calculateCoinTransaction?: (currentDelta: number, context: MoveContext, state: GameState) => number;
     transformCardVisual?: (card: Card, pile?: Pile) => Partial<Card>;

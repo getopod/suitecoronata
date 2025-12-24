@@ -173,6 +173,10 @@ export function compileEffect(definition: EffectDefinition): GameEffect {
         return { ...result, ...custom };
       };
     }
+
+    if (definition.custom.onEncounterComplete) {
+      effect.onEncounterComplete = definition.custom.onEncounterComplete;
+    }
   }
 
   return effect;
