@@ -4298,6 +4298,9 @@ export default function SolitaireEngine({
             </div>
          )}
       </div>
+      </div>
+      </div>
+      </div>
    );
 }
 
