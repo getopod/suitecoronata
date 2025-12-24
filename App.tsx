@@ -4268,37 +4268,36 @@ export default function SolitaireEngine({
             )}
          </div>
 
-      </div>
-
-      {showLevelComplete && (
-         <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 pointer-events-auto">
-            <div className="bg-slate-800 border border-slate-600 p-6 rounded-xl shadow-2xl max-w-sm w-full text-center">
-               <Trophy size={48} className="text-yellow-400 mx-auto mb-4" />
-               <h2 className="text-2xl font-bold text-white mb-2">Encounter Cleared!</h2>
-               <p className="text-slate-400 mb-6">Goal reached: {gameState.score}</p>
-               <button onClick={completeLevel} className="w-full py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 font-bold flex items-center justify-center gap-2">Move On <ShoppingCart size={16} /></button>
+         {showLevelComplete && (
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 pointer-events-auto">
+               <div className="bg-slate-800 border border-slate-600 p-6 rounded-xl shadow-2xl max-w-sm w-full text-center">
+                  <Trophy size={48} className="text-yellow-400 mx-auto mb-4" />
+                  <h2 className="text-2xl font-bold text-white mb-2">Encounter Cleared!</h2>
+                  <p className="text-slate-400 mb-6">Goal reached: {gameState.score}</p>
+                  <button onClick={completeLevel} className="w-full py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 font-bold flex items-center justify-center gap-2">Move On <ShoppingCart size={16} /></button>
+               </div>
             </div>
-         </div>
-      )}
+         )}
 
-      {/* Floating Score/Coin Indicators */}
-      {floatingElements.map(el => (
-         <div
-            key={el.id}
-            className={`floating-text fixed ${el.color} ${el.isMult ? 'mult-pop' : ''}`}
-            style={{ left: el.x, top: el.y }}
-         >
-            {el.text}
-         </div>
-      ))}
+         {/* Floating Score/Coin Indicators */}
+         {floatingElements.map(el => (
+            <div
+               key={el.id}
+               className={`floating-text fixed ${el.color} ${el.isMult ? 'mult-pop' : ''}`}
+               style={{ left: el.x, top: el.y }}
+            >
+               {el.text}
+            </div>
+         ))}
 
-      {/* Effect Banner */}
-      {activeBanner && (
-         <div className="effect-banner fixed top-8 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-3 bg-gradient-to-r from-purple-900 via-blue-900 to-purple-900 px-6 py-3 rounded-full border-2 border-yellow-400 shadow-[0_0_30px_rgba(234,179,8,0.5)]">
-            <i className={`fa ${activeBanner.icon} text-yellow-400 text-2xl effect-icon-flash`} />
-            <span className="text-white font-black text-lg tracking-wider">{activeBanner.name}</span>
-         </div>
-      )}
+         {/* Effect Banner */}
+         {activeBanner && (
+            <div className="effect-banner fixed top-8 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-3 bg-gradient-to-r from-purple-900 via-blue-900 to-purple-900 px-6 py-3 rounded-full border-2 border-yellow-400 shadow-[0_0_30px_rgba(234,179,8,0.5)]">
+               <i className={`fa ${activeBanner.icon} text-yellow-400 text-2xl effect-icon-flash`} />
+               <span className="text-white font-black text-lg tracking-wider">{activeBanner.name}</span>
+            </div>
+         )}
+      </div>
    );
 }
 
