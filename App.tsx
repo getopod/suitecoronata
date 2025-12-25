@@ -275,6 +275,9 @@ const categoryIcons: Record<string, string> = {
    exploits: '/icons/exploit.png',
    curse: '/icons/curse.png',
    curses: '/icons/curse.png',
+   // Patterns category uses fortune icon
+   pattern: '/icons/fortune.png',
+   patterns: '/icons/fortune.png',
 };
 
 export default function SolitaireEngine({ 
@@ -419,7 +422,8 @@ export default function SolitaireEngine({
       if (!activeDrawer) return [] as GameEffect[];
       if (activeDrawer === 'blessing_select') return blessingChoices;
       if (activeDrawer === 'shop') return shopInventory;
-      if (activeDrawer === 'patterns') return effectsRegistry.filter(e => e.type === 'pattern' && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll));
+      // Patterns: always show pattern definitions in the drawer
+      if (activeDrawer === 'patterns') return effectsRegistry.filter(e => e.type === 'pattern');
       // Owned effect lists for exploit/curse/blessing drawers
       if (['exploit', 'curse', 'blessing'].includes(activeDrawer)) {
          return effectsRegistry.filter(e => {
@@ -3309,11 +3313,7 @@ export default function SolitaireEngine({
                                    ? 'bg-slate-700 text-white' 
                                    : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
                              }`}>
-                             {cat !== 'patterns' ? (
-                               <img src={categoryIcons[cat]} alt="" className="w-6 h-6" />
-                             ) : (
-                               <span className="w-6 h-6 flex items-center justify-center text-blue-300">𝌆</span>
-                             )}
+                                           <img src={categoryIcons[cat]} alt="" className="w-6 h-6" />
                           <span className="capitalize">{cat}</span>
                        </button>
                     ))}
@@ -3732,10 +3732,13 @@ export default function SolitaireEngine({
                            </div>
                         ) : activeDrawer === 'inventory' ? (
                            <div className="grid grid-cols-4 gap-1">
-                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('exploit')} aria-label="Exploits"><ResponsiveIcon name="exploit" fallbackType="exploit" size={32} className="w-8 h-8" /></button>
+                              {/* Use explicit PNGs per request: exploits.png for exploits */}
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('exploit')} aria-label="Exploits"><img src="/icons/exploits.png" alt="Exploits" className="w-8 h-8" /></button>
                               <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('blessing')} aria-label="Blessings"><ResponsiveIcon name="blessing" fallbackType="blessing" size={32} className="w-8 h-8" /></button>
-                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('patterns')} aria-label="Patterns"><ResponsiveIcon name="pattern_scoring" fallbackType="exploit" size={32} className="w-8 h-8" /></button>
-                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')} aria-label="Options"><img src="/icons/settings.png" alt="" className="w-8 h-8" /></button>
+                              {/* Use fortune.png for the Patterns button */}
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('patterns')} aria-label="Patterns"><img src="/icons/fortune.png" alt="Patterns" className="w-8 h-8" /></button>
+                              {/* Open the pause drawer (save/resign/test/feedback/settings) */}
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('pause')} aria-label="Pause"><img src="/icons/pause.png" alt="Pause" className="w-8 h-8" /></button>
                            </div>
                         ) : activeDrawer === 'shop' ? (
                            <div className="flex flex-col gap-2">
@@ -4050,6 +4053,10 @@ export default function SolitaireEngine({
                               {effectsRegistry.filter(e => {
                                  const isOwned = gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll;
                                  const isActive = activeEffects.includes(e.id);
+                                 // Patterns drawer: always show pattern definitions
+                                 if (activeDrawer === 'patterns') {
+                                    return e.type === 'pattern';
+                                 }
                                  // For curses, only show the currently active curse (the current encounter's curse)
                                  if (activeDrawer === 'curse') {
                                     const isCurseType = ['curse', 'fear', 'danger'].includes(e.type);
@@ -4065,7 +4072,8 @@ export default function SolitaireEngine({
                                  const bReady = isEffectReady(b.id, gameState);
                                  return (aReady === bReady) ? 0 : aReady ? -1 : 1;
                               }).map(effect => {
-                                 const isActive = activeEffects.includes(effect.id);
+                                 // Treat patterns as always-active in the patterns drawer
+                                 const isActive = effect.type === 'pattern' || activeEffects.includes(effect.id);
                                  const isReady = isEffectReady(effect.id, gameState);
                                  const charges = gameState.charges[effect.id] ?? effect.maxCharges;
                                  const rarityColors = getRarityColor(effect.rarity);
@@ -4154,11 +4162,23 @@ export default function SolitaireEngine({
                   {/* Coronata Mode - Compact HUD: left menu card, centered hand (rendered above), right discard card */}
                   <div className="flex w-full items-end justify-between gap-2">
                      {/* Left card-shaped menu button (Bag of Holding icon) */}
-                     <div className="relative">
-                        <button onClick={() => { setActiveDrawer('inventory'); }} className={`relative w-11 max-w-[44px] h-16 max-h-[64px] rounded border border-slate-700 shadow-md overflow-hidden bg-slate-800 flex items-center justify-center pointer-events-auto`} aria-label="Inventory">
-                           <img src="/icons/bagofholding.png" alt="Bag of Holding" className="w-7 h-7" />
-                        </button>
-                     </div>
+                               <div className="relative">
+                                    <button
+                                       onClick={() => {
+                                          // If drawer is locked and active, respect the lock
+                                          if (nonClosableDrawer && activeDrawer === nonClosableDrawer && (activeDrawer === 'inventory' || activeDrawer === 'pause')) return;
+                                          // If inventory or pause is open, close them; otherwise open inventory
+                                          if (activeDrawer === 'inventory' || activeDrawer === 'pause') {
+                                             setActiveDrawer(null);
+                                             setNonClosableDrawer(null);
+                                          } else {
+                                             toggleDrawer('inventory');
+                                          }
+                                       }}
+                                       className={`relative w-11 max-w-[44px] h-16 max-h-[64px] rounded border border-slate-700 shadow-md overflow-hidden bg-slate-800 flex items-center justify-center pointer-events-auto`} aria-label="Inventory">
+                                        <img src="/icons/bagofholding.png" alt="Bag of Holding" className="w-7 h-7" />
+                                    </button>
+                               </div>
 
                      {/* Center: player's hand icons (card-sized icons between left/right buttons) */}
                      <div className="flex-1 flex items-end justify-center pointer-events-none">
