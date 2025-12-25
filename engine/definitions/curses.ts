@@ -173,9 +173,65 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     name: 'Street Smarts',
     type: 'curse',
     description: 'Complete encounter by gaining goal in coins, not points. x5 coins gained. Only keep 10%.',
+    effectState: { encounterCoins: 0, previousCoins: 0 },
     coins: [
       { pattern: 'coin_multiplier', params: { allMultiplier: 5 } }
-    ]
+    ],
+    custom: {
+      onActivate: (state) => {
+        return {
+          effectState: {
+            ...state.effectState,
+            encounterCoins: 0,
+            previousCoins: state.coins
+          }
+        };
+      },
+      onMoveComplete: (state) => {
+        // Check if coins increased this move
+        const previousCoins = state.effectState.previousCoins || 0;
+        const coinDelta = state.coins - previousCoins;
+
+        if (coinDelta > 0) {
+          // Coins were earned - move them from player coins to encounter coins
+          const encounterCoins = (state.effectState.encounterCoins || 0) + coinDelta;
+          const newPlayerCoins = previousCoins; // Remove the coins that were just added
+
+          // Check if we've reached the goal
+          if (encounterCoins >= state.currentScoreGoal) {
+            // Encounter complete! Give player 10% of encounter coins
+            const coinsToKeep = Math.floor(encounterCoins * 0.1);
+            return {
+              isLevelComplete: true,
+              coins: newPlayerCoins + coinsToKeep,
+              effectState: {
+                ...state.effectState,
+                encounterCoins,
+                previousCoins: newPlayerCoins + coinsToKeep
+              }
+            };
+          }
+
+          // Update encounter coins and reset player coins
+          return {
+            coins: newPlayerCoins,
+            effectState: {
+              ...state.effectState,
+              encounterCoins,
+              previousCoins: newPlayerCoins
+            }
+          };
+        }
+
+        // No coins earned this move, just update tracking
+        return {
+          effectState: {
+            ...state.effectState,
+            previousCoins: state.coins
+          }
+        };
+      }
+    }
   },
 
   {
@@ -247,11 +303,66 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     name: 'Tower of Babel',
     type: 'curse',
     description: '+4 empty tableau. No foundations. No score. Advance by stacking all 4 suits in tableau.',
+    effectState: { towerSuitsCompleted: [] },
     custom: {
       onActivate: (state) => {
         const newPiles = { ...state.piles };
+
+        // Remove all foundations
         Object.keys(newPiles).filter(k => k.startsWith('foundation')).forEach(fid => { delete newPiles[fid]; });
-        return { piles: newPiles };
+
+        // Add 4 empty tableaus
+        const existingTableaus = Object.keys(newPiles).filter(k => k.startsWith('tableau'));
+        const maxTableauIndex = existingTableaus.reduce((max, key) => {
+          const num = parseInt(key.split('-')[1]);
+          return Math.max(max, num);
+        }, -1);
+
+        for (let i = 1; i <= 4; i++) {
+          const newIndex = maxTableauIndex + i;
+          newPiles[`tableau-${newIndex}`] = {
+            id: `tableau-${newIndex}`,
+            type: 'tableau',
+            cards: []
+          };
+        }
+
+        return {
+          piles: newPiles,
+          scoreMultiplier: 0, // Disable scoring
+          effectState: { ...state.effectState, towerSuitsCompleted: [] }
+        };
+      },
+      onMoveComplete: (state) => {
+        // Check if all 4 suits are stacked properly in tableaus (Ace to King)
+        const tableaus = Object.values(state.piles).filter(p => p.type === 'tableau');
+        const completedSuits: string[] = [];
+
+        tableaus.forEach(tableau => {
+          if (tableau.cards.length === 13) {
+            const firstCard = tableau.cards[0];
+            // Check if it's a complete suit from Ace (1) to King (13)
+            const isComplete = tableau.cards.every((card, idx) => {
+              return card.suit === firstCard.suit &&
+                     card.rank === idx + 1 &&
+                     card.faceUp;
+            });
+
+            if (isComplete && !completedSuits.includes(firstCard.suit)) {
+              completedSuits.push(firstCard.suit);
+            }
+          }
+        });
+
+        // Win condition: All 4 suits completed
+        if (completedSuits.length >= 4) {
+          return {
+            isLevelComplete: true,
+            effectState: { ...state.effectState, towerSuitsCompleted: completedSuits }
+          };
+        }
+
+        return { effectState: { ...state.effectState, towerSuitsCompleted: completedSuits } };
       }
     }
   },
@@ -440,6 +551,23 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
         }
         return defaultAllowed;
       },
+      calculateScore: (currentScore, context, state) => {
+        const phase = state.effectState.executivePhase || 'play';
+        const movesLeft = state.effectState.executiveFreeMovesLeft || 0;
+
+        // No scoring during play phase
+        if (phase === 'play') {
+          return 0;
+        }
+
+        // No scoring during free phase except the last move
+        if (phase === 'free' && movesLeft > 1) {
+          return 0;
+        }
+
+        // Allow normal scoring on the last move of free phase
+        return currentScore;
+      },
       onMoveComplete: (state) => {
         const phase = state.effectState.executivePhase || 'play';
         const currentIndex = state.effectState.executiveTableauIndex || 0;
@@ -489,6 +617,34 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
         if (!isOddRank && cycle % 7 === 6) return 0;
 
         return scoreDelta;
+      },
+      transformCardVisual: (card, pile, state) => {
+        // Only apply visual tint to hand cards
+        if (pile?.type !== 'hand') return {};
+
+        const cycle = (state?.effectState?.moodSwingCycle || 0);
+        const isOddRank = card.rank % 2 === 1;
+
+        // Check if this card will score 0 on the next play
+        const willNotScore = (isOddRank && cycle % 6 === 5) || (!isOddRank && cycle % 7 === 6);
+
+        if (willNotScore) {
+          // Subtle red tint for cards that won't score
+          return {
+            meta: {
+              ...card.meta,
+              color: 'rgba(255, 100, 100, 0.15)' // Subtle red overlay
+            }
+          };
+        } else {
+          // Subtle green tint for cards that will score
+          return {
+            meta: {
+              ...card.meta,
+              color: 'rgba(100, 255, 100, 0.15)' // Subtle green overlay
+            }
+          };
+        }
       },
       onMoveComplete: (state) => {
         const cycle = (state.effectState.moodSwingCycle || 0) + 1;
