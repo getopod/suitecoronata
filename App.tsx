@@ -314,7 +314,8 @@ export default function SolitaireEngine({
 
   // Animation state
   const [floatingElements, setFloatingElements] = useState<Array<{ id: number; text: string; x: number; y: number; color: string; isMult?: boolean }>>([]);
-  const [activeBanner, setActiveBanner] = useState<{ id: number; name: string; icon: string } | null>(null);
+  const [activeBanner, setActiveBanner] = useState<{ id: number; name: string; icon: string; effectId?: string } | null>(null);
+  const [curseBanner, setCurseBanner] = useState<{ effectId: string; name: string; description: string } | null>(null);
   const [animatingCards, setAnimatingCards] = useState<Map<string, string>>(new Map());
    // When set, this drawer is intentionally non-closable by the collapse button
    const [nonClosableDrawer, setNonClosableDrawer] = useState<'blessing_select' | 'shop' | null>(null);
@@ -351,12 +352,16 @@ export default function SolitaireEngine({
      }, 2500); // Increased from 1000 to match new animation duration
    }, []);
 
-   const spawnBanner = useCallback((name: string, icon: string) => {
+   const spawnBanner = useCallback((name: string, icon: string, effectId?: string) => {
      const id = Date.now();
-     setActiveBanner({ id, name, icon });
+     setActiveBanner({ id, name, icon, effectId });
      setTimeout(() => {
        setActiveBanner(prev => prev?.id === id ? null : prev);
-     }, 2000);
+     }, 3000);
+   }, []);
+
+   const showCurseBanner = useCallback((effectId: string, name: string, description: string) => {
+     setCurseBanner({ effectId, name, description });
    }, []);
 
    const triggerCardAnimation = useCallback((cardIds: string[], animClass: string) => {
@@ -894,7 +899,8 @@ export default function SolitaireEngine({
             run: {
               ...gameState.run,
               forcedCurse: undefined
-            }
+            },
+            effectState: { scoredTableau: [], scoredFoundation: [] },
         };
 
         // Apply onActivate for the new encounter effect
@@ -929,6 +935,17 @@ export default function SolitaireEngine({
         // Update State
         setActiveEffects(nextActiveEffects);
         setGameState(nextState);
+
+        // Show curse introduction banner for ALL curses in this encounter
+        const activeCurses = nextActiveEffects
+           .map(eid => effectsRegistry.find(e => e.id === eid))
+           .filter(e => e && e.type === 'curse');
+
+        if (activeCurses.length > 0) {
+           // Show banner for the first curse (can be expanded to show all)
+           const curse = activeCurses[0];
+           showCurseBanner(curse.id, curse.name, curse.description);
+        }
      } else { 
         // Run complete - record victory
         if (runStartData) {
@@ -1623,8 +1640,17 @@ export default function SolitaireEngine({
 
     let scoreDelta = 0;
     const card = movingCards[0];
-    if (targetPile.type === 'tableau' && !card.meta?.scoredTableau) { scoreDelta += card.rank; card.meta = { ...card.meta, scoredTableau: true }; }
-    else if (targetPile.type === 'foundation' && !card.meta?.scoredFoundation) { scoreDelta += card.rank * 2; card.meta = { ...card.meta, scoredFoundation: true }; }
+    const scoredTableau = gameState.effectState?.scoredTableau || [];
+    const scoredFoundation = gameState.effectState?.scoredFoundation || [];
+    
+    if (targetPile.type === 'tableau' && !scoredTableau.includes(card.id)) { 
+      scoreDelta += card.rank;
+      scoredTableau.push(card.id);
+    }
+    else if (targetPile.type === 'foundation' && !scoredFoundation.includes(card.id)) { 
+      scoreDelta += card.rank * 2;
+      scoredFoundation.push(card.id);
+    }
 
     const baseScore = scoreDelta;
     effects.forEach(eff => {
@@ -1638,13 +1664,26 @@ export default function SolitaireEngine({
     });
 
     let minigameTrigger = null;
-    let nextState = { ...gameState, piles: newPiles, moves: gameState.moves + 1, score: gameState.score + scoreDelta, coins: gameState.coins + coinDelta };
+    let nextState = { ...gameState, piles: newPiles, moves: gameState.moves + 1, score: gameState.score + scoreDelta, coins: gameState.coins + coinDelta, effectState: { ...gameState.effectState, scoredTableau, scoredFoundation } };
     
     effects.forEach(eff => {
        if (eff.onMoveComplete) {
+          const prevState = { ...nextState };
           const result = eff.onMoveComplete(nextState, { source: sourcePileId, target: finalTargetPileId, cards: movingCards });
           if (result.triggerMinigame) minigameTrigger = result.triggerMinigame;
           nextState = { ...nextState, ...result };
+
+          // Show banner when effect triggers something significant
+          const coinChange = (result.coins || nextState.coins) - prevState.coins;
+          const scoreChange = (result.score || nextState.score) - prevState.score;
+
+          if (coinChange > 0 && coinChange >= 20) {
+             spawnBanner(`+${coinChange} COINS`, 'fa-coins', eff.id);
+          } else if (scoreChange > 0 && scoreChange >= 50) {
+             spawnBanner(`+${scoreChange} POINTS`, 'fa-star', eff.id);
+          } else if (result.triggerMinigame) {
+             spawnBanner(`${eff.name.toUpperCase()} ACTIVATED!`, 'fa-gamepad', eff.id);
+          }
        }
     });
 
@@ -1961,7 +2000,7 @@ export default function SolitaireEngine({
           <button
              key={`${card.id}-${pileId}-${index}`}
              className="absolute w-[50px] h-[73px] rounded border border-slate-700 shadow-md overflow-hidden"
-             style={{ top: `${pileId.includes('tableau') ? index * 10 : 0}px` }}
+             style={{ top: `${pileId.includes('tableau') ? index * 18 : 0}px` }}
              onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
              onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick(pileId, index); }}
              aria-label={`Face down card ${card.id}`}
@@ -1979,14 +2018,14 @@ export default function SolitaireEngine({
          <button
             key={`${card.id}-${pileId}-${index}`}
             type="button"
-            className={`absolute w-[50px] h-[50px] bg-transparent select-none flex items-end justify-center ${isSelected ? 'ring-4 ring-yellow-400' : ''} relative`}
+            className={`absolute w-[50px] h-[73px] bg-transparent select-none flex items-center justify-center ${isSelected ? 'ring-4 ring-yellow-400' : ''} relative`}
             style={pileId === 'hand' ? handStyle : { top: `${pileId.includes('tableau') ? index * 12 : 0}px`, zIndex: index }}
             onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
             aria-label={isTricksterKey ? `Trickster Key (${charges} charges)` : "Key - Click to select, then click locked tableau to unlock"}
          >
             <img src="/icons/key.png" alt="Key" className="w-8 h-8 drop-shadow-lg" />
             {isTricksterKey && charges !== undefined && (
-              <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-purple-400">
+              <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-[14px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-purple-400">
                 {charges}
               </span>
             )}
@@ -2027,18 +2066,17 @@ export default function SolitaireEngine({
                          </div>
                    ) : visualCard.meta?.isWild ? (
                          <div className="relative h-full w-full rounded overflow-hidden">
-                               <img src="/icons/cleverdisguise.png" alt="Wild" className="absolute inset-0 w-full h-full object-cover" />
-                               <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-[6px] font-bold text-white text-center py-0.5">WILD</div>
+                               <img src="/icons/charlatan.png" alt="Wild" className="absolute inset-0 w-full h-full object-cover" />
                          </div>
                    ) : (
                          <>
-                              <div className={`w-full flex justify-between font-bold text-[10px] leading-none ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}><span>{getRankDisplay(visualCard.rank)}</span></div>
+                              <div className={`w-full flex justify-between font-bold text-[14px] leading-none ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}><span>{getRankDisplay(visualCard.rank)}</span></div>
                               {visualCard.meta?.hideSuitIcon ? (
-                               <div className={`text-sm md:text-2xl ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}>?</div>
+                               <div className={`text-lg md:text-4xl ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}>?</div>
                             ) : (
-                               <div className={`text-sm md:text-2xl ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}>{visualCard.suit === 'hearts' ? '♥' : visualCard.suit === 'diamonds' ? '♦' : visualCard.suit === 'clubs' ? '♣' : '♠'}</div>
+                               <div className={`text-lg md:text-4xl ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}>{visualCard.suit === 'hearts' ? '♥' : visualCard.suit === 'diamonds' ? '♦' : visualCard.suit === 'clubs' ? '♣' : '♠'}</div>
                             )}
-                              <div className={`w-full flex justify-between font-bold text-[10px] leading-none rotate-180 ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}><span>{getRankDisplay(visualCard.rank)}</span></div>
+                              <div className={`w-full flex justify-between font-bold text-[14px] leading-none rotate-180 ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}><span>{getRankDisplay(visualCard.rank)}</span></div>
                          </>
                    )}
                    {visualCard.meta?.showLock && <div className="absolute top-0 right-0 text-red-500"><Lock size={10} /></div>}
@@ -2105,14 +2143,14 @@ export default function SolitaireEngine({
              <button
                   key={`${card.id}-hand-key-${index}`}
                   type="button"
-                  className={`w-[50px] h-[50px] bg-transparent select-none flex items-end justify-center ${isSelected ? 'ring-4 ring-yellow-400' : ''} relative`}
+                  className={`w-[50px] h-[73px] bg-transparent select-none flex items-center justify-center ${isSelected ? 'ring-4 ring-yellow-400' : ''} relative`}
                   onClick={(e) => { e.stopPropagation(); handleCardClick('hand', index); }}
                   onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick('hand', index); }}
                   aria-label={isTricksterKey ? `Trickster Key (${charges} charges)` : "Key - Click to select"}
              >
                   <img src="/icons/key.png" alt="Key" className="w-8 h-8 drop-shadow-lg" />
                   {isTricksterKey && charges !== undefined && (
-                     <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-purple-400">
+                     <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-[14px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-purple-400">
                         {charges}
                      </span>
                   )}
@@ -2141,14 +2179,13 @@ export default function SolitaireEngine({
                            </div>
                   ) : visualCard.meta?.isWild ? (
                            <div className="relative h-full w-full rounded overflow-hidden">
-                                    <img src="/icons/cleverdisguise.png" alt="Wild" className="absolute inset-0 w-full h-full object-cover" />
-                                    <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-[6px] font-bold text-white text-center py-0.5">WILD</div>
+                                    <img src="/icons/charlatan.png" alt="Wild" className="absolute inset-0 w-full h-full object-cover" />
                            </div>
                   ) : (
                            <>
-                                  <div className={`w-full flex justify-between font-bold text-[10px] leading-none ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}><span>{getRankDisplay(visualCard.rank)}</span></div>
-                                  <div className={`text-sm md:text-2xl ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}>{visualCard.suit === 'hearts' ? '♥' : visualCard.suit === 'diamonds' ? '♦' : visualCard.suit === 'clubs' ? '♣' : '♠'}</div>
-                                  <div className={`w-full flex justify-between font-bold text-[10px] leading-none rotate-180 ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}><span>{getRankDisplay(visualCard.rank)}</span></div>
+                                  <div className={`w-full flex justify-between font-bold text-[14px] leading-none ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}><span>{getRankDisplay(visualCard.rank)}</span></div>
+                                  <div className={`text-lg md:text-4xl ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}>{visualCard.suit === 'hearts' ? '♥' : visualCard.suit === 'diamonds' ? '♦' : visualCard.suit === 'clubs' ? '♣' : '♠'}</div>
+                                  <div className={`w-full flex justify-between font-bold text-[14px] leading-none rotate-180 ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}><span>{getRankDisplay(visualCard.rank)}</span></div>
                            </>
                   )}
                   {visualCard.meta?.showLock && <div className="absolute top-0 right-0 text-red-500"><Lock size={10} /></div>}
@@ -2473,7 +2510,7 @@ export default function SolitaireEngine({
                                       <div className="flex-1">
                                          <div className="font-bold text-sm flex items-center gap-2">
                                             {feat.name}
-                                            {feat.unlocked && <span className="text-[10px] bg-emerald-600 px-1.5 py-0.5 rounded">Unlocked</span>}
+                                            {feat.unlocked && <span className="text-[14px] bg-emerald-600 px-1.5 py-0.5 rounded">Unlocked</span>}
                                          </div>
                                          {expandedAchievement === i && (
                                             <div className="text-xs text-slate-400 mt-1 animate-in fade-in">
@@ -2520,7 +2557,7 @@ export default function SolitaireEngine({
                                       <div className="bg-slate-700/50 rounded-lg p-2">
                                          <div className="flex items-center gap-1 mb-1.5 text-slate-400">
                                             <img src={categoryIcons.exploit} alt="" className="w-[18px] h-[18px]" />
-                                            <span className="uppercase tracking-wider text-[10px]">Exploits</span>
+                                            <span className="uppercase tracking-wider text-[14px]">Exploits</span>
                                          </div>
                                          <div className="flex flex-wrap gap-1">
                                             {run.exploits.map((effectId, i) => (
@@ -2532,7 +2569,7 @@ export default function SolitaireEngine({
                                       <div className="bg-slate-700/50 rounded-lg p-2">
                                          <div className="flex items-center gap-1 mb-1.5 text-slate-400">
                                             <img src={categoryIcons.curse} alt="" className="w-[18px] h-[18px]" />
-                                            <span className="uppercase tracking-wider text-[10px]">Curses</span>
+                                            <span className="uppercase tracking-wider text-[14px]">Curses</span>
                                          </div>
                                          <div className="flex flex-wrap gap-1">
                                             {run.curses.map((effectId, i) => (
@@ -2544,7 +2581,7 @@ export default function SolitaireEngine({
                                       <div className="bg-slate-700/50 rounded-lg p-2">
                                          <div className="flex items-center gap-1 mb-1.5 text-slate-400">
                                             <img src={categoryIcons.blessing} alt="" className="w-[18px] h-[18px]" />
-                                            <span className="uppercase tracking-wider text-[10px]">Blessings</span>
+                                            <span className="uppercase tracking-wider text-[14px]">Blessings</span>
                                          </div>
                                          <div className="flex flex-wrap gap-1">
                                             {run.blessings.map((effectId, i) => (
@@ -2556,7 +2593,7 @@ export default function SolitaireEngine({
 
                                    {/* Encounter Progress Bar */}
                                    <div>
-                                      <div className="flex items-center gap-1 mb-1.5 text-slate-400 text-[10px] uppercase tracking-wider">
+                                      <div className="flex items-center gap-1 mb-1.5 text-slate-400 text-[14px] uppercase tracking-wider">
                                          <MapIcon size={20} />
                                          <span>Curses ({run.encounters.filter(e => e.passed).length}/10)</span>
                                       </div>
@@ -2713,7 +2750,7 @@ export default function SolitaireEngine({
                                       <div key={mode.id} className="flex items-center justify-between p-2 bg-slate-700/30 rounded">
                                          <div>
                                             <div className="font-medium text-xs">{mode.name}</div>
-                                            <div className="text-[10px] text-slate-500">{mode.desc}</div>
+                                            <div className="text-[14px] text-slate-500">{mode.desc}</div>
                                          </div>
                                          <button onClick={() => setSettings(s => ({...s, [`${mode.id}Enabled`]: !s[`${mode.id}Enabled` as keyof typeof s]}))} className={`w-10 h-5 ${(settings as any)[`${mode.id}Enabled`] ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors shrink-0`}>
                                             <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${(settings as any)[`${mode.id}Enabled`] ? 'right-0.5' : 'left-0.5'}`}></div>
@@ -3152,7 +3189,7 @@ export default function SolitaireEngine({
                                 className="flex-1 p-2 bg-slate-700/50 rounded-lg text-center hover:bg-slate-700 text-xs">Credits</button>
 
                              </div>
-                             <div className="text-[10px] text-slate-500 text-center pt-2">
+                             <div className="text-[14px] text-slate-500 text-center pt-2">
                                 Made with obsession and questionable life choices.
                              </div>
                           </div>
@@ -3327,7 +3364,7 @@ export default function SolitaireEngine({
                                            <div className="flex-1 min-w-0">
                                              <div className="flex justify-between items-start gap-2">
                                                <div className="font-bold text-white truncate">{p.name}</div>
-                                               <div className={`text-[10px] uppercase px-1.5 py-0.5 rounded font-bold shrink-0 ${rarityColors?.text || ''} ${rarityColors?.bg || ''} border ${rarityColors?.border || ''}`}>{p.rarity || 'Common'}</div>
+                                               <div className={`text-[14px] uppercase px-1.5 py-0.5 rounded font-bold shrink-0 ${rarityColors?.text || ''} ${rarityColors?.bg || ''} border ${rarityColors?.border || ''}`}>{p.rarity || 'Common'}</div>
                                              </div>
                                              <div className="text-slate-300 text-sm mt-1">{p.description}</div>
                                            </div>
@@ -3351,7 +3388,7 @@ export default function SolitaireEngine({
                           <div className="flex-1 min-w-0">
                              <div className="flex justify-between items-start gap-2">
                                <div className="font-bold text-white truncate">{e.name}</div>
-                               <div className={`text-[10px] uppercase px-1.5 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} ${rarityColors.bg} border ${rarityColors.border}`}>{e.rarity || 'Common'}</div>
+                               <div className={`text-[14px] uppercase px-1.5 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} ${rarityColors.bg} border ${rarityColors.border}`}>{e.rarity || 'Common'}</div>
                              </div>
                              <div className="text-slate-300 text-sm mt-1">{e.description}</div>
                              {Boolean(e.cost) && <div className="text-xs text-yellow-500 mt-1 flex items-center gap-1"><Coins size={10}/> {e.cost}</div>}
@@ -3547,9 +3584,21 @@ export default function SolitaireEngine({
         </div>
       ) : (
         /* Coronata Mode Layout - Uses flex/grid */
-        <div className={`flex-1 w-full mx-auto p-2 pb-40 overflow-x-auto overflow-visible`} style={{ transform: `scale(${zoomScale})`, transformOrigin: 'top center' }}>
+        <div className={`flex-1 w-full mx-auto p-[2px] pb-40 overflow-x-auto overflow-visible`} style={{ transform: `scale(${zoomScale})`, transformOrigin: 'top center' }}>
           <div className="flex justify-center mb-4">
-            <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${foundationPiles.length + (gameState.piles['shadow-realm'] ? 1 : 0)}, minmax(0, 44px))` }}>
+            <div className="grid gap-[2px] transition-transform duration-700" style={{
+               gridTemplateColumns: `repeat(${foundationPiles.length + (gameState.piles['shadow-realm'] ? 1 : 0)}, minmax(0, 50px))`,
+               transform: (() => {
+                  const pendingFlips = gameState.effectState?.pendingFlips || [];
+                  let scaleX = 1;
+                  let scaleY = 1;
+                  pendingFlips.forEach((flip: string) => {
+                     if (flip === 'horizontal') scaleX *= -1;
+                     if (flip === 'vertical') scaleY *= -1;
+                  });
+                  return pendingFlips.length > 0 ? `scale(${scaleX}, ${scaleY})` : 'none';
+               })()
+            }}>
                   {/* Shadow Realm Pile */}
                   {gameState.piles['shadow-realm'] && (
                      <div
@@ -3591,7 +3640,7 @@ export default function SolitaireEngine({
              <div className="flex justify-center gap-4 mb-2 animate-in fade-in slide-in-from-top-2">
                 {activeEffects.includes('ritual_components') && (
                    <div className="flex items-center gap-1 bg-slate-800/80 p-1.5 rounded border border-slate-700">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold mr-1">Ritual</span>
+                      <span className="text-[14px] text-slate-400 uppercase font-bold mr-1">Ritual</span>
                       {['blood', 'bone', 'ash'].map((step, i) => {
                          const seq = gameState.effectState?.ritualSequence || [];
                          const done = seq.length > i;
@@ -3602,7 +3651,7 @@ export default function SolitaireEngine({
                 {activeEffects.includes('momentum_tokens') && (
                    <div className="flex items-center gap-2 bg-slate-800/80 p-1.5 rounded border border-slate-700">
                       <div className="flex items-center gap-1">
-                         <span className="text-[10px] text-slate-400 uppercase font-bold">Momentum</span>
+                         <span className="text-[14px] text-slate-400 uppercase font-bold">Momentum</span>
                          <span className="text-sm font-bold text-blue-400">{gameState.effectState?.momentum || 0}</span>
                       </div>
                       <div className="flex gap-1">
@@ -3616,7 +3665,19 @@ export default function SolitaireEngine({
           )}
 
           <div className="flex justify-center">
-            <div className="grid gap-x-[3px] h-full" style={{ gridTemplateColumns: `repeat(${tableauCount}, minmax(0, 44px))` }}>
+            <div className="grid gap-x-[2px] h-full transition-transform duration-700" style={{
+               gridTemplateColumns: `repeat(${tableauCount}, minmax(0, 50px))`,
+               transform: (() => {
+                  const pendingFlips = gameState.effectState?.pendingFlips || [];
+                  let scaleX = 1;
+                  let scaleY = 1;
+                  pendingFlips.forEach((flip: string) => {
+                     if (flip === 'horizontal') scaleX *= -1;
+                     if (flip === 'vertical') scaleY *= -1;
+                  });
+                  return pendingFlips.length > 0 ? `scale(${scaleX}, ${scaleY})` : 'none';
+               })()
+            }}>
                  {tableauPiles.map(pile => {
                     const isLinked = activeEffects.includes('linked_fates') && gameState.effectState?.linkedTableaus?.includes(pile.id);
                     const isLinkedTurn = isLinked && gameState.effectState?.lastLinkedPlayed !== pile.id;
@@ -3752,7 +3813,7 @@ export default function SolitaireEngine({
                                              <span className="font-bold text-white text-xs truncate">{item.name}</span>
                                              <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
                                           </div>
-                                          <div className="text-slate-400 text-[10px]">{item.description}</div>
+                                          <div className="text-slate-400 text-[14px]">{item.description}</div>
                                        </div>
                                        <button
                                          className={`text-white px-2 py-1 rounded text-xs font-bold shrink-0 flex items-center gap-1 ${isOwned ? 'bg-transparent cursor-not-allowed' : gameState.coins >= (item.cost || 50) ? 'bg-green-600 hover:bg-green-500' : 'bg-slate-600 cursor-not-allowed'}`}
@@ -3784,7 +3845,7 @@ export default function SolitaireEngine({
                                                   <span className="font-bold text-white text-xs truncate">{item.name}</span>
                                                   <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
                                                </div>
-                                               <div className="text-slate-400 text-[10px]">{item.description}</div>
+                                               <div className="text-slate-400 text-[14px]">{item.description}</div>
                                             </div>
                                             <button className={`text-white px-2 py-1 rounded text-xs font-bold shrink-0 bg-slate-700 hover:bg-slate-600`} onClick={() => {
                                                const price = sellPrice;
@@ -3807,7 +3868,7 @@ export default function SolitaireEngine({
                               </div>
                               <textarea className="w-full h-20 bg-slate-900 border border-slate-600 rounded p-2 text-xs text-white" placeholder="Describe issue or idea..." value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} />
                               <div className="h-32 overflow-y-auto border border-slate-700 rounded bg-slate-900/50 p-2">
-                                 <div className="text-[10px] text-slate-500 mb-2 uppercase">Related Effects</div>
+                                 <div className="text-[14px] text-slate-500 mb-2 uppercase">Related Effects</div>
                                  <div className="grid grid-cols-2 gap-1">
                                     {effectsRegistry.map(e => (
                                        <label key={e.id} className="flex items-center gap-2 text-xs text-slate-300">
@@ -3988,7 +4049,7 @@ export default function SolitaireEngine({
                               <label className="flex items-center justify-between text-sm text-slate-300 bg-slate-700/30 p-2 rounded">
                                  <div>
                                     <div>Support Patriarchy</div>
-                                    <div className="text-[10px] text-slate-400">Kings high instead of Queens</div>
+                                    <div className="text-[14px] text-slate-400">Kings high instead of Queens</div>
                                  </div>
                                  <button onClick={() => setSettings(s => ({...s, supportPatriarchy: !s.supportPatriarchy}))} className={`w-12 h-6 ${settings.supportPatriarchy ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative transition-colors`}>
                                     <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.supportPatriarchy ? 'right-0.5' : 'left-0.5'}`}></div>
@@ -4038,7 +4099,7 @@ export default function SolitaireEngine({
                                              <span className="font-bold text-white text-xs truncate">{item.name}</span>
                                              <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{item.rarity || 'Common'}</span>
                                           </div>
-                                          <div className="text-slate-400 text-[10px]">{item.description}</div>
+                                          <div className="text-slate-400 text-[14px]">{item.description}</div>
                                        </div>
                                        <Gift size={16} className="text-purple-400 shrink-0" />
                                     </div>
@@ -4094,25 +4155,25 @@ export default function SolitaireEngine({
                                        className={`p-2 rounded border text-xs flex items-center gap-3 transition-all ${isActive ? 'bg-purple-900/60 border-purple-500' : `${rarityColors.bg} ${rarityColors.border}`} ${['curse', 'fear', 'danger', 'passive'].includes(effect.type) || (['whore', 'metrocard', 'breaking_entering', 'insider_trading', 'switcheroo'].includes(effect.id) && isActive) ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                        <ResponsiveIcon name={effect.id || effect.name} fallbackType={effectType === 'passive' ? 'exploit' : effectType} size={32} className="w-8 h-8 rounded shrink-0" alt={effect.name} />
                                        <div className="flex-1 min-w-0 text-left">
-                                           <div className="font-bold text-white flex gap-1 items-center flex-wrap">
+                                           <div className="font-bold text-white text-sm flex gap-1 items-center flex-wrap">
                                                <span className="truncate">{effect.name}</span>
                                                {effect.type === 'passive' && <span className="text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 bg-cyan-900/50 text-cyan-300 border border-cyan-500">Always On</span>}
                                                <span className={`text-[8px] uppercase px-1 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} border ${rarityColors.border}`}>{effect.rarity || 'Common'}</span>
                                                {effect.maxCharges && <span className="text-[9px] bg-slate-600 px-1 rounded text-white shrink-0">{charges}/{effect.maxCharges}</span>}
                                            </div>
-                                           <div className="text-slate-400 text-[10px]">{effect.description}</div>
+                                           <div className="text-white text-sm">{effect.description}</div>
                                            {effect.id === 'whore' && isActive && (
                                               <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
                                                 <button
                                                   onClick={convertScoreToCoin}
                                                   disabled={gameState.score < 5}
-                                                  className="text-[10px] px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
+                                                  className="text-[14px] px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
                                                   5 Score → 1 Coin
                                                 </button>
                                                 <button
                                                   onClick={convertCoinToScore}
                                                   disabled={gameState.coins < 1}
-                                                  className="text-[10px] px-2 py-1 rounded bg-green-600 hover:bg-green-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
+                                                  className="text-[14px] px-2 py-1 rounded bg-green-600 hover:bg-green-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
                                                   1 Coin → 4 Score
                                                 </button>
                                               </div>
@@ -4122,7 +4183,7 @@ export default function SolitaireEngine({
                                                 <button
                                                   onClick={buyKeyWithTaxLoophole}
                                                   disabled={gameState.coins <= 0}
-                                                  className="text-[10px] px-2 py-1 rounded bg-yellow-600 hover:bg-yellow-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
+                                                  className="text-[14px] px-2 py-1 rounded bg-yellow-600 hover:bg-yellow-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
                                                   Buy Key (25% Coin)
                                                 </button>
                                               </div>
@@ -4132,7 +4193,7 @@ export default function SolitaireEngine({
                                                 <button
                                                   onClick={undoWithSwitcheroo}
                                                   disabled={gameState.coins < Math.floor(gameState.coins * 0.2) || (gameState.effectState?.lastSnapshots || []).length < 3}
-                                                  className="text-[10px] px-2 py-1 rounded bg-purple-600 hover:bg-purple-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
+                                                  className="text-[14px] px-2 py-1 rounded bg-purple-600 hover:bg-purple-500 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-1">
                                                   Undo (20% Coin)
                                                 </button>
                                               </div>
@@ -4157,9 +4218,9 @@ export default function SolitaireEngine({
             {!CLASSIC_GAMES[selectedMode] ? (
                <>
                   {/* Coronata Mode - Compact HUD: left menu card, centered hand (rendered above), right discard card */}
-                  <div className="flex w-full items-end justify-between gap-2">
+                  <div className="relative w-full h-[73px] flex items-end justify-center">
                      {/* Left card-shaped menu button (Bag of Holding icon) */}
-                               <div className="relative">
+                               <div className="absolute left-[1px] bottom-0">
                                     <button
                                        onClick={() => {
                                           // If drawer is locked and active, respect the lock
@@ -4177,19 +4238,41 @@ export default function SolitaireEngine({
                                     </button>
                                </div>
 
-                     {/* Center: player's hand icons (card-sized icons between left/right buttons) */}
-                     <div className="flex-1 flex items-end justify-center pointer-events-none">
-                        <div className="flex items-center gap-2 pointer-events-auto">
-                           {gameState.piles.hand.cards.map((c, i) => renderHandCardHUD(c, i))}
-                        </div>
-                     </div>
+                     {/* Center: player's hand with overlapping cards */}
+                    <div className="absolute left-[52px] right-[52px] bottom-0 flex items-center justify-center pointer-events-none">
+                       <div className="relative flex items-center justify-center" style={{
+                          width: (() => {
+                             const numCards = gameState.piles.hand.cards.length;
+                             if (numCards === 0) return '0px';
+                             const availableWidth = typeof window !== 'undefined' ? window.innerWidth - 104 : 256;
+                             const cardWidth = 50;
+                             const totalWidth = numCards * cardWidth;
+                             return totalWidth <= availableWidth ? `${totalWidth}px` : `${availableWidth}px`;
+                          })(),
+                          height: '73px'
+                       }}>
+                          {gameState.piles.hand.cards.map((c, i) => {
+                             const numCards = gameState.piles.hand.cards.length;
+                             const availableWidth = typeof window !== 'undefined' ? window.innerWidth - 104 : 256;
+                             const cardWidth = 50;
+                             const totalWidth = numCards * cardWidth;
+                             const spacing = totalWidth <= availableWidth ? cardWidth : Math.max(10, (availableWidth - cardWidth) / Math.max(1, numCards - 1));
+
+                             return (
+                                <div key={`hand-overlap-${c.id}-${i}`} className="absolute pointer-events-auto" style={{ left: `${i * spacing}px`, zIndex: i }}>
+                                   {renderHandCardHUD(c, i)}
+                                </div>
+                             );
+                          })}
+                       </div>
+                    </div>
 
                      {/* Right card-shaped discard/draw button (no card back) */}
-                     <div>
+                     <div className="absolute right-[1px] bottom-0">
                         <button type="button" onClick={() => discardAndDrawHand()} aria-label="Discard/Draw" className="relative w-[50px] h-[73px] rounded border border-blue-700 shadow-md overflow-hidden bg-blue-900 flex items-center justify-center pointer-events-auto hover:brightness-110">
                            <img src="/icons/foundation.png" alt="Discard" className="w-6 h-6 opacity-90" />
                            {gameState.piles.deck.cards.length > 0 && (
-                              <span className="absolute -top-1 -right-1 bg-slate-700 text-[10px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
+                              <span className="absolute -top-1 -right-1 bg-slate-700 text-[14px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
                            )}
                         </button>
                      </div>
@@ -4245,15 +4328,15 @@ export default function SolitaireEngine({
                            <span className="absolute -top-1 -right-1 bg-slate-700 text-[8px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
                         )}
                      </button>
-                     <button className="flex-1 py-1.5 rounded text-[10px] font-bold border border-slate-700 bg-slate-800 text-slate-400 flex flex-col items-center justify-center gap-0.5">
+                     <button className="flex-1 py-1.5 rounded text-[14px] font-bold border border-slate-700 bg-slate-800 text-slate-400 flex flex-col items-center justify-center gap-0.5">
                         <Clock size={18} />
                         <span>{formatTime(elapsedTime)}</span>
                      </button>
-                     <button className="flex-1 py-1.5 rounded text-[10px] font-bold border border-slate-700 bg-slate-800 text-slate-400 flex flex-col items-center justify-center gap-0.5">
+                     <button className="flex-1 py-1.5 rounded text-[14px] font-bold border border-slate-700 bg-slate-800 text-slate-400 flex flex-col items-center justify-center gap-0.5">
                         <span className="text-[18px]">📊</span>
                         <span>{gameState.score}</span>
                      </button>
-                     <button className="flex-1 py-1.5 rounded text-[10px] font-bold border border-slate-700 bg-slate-800 text-slate-400 flex flex-col items-center justify-center gap-0.5">
+                     <button className="flex-1 py-1.5 rounded text-[14px] font-bold border border-slate-700 bg-slate-800 text-slate-400 flex flex-col items-center justify-center gap-0.5">
                         <Play size={18} />
                         <span>{gameState.moves}</span>
                      </button>
@@ -4288,9 +4371,32 @@ export default function SolitaireEngine({
 
       {/* Effect Banner */}
       {activeBanner && (
-         <div className="effect-banner fixed top-8 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-3 bg-gradient-to-r from-purple-900 via-blue-900 to-purple-900 px-6 py-3 rounded-full border-2 border-yellow-400 shadow-[0_0_30px_rgba(234,179,8,0.5)]">
-            <i className={`fa ${activeBanner.icon} text-yellow-400 text-2xl effect-icon-flash`} />
-            <span className="text-white font-black text-lg tracking-wider">{activeBanner.name}</span>
+         <div className="effect-banner fixed top-20 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-4 bg-gradient-to-r from-purple-900 via-blue-900 to-purple-900 px-8 py-4 rounded-2xl border-4 border-yellow-400 shadow-[0_0_40px_rgba(234,179,8,0.8)] animate-in zoom-in-95 duration-300">
+            {activeBanner.effectId ? (
+               <ResponsiveIcon name={activeBanner.effectId} fallbackType="blessing" size={48} className="effect-icon-flash" />
+            ) : (
+               <i className={`fa ${activeBanner.icon} text-yellow-400 text-4xl effect-icon-flash`} />
+            )}
+            <span className="text-white font-black text-2xl tracking-wider drop-shadow-lg">{activeBanner.name}</span>
+         </div>
+      )}
+
+      {/* Dismissible Curse Introduction Banner */}
+      {curseBanner && (
+         <div className="fixed inset-0 z-[1001] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className="bg-gradient-to-b from-red-900 via-purple-900 to-black p-8 rounded-3xl border-4 border-red-500 shadow-[0_0_60px_rgba(239,68,68,0.9)] max-w-md mx-4 animate-in zoom-in-95 duration-500">
+               <div className="flex flex-col items-center gap-6">
+                  <ResponsiveIcon name={curseBanner.effectId} fallbackType="curse" size={80} className="animate-pulse" />
+                  <h2 className="text-white font-black text-3xl tracking-wider text-center drop-shadow-lg">{curseBanner.name}</h2>
+                  <p className="text-white text-center text-3xl leading-relaxed">{curseBanner.description}</p>
+                  <button
+                     onClick={() => setCurseBanner(null)}
+                     className="bg-red-600 hover:bg-red-500 text-white font-bold text-xl px-8 py-4 rounded-xl border-2 border-red-400 shadow-lg transition-all hover:scale-105"
+                  >
+                     ACCEPT CURSE
+                  </button>
+               </div>
+            </div>
          </div>
       )}
     </div>

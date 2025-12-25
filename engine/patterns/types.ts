@@ -398,6 +398,8 @@ export interface EffectDefinition {
   type: 'blessing' | 'exploit' | 'curse' | 'pattern';
   /** Description shown to player */
   description: string;
+  /** Full original description for reference */
+  originalDescription?: string;
   /** Rarity tier */
   rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
   /** Coin cost in shop */

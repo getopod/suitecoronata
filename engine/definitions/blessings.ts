@@ -22,7 +22,8 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     id: 'blacksmith',
     name: 'Blacksmith',
     type: 'blessing',
-    description: 'Tableau plays allow same or ±1 rank. Play buried face-up cards without moving their stack.',
+    description: 'Tableau: ±1 rank. Play buried face-up cards.',
+    originalDescription: 'Tableau plays allow same or ±1 rank. Play buried face-up cards without moving their stack.',
     custom: {
       canMove: (cards, source, target, defaultAllowed) => {
         // Allow playing buried face-up cards
@@ -49,7 +50,8 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     id: 'maneki_neko',
     name: 'Maneki-Neko',
     type: 'blessing',
-    description: 'Tableau plays ignore suit, foundation plays ignore rank.',
+    description: 'Tableau: ignore suit. Foundation: ignore rank.',
+    originalDescription: 'Tableau plays ignore suit, foundation plays ignore rank.',
     custom: {
       canMove: (cards, source, target, defaultAllowed) => {
         const moving = cards[0];
@@ -72,7 +74,8 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     id: 'tortoiseshell',
     name: 'Tortoiseshell',
     type: 'blessing',
-    description: 'Tableau plays ignore rank, foundation plays ignore suit. No duplicate rank+suit in same tableau.',
+    description: 'Tableau: ignore rank (no duplicates). Foundation: ignore suit.',
+    originalDescription: 'Tableau plays ignore rank, foundation plays ignore suit. No duplicate rank+suit in same tableau.',
     custom: {
       canMove: (cards, source, target, defaultAllowed) => {
         const moving = cards[0];
@@ -96,7 +99,8 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     id: 'vagrant',
     name: 'Vagrant',
     type: 'blessing',
-    description: '+2 tableaus. Allows playing buried face-up cards while moving their stack.',
+    description: '+2 tableaus. Move buried stacks.',
+    originalDescription: '+2 tableaus. Allows playing buried face-up cards while moving their stack.',
     onActivate: [
       { action: 'add_piles', params: { type: 'tableau', count: 2 } }
     ],
@@ -117,7 +121,8 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     id: 'wizard',
     name: 'Wizard',
     type: 'blessing',
-    description: '+2 foundations. Build tableau up or down by rank.',
+    description: '+2 foundations. Tableau: build up/down.',
+    originalDescription: '+2 foundations. Build tableau up or down by rank.',
     onActivate: [
       { action: 'add_piles', params: { type: 'foundation', count: 2 } }
     ],
@@ -138,7 +143,8 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     id: 'jester',
     name: 'Jester',
     type: 'blessing',
-    description: '+50% coin from all sources. Add a wild card to your hand (3 charges).',
+    description: '+50% coins. Gain wild card (3 charges).',
+    originalDescription: '+50% coin from all sources. Add a wild card to your hand (3 charges).',
     coins: [
       { pattern: 'coin_multiplier', params: { allMultiplier: 1.5 } }
     ],
@@ -169,7 +175,8 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     id: 'trickster',
     name: 'Trickster',
     type: 'blessing',
-    description: 'All tableau cards face up. Add a key to your hand (3 charges).',
+    description: 'All tableau face up. Gain key (3 charges).',
+    originalDescription: 'All tableau cards face up. Add a key to your hand (3 charges).',
     visuals: [
       { pattern: 'force_face_up', appliesTo: ['tableau'] }
     ],
@@ -198,7 +205,8 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     id: 'klabautermann',
     name: 'Klabautermann',
     type: 'blessing',
-    description: 'Block 1 ability trigger or gain 1 advantage per encounter. (blocks 1 flip on Reverse Psychology, adds 1 extra bandage on Flesh Wound, adds 1 key on Caged Bakeneko, doubles the coin kept on Street Smarts, blocks shift once on Fog of War, allows picking starting preference on Mood Swings, gives +1 coin per move on Eat the Rich, & gives 3 play head start on 3 rules of 3)',
+    description: 'Block 1 ability trigger or gain 1 advantage per encounter.',
+    originalDescription: 'Block 1 ability trigger or gain 1 advantage per encounter. (blocks 1 flip on Reverse Psychology, adds 1 extra bandage on Flesh Wound, adds 1 key on Caged Bakeneko, doubles the coin kept on Street Smarts, blocks shift once on Fog of War, allows picking starting preference on Mood Swings, gives +1 coin per move on Eat the Rich, & gives 3 play head start on 3 rules of 3)',
     effectState: {},
     custom: {
       // Implement per-curse logic in their respective handlers
@@ -210,7 +218,8 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     id: 'martyr',
     name: 'Martyr',
     type: 'blessing',
-    description: 'Sacrifice 1 foundation. Return its cards to the deck. Return the last 5 cards you played to your hand (1 charge).',
+    description: 'Sacrifice foundation. Recall last 5 cards (1 charge).',
+    originalDescription: 'Sacrifice 1 foundation. Return its cards to the deck. Return the last 5 cards you played to your hand (1 charge).',
     effectState: { lastPlayedCards: [], martyrTimekeeperUsed: false },
     custom: {
       onActivate: (state) => {
@@ -254,7 +263,8 @@ export const BLESSING_DEFINITIONS: EffectDefinition[] = [
     id: 'whore',
     name: 'Whore',
     type: 'blessing',
-    description: 'Convert between points & coins (4:1 or 1:5). Pay 2× score goal to skip encounter (no coin rewards).',
+    description: 'Convert points↔coins. Skip encounter for 2× goal.',
+    originalDescription: 'Convert between points & coins (4:1 or 1:5). Pay 2× score goal to skip encounter (no coin rewards).',
     effectState: {},
     custom: {
       // Conversion and skip logic handled in UI/game flow

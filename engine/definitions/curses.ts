@@ -24,7 +24,8 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'reverse_psychology',
     name: 'Reverse Psychology',
     type: 'curse',
-    description: 'Every 5 moves, flip gameboard horizontally, then vertically, then horizontally, then vertically, & so on. Completed foundations remove 1 flip from 4 possible.',
+    description: 'Flip board every 5 moves. Foundations remove flips.',
+    originalDescription: 'Every 5 moves, flip gameboard horizontally, then vertically, then horizontally, then vertically, & so on. Completed foundations remove 1 flip from 4 possible.',
     effectState: { pendingFlips: [] },
     custom: {
       onMoveComplete: (state) => {
@@ -44,9 +45,30 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'schrodingers_deck',
     name: "Schrodinger's Deck",
     type: 'curse',
-    description: 'Tableaus 50% exist after each play; at least 3 exist. Each Ace in foundation increases odds by 10%. Queen at bottom of tableau stops it from disappearing.',
+    description: 'Tableaus flicker (50% every 1-4 plays). Aces stabilize. Queens anchor.',
+    originalDescription: 'Tableaus 50% exist after each play; at least 3 exist. Each Ace in foundation increases odds by 10%. Queen at bottom of tableau stops it from disappearing.',
+    effectState: { schrodingerPlayCount: 0, schrodingerNextCheck: 0 },
     custom: {
-      onMoveComplete: (state) => {
+      onActivate: (state) => {
+        // Set initial check interval (1-4 plays)
+        const nextCheck = Math.floor(Math.random() * 4) + 1;
+        return { effectState: { ...state.effectState, schrodingerPlayCount: 0, schrodingerNextCheck: nextCheck } };
+      },
+      onMoveComplete: (state, context) => {
+        // Count draws, discards, and regular moves as "plays"
+        const isPlay = context.source === 'deck' || context.target === 'deck' || context.source === 'hand' || context.target !== 'deck';
+
+        if (!isPlay) return {};
+
+        const playCount = (state.effectState.schrodingerPlayCount || 0) + 1;
+        const nextCheck = state.effectState.schrodingerNextCheck || 1;
+
+        // Only trigger flicker at the scheduled check interval
+        if (playCount < nextCheck) {
+          return { effectState: { ...state.effectState, schrodingerPlayCount: playCount } };
+        }
+
+        // Time to flicker!
         const newPiles = { ...state.piles };
         const tabs = Object.keys(newPiles).filter(k => k.startsWith('tableau'));
 
@@ -80,7 +102,13 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
           const forceIds = tabs.slice(0, 3);
           forceIds.forEach(id => { newPiles[id].hidden = false; });
         }
-        return { piles: newPiles };
+
+        // Reset counter and set new random interval (1-4 plays)
+        const newNextCheck = Math.floor(Math.random() * 4) + 1;
+        return {
+          piles: newPiles,
+          effectState: { ...state.effectState, schrodingerPlayCount: 0, schrodingerNextCheck: newNextCheck }
+        };
       },
       canMove: (cards, source, target, defaultAllowed, state) =>
         (source.hidden || target.hidden) ? false : defaultAllowed
@@ -95,7 +123,8 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'flesh_wound',
     name: 'Flesh Wound',
     type: 'curse',
-    description: 'Wound in hand increases goal by 10% each cycle. Find 2 bandages in tableau to remove.',
+    description: 'Wound increases goal 10%/cycle. Find 2 bandages.',
+    originalDescription: 'Wound in hand increases goal by 10% each cycle. Find 2 bandages in tableau to remove.',
     effectState: { woundActive: true, bandagesFound: 0, baseGoal: 0 },
     custom: {
       onActivate: (state) => {
@@ -158,7 +187,8 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'caged_bakeneko',
     name: 'Caged Bakeneko',
     type: 'curse',
-    description: '3 tableau locked. 4 keys hidden in other tableau. Unlock a random tableau at 50% of score goal.',
+    description: '3 tableaus locked. Find 4 keys. Auto-unlock at 50% goal.',
+    originalDescription: '3 tableau locked. 4 keys hidden in other tableau. Unlock a random tableau at 50% of score goal.',
     effectState: { bakenekoLocked: [], bakenekoKeys: [] },
     custom: {
       onActivate: (state) => {
@@ -204,7 +234,8 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'street_smarts',
     name: 'Street Smarts',
     type: 'curse',
-    description: 'Complete encounter by gaining goal in coins, not points. x5 coins gained. Only keep 10%.',
+    description: 'Win with coins not points. 5× gain, keep 10%.',
+    originalDescription: 'Complete encounter by gaining goal in coins, not points. x5 coins gained. Only keep 10%.',
     effectState: { encounterCoins: 0, previousCoins: 0 },
     coins: [
       { pattern: 'coin_multiplier', params: { allMultiplier: 5 } }
@@ -270,7 +301,8 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'counterfeiting',
     name: 'Counterfeiting',
     type: 'curse',
-    description: 'Duplicate all cards before dealing. -50% points gained. Cards with same rank can be stacked.',
+    description: 'Duplicate deck. -50% points. Stack same ranks.',
+    originalDescription: 'Duplicate all cards before dealing. -50% points gained. Cards with same rank can be stacked.',
     scoring: [
       { pattern: 'percentage_multiplier', params: { multiplier: 0.5 } }
     ],
@@ -296,7 +328,8 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'fog_of_war_variant',
     name: 'Fog of War',
     type: 'curse',
-    description: 'Only rank & color visible. Suit hidden. Every 10 moves, reduce rank of face-up tableau cards by 1 & increase rank of face-down tableau cards by 1.',
+    description: 'Suits hidden. Ranks shift every 10 moves.',
+    originalDescription: 'Only rank & color visible. Suit hidden. Every 10 moves, reduce rank of face-up tableau cards by 1 & increase rank of face-down tableau cards by 1.',
     visuals: [
       { pattern: 'hide_suit' }
     ],
@@ -334,7 +367,8 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'tower_of_babel',
     name: 'Tower of Babel',
     type: 'curse',
-    description: '+4 empty tableau. No foundations. No score. Advance by stacking all 4 suits in tableau.',
+    description: '+4 tableaus. No foundations/score. Stack full suits to win.',
+    originalDescription: '+4 empty tableau. No foundations. No score. Advance by stacking all 4 suits in tableau.',
     effectState: { towerSuitsCompleted: [] },
     custom: {
       onActivate: (state) => {
@@ -403,7 +437,8 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'revolving_door',
     name: 'Revolving Door',
     type: 'curse',
-    description: 'Foundations only keep top card, return rest to deck. Cards score +50% each cycle. Pass all 13 ranks through a foundation to close it & gain +100% score bonus.',
+    description: 'Foundations keep 1 card. +50%/cycle. Close with 13 ranks.',
+    originalDescription: 'Foundations only keep top card, return rest to deck. Cards score +50% each cycle. Pass all 13 ranks through a foundation to close it & gain +100% score bonus.',
     effectState: { cardCycles: {}, closedFoundations: [] },
     custom: {
       calculateScore: (scoreDelta, context, state) => {
@@ -475,7 +510,8 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'three_rules_of_three',
     name: '3 Rules of 3',
     type: 'curse',
-    description: 'Every 3rd play removes 3 cards from deck. Lowest face-up tableau card moved to deck.',
+    description: 'Every 3rd play: lose 3 deck cards + lowest tableau card.',
+    originalDescription: 'Every 3rd play removes 3 cards from deck. Lowest face-up tableau card moved to deck.',
     custom: {
       onMoveComplete: (state) => {
         if (state.moves > 0 && state.moves % 3 === 0) {
@@ -504,7 +540,8 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'eat_the_rich',
     name: 'Eat the Rich',
     type: 'curse',
-    description: 'Full deck dealt to equal tableaus at start. Coin gains disabled. 3× points gained.',
+    description: 'All cards dealt to tableaus. No coins. 3× points.',
+    originalDescription: 'Full deck dealt to equal tableaus at start. Coin gains disabled. 3× points gained.',
     custom: {
       onActivate: (state) => {
         const deck = state.piles['deck'];
@@ -533,7 +570,8 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'entropy',
     name: 'Entropy',
     type: 'curse',
-    description: 'Every 10 plays, shuffle & redeal tableau & foundations from deck. Hand size is 10. Tableau plays from your hand swap places.',
+    description: 'Redeal every 10 plays. Hand size 10. Swaps on tableau plays.',
+    originalDescription: 'Every 10 plays, shuffle & redeal tableau & foundations from deck. Hand size is 10. Tableau plays from your hand swap places.',
     custom: {
       onMoveComplete: (state, context) => {
         let updates: any = {};
@@ -590,7 +628,8 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'executive_order',
     name: 'Executive Order',
     type: 'curse',
-    description: 'All tableaus linked; Must play 1 to each in order, even if not valid. Then rearrange cards freely for 7 moves & score at end. Repeat.',
+    description: 'Play 1 to each tableau in order. Then 7 free moves to score.',
+    originalDescription: 'All tableaus linked; Must play 1 to each in order, even if not valid. Then rearrange cards freely for 7 moves & score at end. Repeat.',
     effectState: { executivePhase: 'play', executiveTableauIndex: 0, executiveFreeMovesLeft: 0 },
     custom: {
       onActivate: (state) => ({
@@ -657,7 +696,8 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'mood_swings',
     name: 'Mood Swings',
     type: 'curse',
-    description: 'Odd/even ranks alternate scoring 0 every 6/7 plays. x2 scoring.',
+    description: 'Odd/even ranks score 0 every 6/7 plays. 2× scoring.',
+    originalDescription: 'Odd/even ranks alternate scoring 0 every 6/7 plays. x2 scoring.',
     effectState: { moodSwingCycle: 0 },
     custom: {
       onActivate: (state) => ({
@@ -694,7 +734,8 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'veil_of_uncertainty',
     name: 'Veil of Uncertainty',
     type: 'curse',
-    description: 'Only suit visible. +50% points gained. 33% to stumble to an adjacent tableau for negative score.',
+    description: 'Ranks hidden. +50% points. 33% stumble penalty.',
+    originalDescription: 'Only suit visible. +50% points gained. 33% to stumble to an adjacent tableau for negative score.',
     visuals: [
       { pattern: 'hide_rank' }
     ],
