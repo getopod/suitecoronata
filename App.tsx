@@ -348,7 +348,7 @@ export default function SolitaireEngine({
      setFloatingElements(prev => [...prev, { id, text, x, y, color, isMult }]);
      setTimeout(() => {
        setFloatingElements(prev => prev.filter(e => e.id !== id));
-     }, 1000);
+     }, 2500); // Increased from 1000 to match new animation duration
    }, []);
 
    const spawnBanner = useCallback((name: string, icon: string) => {
@@ -1685,10 +1685,7 @@ export default function SolitaireEngine({
       spawnBanner('FOUNDATION COMPLETE', 'fa-crown');
     }
 
-    // Show banner for high multipliers
-    if (multiplier >= 3) {
-      spawnBanner(`×${multiplier} MULTIPLIER!`, 'fa-bolt');
-    }
+    // Multiplier banner removed - now using floating text only for all multipliers
 
     // Check for newly activated effects
     const newActives = nextState.activeItemIds?.filter(id => !gameState.activeItemIds?.includes(id)) || [];
@@ -1947,7 +1944,7 @@ export default function SolitaireEngine({
     let handStyle = {};
     // Hand cards stick to top of bottom bar, raise when selected
     if (pileId === 'hand') {
-       const xOffset = (index - (totalCards - 1) / 2) * 45;
+       const xOffset = (index - (totalCards - 1) / 2) * 52;
        handStyle = {
            position: 'absolute',
            bottom: isSelected ? '0px' : '-32px',
@@ -1963,7 +1960,7 @@ export default function SolitaireEngine({
        return (
           <button
              key={`${card.id}-${pileId}-${index}`}
-             className="absolute w-11 max-w-[44px] h-16 max-h-[64px] rounded border border-slate-700 shadow-md overflow-hidden"
+             className="absolute w-[50px] h-[73px] rounded border border-slate-700 shadow-md overflow-hidden"
              style={{ top: `${pileId.includes('tableau') ? index * 10 : 0}px` }}
              onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
              onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick(pileId, index); }}
@@ -1982,7 +1979,7 @@ export default function SolitaireEngine({
          <button
             key={`${card.id}-${pileId}-${index}`}
             type="button"
-            className={`absolute w-11 max-w-[44px] h-11 bg-transparent select-none flex items-end justify-center ${isSelected ? 'ring-4 ring-yellow-400' : ''} relative`}
+            className={`absolute w-[50px] h-[50px] bg-transparent select-none flex items-end justify-center ${isSelected ? 'ring-4 ring-yellow-400' : ''} relative`}
             style={pileId === 'hand' ? handStyle : { top: `${pileId.includes('tableau') ? index * 12 : 0}px`, zIndex: index }}
             onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
             aria-label={isTricksterKey ? `Trickster Key (${charges} charges)` : "Key - Click to select, then click locked tableau to unlock"}
@@ -2012,7 +2009,7 @@ export default function SolitaireEngine({
              <button
                   key={`${card.id}-${pileId}-${index}`}
                   type="button"
-                  className={`${isClassicGame ? 'relative' : 'absolute'} w-11 max-w-[44px] h-16 max-h-[64px] bg-transparent perspective-1000 select-none transition-transform hover:scale-105 hover:brightness-110 cursor-pointer ${cardAnimClass}`}
+                  className={`${isClassicGame ? 'relative' : 'absolute'} w-[50px] h-[73px] bg-transparent perspective-1000 select-none transition-transform hover:scale-105 hover:brightness-110 cursor-pointer ${cardAnimClass}`}
                   style={cardStyle}
                   onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
                   onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick(pileId, index); }}
@@ -2091,7 +2088,7 @@ export default function SolitaireEngine({
           return (
                <button
                    key={`${card.id}-hand-hud-${index}`}
-                   className="w-11 max-w-[44px] h-16 max-h-[64px] rounded border border-slate-700 shadow-md overflow-hidden bg-transparent"
+                   className="w-[50px] h-[73px] rounded border border-slate-700 shadow-md overflow-hidden bg-transparent"
                    onClick={(e) => { e.stopPropagation(); handleCardClick('hand', index); }}
                    onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick('hand', index); }}
                    aria-label={`Face down card ${index + 1}`}>
@@ -2108,7 +2105,7 @@ export default function SolitaireEngine({
              <button
                   key={`${card.id}-hand-key-${index}`}
                   type="button"
-                  className={`w-11 max-w-[44px] h-11 bg-transparent select-none flex items-end justify-center ${isSelected ? 'ring-4 ring-yellow-400' : ''} relative`}
+                  className={`w-[50px] h-[50px] bg-transparent select-none flex items-end justify-center ${isSelected ? 'ring-4 ring-yellow-400' : ''} relative`}
                   onClick={(e) => { e.stopPropagation(); handleCardClick('hand', index); }}
                   onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick('hand', index); }}
                   aria-label={isTricksterKey ? `Trickster Key (${charges} charges)` : "Key - Click to select"}
@@ -2129,7 +2126,7 @@ export default function SolitaireEngine({
          <button
                key={`${card.id}-hand-${index}`}
                type="button"
-               className={`w-11 max-w-[44px] h-16 max-h-[64px] bg-transparent perspective-1000 select-none transition-transform hover:scale-105 hover:brightness-110 cursor-pointer ${cardAnimClass}`}
+               className={`w-[50px] h-[73px] bg-transparent perspective-1000 select-none transition-transform hover:scale-105 hover:brightness-110 cursor-pointer ${cardAnimClass}`}
                onClick={(e) => { e.stopPropagation(); handleCardClick('hand', index); }}
                onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick('hand', index); }}
                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); handleDoubleClick('hand', index); } }}
@@ -2188,7 +2185,7 @@ export default function SolitaireEngine({
    let zoomScale = 1;
    if (CLASSIC_GAMES[selectedMode]) {
       // Classic mode: fit tableaus with 2px gaps and 2px margins
-      const cardWidth = 44;
+      const cardWidth = 50;
       const gap = 2;
       const margin = 2;
       const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 360;
@@ -2196,7 +2193,7 @@ export default function SolitaireEngine({
       zoomScale = Math.min(1, (screenWidth - 4) / requiredWidth);
    } else {
       // Coronata mode: fit maxItems with 2px gaps and 2px margins
-      const cardWidth = 44;
+      const cardWidth = 50;
       const gap = 2;
       const margin = 2;
       const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 360;
@@ -3556,7 +3553,7 @@ export default function SolitaireEngine({
                   {/* Shadow Realm Pile */}
                   {gameState.piles['shadow-realm'] && (
                      <div
-                        className="relative w-11 max-w-[44px] h-16 max-h-[64px] bg-purple-900/30 border border-purple-500/50 rounded flex items-center justify-center cursor-pointer hover:bg-purple-900/50 transition-colors"
+                        className="relative w-[50px] h-[73px] bg-purple-900/30 border border-purple-500/50 rounded flex items-center justify-center cursor-pointer hover:bg-purple-900/50 transition-colors"
                         onClick={handleShadowRealmClick}
                         title="Shadow Realm: Click to summon back (10 coins)">
                         <div className="absolute -top-2 -left-1 bg-purple-900 text-[8px] px-1 rounded-full border border-purple-500 z-10">Realm</div>
@@ -3575,11 +3572,11 @@ export default function SolitaireEngine({
                      const ringColor = selectionColor === 'green' ? 'ring-green-400' : selectionColor === 'yellow' ? 'ring-amber-300' : 'ring-red-400';
                      const shadowColor = selectionColor === 'green' ? 'shadow-[0_0_0_2px_rgba(74,222,128,0.25)]' : selectionColor === 'yellow' ? 'shadow-[0_0_0_2px_rgba(251,191,36,0.25)]' : 'shadow-[0_0_0_2px_rgba(248,113,113,0.25)]';
                      return (
-                     <div key={pile.id} data-pile-id={pile.id} className={`relative w-11 max-w-[44px] h-16 max-h-[64px] bg-slate-800/50 rounded border border-slate-700 flex items-center justify-center ${isHighlighted ? `ring-2 ${ringColor} ${shadowColor}` : ''}`}>
+                     <div key={pile.id} data-pile-id={pile.id} className={`relative w-[50px] h-[73px] bg-slate-800/50 rounded border border-slate-700 flex items-center justify-center ${isHighlighted ? `ring-2 ${ringColor} ${shadowColor}` : ''}`}>
                         {pile.cards.length === 0 ? (
                            <div className="relative w-full h-full flex items-center justify-center">
                               <span className={`text-xl opacity-20 ${suitColor}`}>{suitSymbol}</span>
-                              <button type="button" aria-label={`Empty foundation ${pile.id}`} className={`absolute top-0 left-0 w-11 max-w-[44px] h-16 max-h-[64px] bg-transparent ${isHighlighted ? `ring-2 ${ringColor} rounded` : ''}`} onClick={() => handleCardClick(pile.id, -1)} />
+                              <button type="button" aria-label={`Empty foundation ${pile.id}`} className={`absolute top-0 left-0 w-[50px] h-[73px] bg-transparent ${isHighlighted ? `ring-2 ${ringColor} rounded` : ''}`} onClick={() => handleCardClick(pile.id, -1)} />
                            </div>
                         ) : null}
                         {pile.cards.map((c, i) => renderCard(c, i, pile.id))}
@@ -3650,7 +3647,7 @@ export default function SolitaireEngine({
                         {pile.cards.length === 0 && (() => {
                            const ringColor = selectionColor === 'green' ? 'ring-green-400' : selectionColor === 'yellow' ? 'ring-amber-300' : 'ring-red-400';
                            return (
-                              <div className="relative w-11 max-w-[44px] h-16 max-h-[64px]">
+                              <div className="relative w-[50px] h-[73px]">
                                  <div className={`w-full h-full bg-slate-800/50 rounded border border-slate-700 ${isHighlighted ? `ring-2 ${ringColor}` : ''}`}></div>
                                  <button type="button" aria-label={`Empty ${pile.id}`} className="absolute inset-0 w-full h-full bg-transparent" onClick={() => handleCardClick(pile.id, -1)} />
                               </div>
@@ -4175,7 +4172,7 @@ export default function SolitaireEngine({
                                              toggleDrawer('inventory');
                                           }
                                        }}
-                                       className={`relative w-11 max-w-[44px] h-16 max-h-[64px] rounded border border-slate-700 shadow-md overflow-hidden bg-slate-800 flex items-center justify-center pointer-events-auto`} aria-label="Inventory">
+                                       className={`relative w-[50px] h-[73px] rounded border border-slate-700 shadow-md overflow-hidden bg-slate-800 flex items-center justify-center pointer-events-auto`} aria-label="Inventory">
                                         <img src="/icons/bagofholding.png" alt="Bag of Holding" className="w-7 h-7" />
                                     </button>
                                </div>
@@ -4189,7 +4186,7 @@ export default function SolitaireEngine({
 
                      {/* Right card-shaped discard/draw button (no card back) */}
                      <div>
-                        <button type="button" onClick={() => discardAndDrawHand()} aria-label="Discard/Draw" className="relative w-11 max-w-[44px] h-16 max-h-[64px] rounded border border-blue-700 shadow-md overflow-hidden bg-blue-900 flex items-center justify-center pointer-events-auto hover:brightness-110">
+                        <button type="button" onClick={() => discardAndDrawHand()} aria-label="Discard/Draw" className="relative w-[50px] h-[73px] rounded border border-blue-700 shadow-md overflow-hidden bg-blue-900 flex items-center justify-center pointer-events-auto hover:brightness-110">
                            <img src="/icons/foundation.png" alt="Discard" className="w-6 h-6 opacity-90" />
                            {gameState.piles.deck.cards.length > 0 && (
                               <span className="absolute -top-1 -right-1 bg-slate-700 text-[10px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>

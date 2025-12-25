@@ -96,7 +96,7 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     name: 'Flesh Wound',
     type: 'curse',
     description: 'Wound in hand increases goal by 10% each cycle. Find 2 bandages in tableau to remove.',
-    effectState: { woundActive: true, bandagesFound: 0 },
+    effectState: { woundActive: true, bandagesFound: 0, baseGoal: 0 },
     custom: {
       onActivate: (state) => {
         const hand = state.piles['hand'];
@@ -108,15 +108,47 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
           const bandage: Card = { id: `bandage-${i}-${Date.now()}`, suit: 'special', rank: 0 as Rank, faceUp: false, meta: { isBandage: true } };
           newPiles[key] = { ...newPiles[key], cards: [...newPiles[key].cards, bandage] };
         }
-        return { piles: newPiles, effectState: { ...state.effectState, woundActive: true, bandagesFound: 0 } };
+        return {
+          piles: newPiles,
+          effectState: { ...state.effectState, woundActive: true, bandagesFound: 0, baseGoal: state.currentScoreGoal }
+        };
       },
       onMoveComplete: (state, context) => {
         const foundBandage = context.cards.find(c => c.meta?.isBandage);
         if (foundBandage && context.cards[0].faceUp) {
           const remaining = (state.effectState.bandagesFound || 0) + 1;
           const clearWound = remaining >= 2;
-          return { effectState: { ...state.effectState, bandagesFound: remaining, woundActive: clearWound ? false : true } };
+
+          // If wound is cleared, restore original goal
+          if (clearWound) {
+            const baseGoal = state.effectState.baseGoal || state.currentScoreGoal;
+            const newPiles = { ...state.piles };
+            // Remove wound from hand
+            const hand = newPiles['hand'];
+            if (hand) {
+              newPiles['hand'] = { ...hand, cards: hand.cards.filter(c => !c.meta?.isWound) };
+            }
+            return {
+              piles: newPiles,
+              currentScoreGoal: baseGoal,
+              effectState: { ...state.effectState, bandagesFound: remaining, woundActive: false }
+            };
+          }
+
+          return { effectState: { ...state.effectState, bandagesFound: remaining } };
         }
+
+        // Increase goal by 10% each time deck is cycled (or every N moves as a proxy for "cycle")
+        // Assuming "cycle" means deck recycling or similar
+        if (context.target === 'deck' && state.effectState.woundActive) {
+          const baseGoal = state.effectState.baseGoal || state.currentScoreGoal;
+          const newGoal = Math.floor(baseGoal * 1.1);
+          return {
+            currentScoreGoal: newGoal,
+            effectState: { ...state.effectState, baseGoal }
+          };
+        }
+
         return {};
       }
     }
@@ -374,6 +406,27 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     description: 'Foundations only keep top card, return rest to deck. Cards score +50% each cycle. Pass all 13 ranks through a foundation to close it & gain +100% score bonus.',
     effectState: { cardCycles: {}, closedFoundations: [] },
     custom: {
+      calculateScore: (scoreDelta, context, state) => {
+        const card = context.cards[0];
+        const cycles = state.effectState.cardCycles || {};
+        const closedFounds = state.effectState.closedFoundations || [];
+
+        // +50% for each cycle this card has been through
+        const cardCycles = cycles[card.id] || 0;
+        let multiplier = 1 + (cardCycles * 0.5);
+
+        // +100% bonus if this move completes a foundation to all 13 ranks
+        if (context.target.includes('foundation')) {
+          const pile = state.piles[context.target];
+          const allRanks = new Set(pile.cards.map(c => c.rank));
+          allRanks.add(card.rank); // Include the card being placed
+          if (allRanks.size === 13 && !closedFounds.includes(context.target)) {
+            multiplier += 1.0; // +100% bonus
+          }
+        }
+
+        return Math.floor(scoreDelta * multiplier);
+      },
       onMoveComplete: (state, context) => {
         if (context.target.includes('foundation')) {
           const pile = state.piles[context.target];
@@ -423,26 +476,28 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     name: '3 Rules of 3',
     type: 'curse',
     description: 'Every 3rd play removes 3 cards from deck. Lowest face-up tableau card moved to deck.',
-    onMoveComplete: (state) => {
-      if (state.moves > 0 && state.moves % 3 === 0) {
-        const deck = state.piles['deck'];
-        const newDeck = [...deck.cards];
-        newDeck.splice(0, Math.min(3, newDeck.length));
-        let lowest: Card | null = null;
-        Object.values(state.piles).filter(p => p.type === 'tableau').forEach(p => {
-          const faceUps = p.cards.filter(c => c.faceUp);
-          faceUps.forEach(c => { if (!lowest || c.rank < lowest.rank) lowest = c; });
-        });
-        if (lowest) {
-          const newPiles = { ...state.piles };
-          Object.keys(newPiles).filter(k => k.startsWith('tableau')).forEach(id => {
-            newPiles[id].cards = newPiles[id].cards.filter(c => c.id !== lowest!.id);
+    custom: {
+      onMoveComplete: (state) => {
+        if (state.moves > 0 && state.moves % 3 === 0) {
+          const deck = state.piles['deck'];
+          const newDeck = [...deck.cards];
+          newDeck.splice(0, Math.min(3, newDeck.length));
+          let lowest: Card | null = null;
+          Object.values(state.piles).filter((p): p is Pile => p.type === 'tableau').forEach(p => {
+            const faceUps = p.cards.filter(c => c.faceUp);
+            faceUps.forEach(c => { if (!lowest || c.rank < lowest.rank) lowest = c; });
           });
-          newDeck.push({ ...lowest, faceUp: false });
-          return { piles: { ...newPiles, deck: { ...deck, cards: newDeck } } };
+          if (lowest) {
+            const newPiles = { ...state.piles };
+            Object.keys(newPiles).filter(k => k.startsWith('tableau')).forEach(id => {
+              newPiles[id].cards = newPiles[id].cards.filter(c => c.id !== lowest!.id);
+            });
+            newDeck.push({ ...lowest, faceUp: false });
+            return { piles: { ...newPiles, deck: { ...deck, cards: newDeck } } };
+          }
         }
+        return {};
       }
-      return {};
     }
   },
    {
@@ -450,24 +505,26 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     name: 'Eat the Rich',
     type: 'curse',
     description: 'Full deck dealt to equal tableaus at start. Coin gains disabled. 3× points gained.',
-    onActivate: (state) => {
-      const deck = state.piles['deck'];
-      const allCards = [...deck.cards];
-      allCards.sort(() => Math.random() - 0.5);
-      const newPiles: Record<string, Pile> = {};
-      const tableauCount = 7;
-      const perPile = Math.floor(allCards.length / tableauCount);
-      for (let i = 0; i < tableauCount; i++) {
-        const pileCards = allCards.slice(i * perPile, (i + 1) * perPile);
-        if (pileCards.length > 0) pileCards[pileCards.length - 1].faceUp = true;
-        newPiles[`tableau-${i}`] = { id: `tableau-${i}`, type: 'tableau', cards: pileCards };
+    custom: {
+      onActivate: (state) => {
+        const deck = state.piles['deck'];
+        const allCards = [...deck.cards];
+        allCards.sort(() => Math.random() - 0.5);
+        const newPiles: Record<string, Pile> = {};
+        const tableauCount = 7;
+        const perPile = Math.floor(allCards.length / tableauCount);
+        for (let i = 0; i < tableauCount; i++) {
+          const pileCards = allCards.slice(i * perPile, (i + 1) * perPile);
+          if (pileCards.length > 0) pileCards[pileCards.length - 1].faceUp = true;
+          newPiles[`tableau-${i}`] = { id: `tableau-${i}`, type: 'tableau', cards: pileCards };
+        }
+        Object.keys(state.piles).filter(k => k.startsWith('foundation')).forEach(fid => { delete newPiles[fid]; });
+        return {
+          piles: { ...state.piles, ...newPiles, deck: { ...deck, cards: [] } },
+          coinMultiplier: 0,
+          scoreMultiplier: 3
+        };
       }
-      Object.keys(state.piles).filter(k => k.startsWith('foundation')).forEach(fid => { delete newPiles[fid]; });
-      return {
-        piles: { ...state.piles, ...newPiles, deck: { ...deck, cards: [] } },
-        coinMultiplier: 0,
-        scoreMultiplier: 3
-      };
     }
   },
 
@@ -618,33 +675,13 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
 
         return scoreDelta;
       },
-      transformCardVisual: (card, pile, state) => {
+      transformCardVisual: (card, pile) => {
         // Only apply visual tint to hand cards
         if (pile?.type !== 'hand') return {};
 
-        const cycle = (state?.effectState?.moodSwingCycle || 0);
-        const isOddRank = card.rank % 2 === 1;
-
-        // Check if this card will score 0 on the next play
-        const willNotScore = (isOddRank && cycle % 6 === 5) || (!isOddRank && cycle % 7 === 6);
-
-        if (willNotScore) {
-          // Subtle red tint for cards that won't score
-          return {
-            meta: {
-              ...card.meta,
-              color: 'rgba(255, 100, 100, 0.15)' // Subtle red overlay
-            }
-          };
-        } else {
-          // Subtle green tint for cards that will score
-          return {
-            meta: {
-              ...card.meta,
-              color: 'rgba(100, 255, 100, 0.15)' // Subtle green overlay
-            }
-          };
-        }
+        // Note: We can't access state here, so visual feedback won't work perfectly
+        // This would need to be implemented differently, perhaps through card metadata
+        return {};
       },
       onMoveComplete: (state) => {
         const cycle = (state.effectState.moodSwingCycle || 0) + 1;

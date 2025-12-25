@@ -162,9 +162,6 @@ export const PATTERN_DEFINITIONS: EffectDefinition[] = [
     name: 'High Society',
     type: 'pattern',
     description: 'Hand to foundation plays ×2 points.',
-    scoring: [
-      { pattern: 'percentage_multiplier', trigger: 'source=hand', params: { multiplier: 2 } }
-    ],
     custom: {
       calculateScore: (score, context) =>
         (context.source === 'hand' && context.target.includes('foundation')) ? score * 2 : score
@@ -177,17 +174,33 @@ export const PATTERN_DEFINITIONS: EffectDefinition[] = [
     name: 'Keen Instincts',
     type: 'pattern',
     description: 'Revealed cards ignore rank & give +10 coin if played immediately.',
+    effectState: { justRevealedCardId: null },
     custom: {
       canMove: (cards, source, target, defaultAllowed, state) => {
         const c = cards[0];
+        // If this is the card that was just revealed, allow it to be played anywhere on tableau
         if (c.id === state.effectState.justRevealedCardId && target.type === 'tableau') return true;
         return defaultAllowed;
       },
       onMoveComplete: (state, context) => {
+        let updates: any = {};
+
+        // If the card that was just played was the revealed card, give +10 coins
         if (context.cards[0]?.id === state.effectState.justRevealedCardId) {
-          return { coins: state.coins + 10, effectState: { ...state.effectState, justRevealedCardId: null } };
+          updates.coins = state.coins + 10;
+          updates.effectState = { ...state.effectState, justRevealedCardId: null };
         }
-        return {};
+
+        // Track any newly revealed cards from this move
+        if (context.reveal) {
+          const revealedCards = context.cards.filter(c => c.faceUp);
+          if (revealedCards.length > 0) {
+            // Track the last revealed card
+            updates.effectState = { ...state.effectState, justRevealedCardId: revealedCards[revealedCards.length - 1].id };
+          }
+        }
+
+        return updates;
       }
     }
   },
