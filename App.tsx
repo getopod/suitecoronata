@@ -302,15 +302,12 @@ export default function SolitaireEngine({
   // Player Stats
   const [playerStats, setPlayerStats] = useState<PlayerStats>(() => loadPlayerStats());
   const [runStartData, setRunStartData] = useState<{ startTime: number; startCoins: number; encounterLog: RunEncounterRecord[] } | null>(null);
-  const [activeDrawer, setActiveDrawer] = useState<'pause' | 'exploit' | 'curse' | 'blessing' | 'shop' | 'feedback' | 'test' | 'settings' | 'resign' | 'blessing_select' | null>(null);
+   const [activeDrawer, setActiveDrawer] = useState<'pause' | 'exploit' | 'curse' | 'blessing' | 'patterns' | 'shop' | 'feedback' | 'test' | 'settings' | 'resign' | 'blessing_select' | 'inventory' | null>(null);
   const [shopInventory, setShopInventory] = useState<GameEffect[]>([]);
   const [blessingChoices, setBlessingChoices] = useState<GameEffect[]>([]);
   const [patternDrawer, setPatternDrawer] = useState(false);
   const [showLevelComplete, setShowLevelComplete] = useState(false);
-   // Left-floating menu state (new bottom HUD controls)
-   const [leftMenuOpen, setLeftMenuOpen] = useState(false);
-   const [leftSubMenu, setLeftSubMenu] = useState<'exploits' | 'blessings' | 'patterns' | 'options' | null>(null);
-   const [optionsSubMenu, setOptionsSubMenu] = useState<'settings' | null>(null);
+   // Left-floating menu state removed — inventory now uses the unified bottom drawer
 
   // Animation state
   const [floatingElements, setFloatingElements] = useState<Array<{ id: number; text: string; x: number; y: number; color: string; isMult?: boolean }>>([]);
@@ -422,6 +419,7 @@ export default function SolitaireEngine({
       if (!activeDrawer) return [] as GameEffect[];
       if (activeDrawer === 'blessing_select') return blessingChoices;
       if (activeDrawer === 'shop') return shopInventory;
+      if (activeDrawer === 'patterns') return effectsRegistry.filter(e => e.type === 'pattern' && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll));
       // Owned effect lists for exploit/curse/blessing drawers
       if (['exploit', 'curse', 'blessing'].includes(activeDrawer)) {
          return effectsRegistry.filter(e => {
@@ -589,19 +587,19 @@ export default function SolitaireEngine({
     }
   }, [gameState.score, gameState.currentScoreGoal, gameState.isLevelComplete, gameState.piles, gameState.moves, currentView, showLevelComplete, selectedMode]);
 
-  // Timer for classic modes
-  React.useEffect(() => {
-    const classicGame = CLASSIC_GAMES[selectedMode];
-    if (classicGame && currentView === 'game' && !gameState.isLevelComplete && !showLevelComplete) {
-      setIsTimerRunning(true);
-      const interval = setInterval(() => {
-        setElapsedTime(prev => prev + 1);
-      }, 1000);
-      return () => clearInterval(interval);
-    } else {
-      setIsTimerRunning(false);
-    }
-  }, [selectedMode, currentView, gameState.isLevelComplete, showLevelComplete]);
+   // Timer for classic modes
+   React.useEffect(() => {
+      const classicGame = CLASSIC_GAMES[selectedMode];
+      if (classicGame && currentView === 'game' && !gameState.isLevelComplete && !showLevelComplete) {
+         setIsTimerRunning(true);
+         const interval = setInterval(() => {
+            setElapsedTime(prev => prev + 1);
+         }, 1000);
+         return () => clearInterval(interval);
+      } else {
+         setIsTimerRunning(false);
+      }
+   }, [selectedMode, currentView, gameState.isLevelComplete, showLevelComplete]);
 
   // Reset timer when starting a new game
   React.useEffect(() => {
@@ -1866,6 +1864,59 @@ export default function SolitaireEngine({
       toggleEffect(effect.id, true);
   };
 
+  const handleShadowRealmClick = () => {
+     const shadowPile = gameState.piles['shadow-realm'];
+     if (!shadowPile || shadowPile.cards.length === 0) return;
+     
+     // Cost to summon: 10 coins
+     const cost = 10;
+     if (gameState.coins >= cost) {
+        const card = shadowPile.cards[shadowPile.cards.length - 1];
+        const newShadowCards = shadowPile.cards.slice(0, -1);
+        const hand = gameState.piles['hand'];
+        const newHandCards = [...hand.cards, card];
+        
+        setGameState(prev => ({
+           ...prev,
+           coins: prev.coins - cost,
+           piles: {
+              ...prev.piles,
+              'shadow-realm': { ...shadowPile, cards: newShadowCards },
+              hand: { ...hand, cards: newHandCards }
+           }
+        }));
+     }
+  };
+
+  const spendMomentum = (type: 'wild' | 'unlock' | 'pts') => {
+     const current = gameState.effectState?.momentum || 0;
+     if (type === 'wild' && current >= 3) {
+        const wild: Card = { id: `momentum-wild-${Math.random()}`, rank: 0 as Rank, suit: 'special', faceUp: true, meta: { isWild: true } };
+        setGameState(prev => ({
+           ...prev,
+           piles: { ...prev.piles, hand: { ...prev.piles.hand, cards: [...prev.piles.hand.cards, wild] } },
+           effectState: { ...prev.effectState, momentum: current - 3 }
+        }));
+     } else if (type === 'unlock' && current >= 5) {
+        // Unlock random locked tableau
+        const locked = (Object.values(gameState.piles) as any[]).filter(p => p.type === 'tableau' && p.locked);
+        if (locked.length > 0) {
+           const target = locked[Math.floor(Math.random() * locked.length)];
+           setGameState(prev => ({
+              ...prev,
+              piles: { ...prev.piles, [target.id]: { ...(target as any), locked: false } },
+              effectState: { ...prev.effectState, momentum: current - 5 }
+           }));
+        }
+     } else if (type === 'pts' && current >= 1) {
+        setGameState(prev => ({
+           ...prev,
+           score: prev.score + 100,
+           effectState: { ...prev.effectState, momentum: current - 1 }
+        }));
+     }
+  };
+
   const renderCard = (card: Card, index: number, pileId: string, totalCards: number = 0) => {
     let visualCard = { ...card };
     const pile = gameState.piles[pileId]; 
@@ -2004,6 +2055,113 @@ export default function SolitaireEngine({
   
   // ... (Rest of Component - Render Logic - Identical) ...
   // ...
+   // Render a hand card for the compact HUD (inline, not absolutely positioned)
+   const renderHandCardHUD = (card: Card, index: number) => {
+      let visualCard = { ...card };
+      const pile = gameState.piles['hand'];
+      const effects = getEffects();
+      for (const eff of effects) {
+          if (eff.transformCardVisual) {
+               visualCard = { ...visualCard, ...eff.transformCardVisual(card, pile) };
+          }
+      }
+
+      const isSelected = gameState.selectedCardIds?.includes(card.id);
+      const isHintTarget = hintTargets.includes('hand') && index === (pile?.cards?.length || 0) - 1;
+      const ringColor = isSelected || isHintTarget
+         ? selectionColor === 'green'
+             ? 'ring-emerald-400'
+             : selectionColor === 'yellow'
+                  ? 'ring-amber-300'
+                  : selectionColor === 'red'
+                      ? 'ring-rose-400'
+                      : 'ring-rose-400'
+         : '';
+
+      const cardAnimClass = animatingCards.get(card.id)
+         ? `animated-card ${animatingCards.get(card.id)}`
+         : '';
+
+      // Face-down HUD representation
+      if (!visualCard.faceUp) {
+          return (
+               <button
+                   key={`${card.id}-hand-hud-${index}`}
+                   className="w-11 max-w-[44px] h-16 max-h-[64px] rounded border border-slate-700 shadow-md overflow-hidden bg-transparent"
+                   onClick={(e) => { e.stopPropagation(); handleCardClick('hand', index); }}
+                   onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick('hand', index); }}
+                   aria-label={`Face down card ${index + 1}`}>
+                   <img src={`/icons/${settings.cardBack}.png`} alt="Card back" className="w-full h-full object-cover" />
+               </button>
+          );
+      }
+
+      // Key special-case (smaller round icon)
+      if (visualCard.meta?.isKey && visualCard.faceUp) {
+         const charges = visualCard.meta?.charges;
+         const isTricksterKey = visualCard.meta?.isTricksterKey;
+         return (
+             <button
+                  key={`${card.id}-hand-key-${index}`}
+                  type="button"
+                  className={`w-11 max-w-[44px] h-11 bg-transparent select-none flex items-end justify-center ${isSelected ? 'ring-4 ring-yellow-400' : ''} relative`}
+                  onClick={(e) => { e.stopPropagation(); handleCardClick('hand', index); }}
+                  onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick('hand', index); }}
+                  aria-label={isTricksterKey ? `Trickster Key (${charges} charges)` : "Key - Click to select"}
+             >
+                  <img src="/icons/key.png" alt="Key" className="w-8 h-8 drop-shadow-lg" />
+                  {isTricksterKey && charges !== undefined && (
+                     <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-purple-400">
+                        {charges}
+                     </span>
+                  )}
+             </button>
+         );
+      }
+
+      const color = getCardColor(visualCard.suit);
+
+      return (
+         <button
+               key={`${card.id}-hand-${index}`}
+               type="button"
+               className={`w-11 max-w-[44px] h-16 max-h-[64px] bg-transparent perspective-1000 select-none transition-transform hover:scale-105 hover:brightness-110 cursor-pointer ${cardAnimClass}`}
+               onClick={(e) => { e.stopPropagation(); handleCardClick('hand', index); }}
+               onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick('hand', index); }}
+               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); handleDoubleClick('hand', index); } }}
+               aria-label={`${getRankDisplay(visualCard.rank)} ${visualCard.suit} card`}
+         >
+            <div className={`relative w-full h-full transform-style-3d ${settings.cardAnimations ? 'duration-500 transition-transform' : ''} ${visualCard.faceUp ? 'rotate-y-0' : 'rotate-y-180'}`}>
+               <div className={`absolute inset-0 backface-hidden bg-white rounded shadow-md flex flex-col items-center justify-between p-0.5 border border-gray-300 ${ringColor ? `ring-2 ${ringColor}` : ''}`} style={{ opacity: visualCard.meta?.disabled ? 0.5 : 1, filter: visualCard.meta?.hiddenDimension ? 'grayscale(100%) blur(2px)' : 'none' }}>
+                  {visualCard.meta?.isBlessing ? (
+                           <div className="flex flex-col items-center justify-center h-full text-center bg-gradient-to-b from-purple-100 to-purple-200 rounded">
+                                    <ResponsiveIcon name={visualCard.meta.effectId || visualCard.meta.name || ''} fallbackType="blessing" size={24} className="mb-0.5" />
+                                    <div className="text-[8px] font-bold leading-tight text-purple-800 px-0.5">{visualCard.meta.name}</div>
+                           </div>
+                  ) : visualCard.meta?.isWild ? (
+                           <div className="relative h-full w-full rounded overflow-hidden">
+                                    <img src="/icons/cleverdisguise.png" alt="Wild" className="absolute inset-0 w-full h-full object-cover" />
+                                    <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-[6px] font-bold text-white text-center py-0.5">WILD</div>
+                           </div>
+                  ) : (
+                           <>
+                                  <div className={`w-full flex justify-between font-bold text-[10px] leading-none ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}><span>{getRankDisplay(visualCard.rank)}</span></div>
+                                  <div className={`text-sm md:text-2xl ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}>{visualCard.suit === 'hearts' ? '♥' : visualCard.suit === 'diamonds' ? '♦' : visualCard.suit === 'clubs' ? '♣' : '♠'}</div>
+                                  <div className={`w-full flex justify-between font-bold text-[10px] leading-none rotate-180 ${color === 'red' ? 'text-red-600' : 'text-slate-800'}`}><span>{getRankDisplay(visualCard.rank)}</span></div>
+                           </>
+                  )}
+                  {visualCard.meta?.showLock && <div className="absolute top-0 right-0 text-red-500"><Lock size={10} /></div>}
+                  {visualCard.meta?.showKey && <div className="absolute top-0 left-0 text-yellow-500"><Key size={10} /></div>}
+                  {visualCard.meta?.showWild && <div className="absolute top-0 left-0 text-fuchsia-500"><Smile size={10} /></div>}
+                  {visualCard.meta?.showFake && <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none"><Skull size={24} className="text-red-900" /></div>}
+               </div>
+               <div className="absolute inset-0 backface-hidden rotate-y-180 rounded border border-slate-700 shadow-md overflow-hidden">
+                     <img src={`/icons/${settings.cardBack}.png`} alt="Card back" className="w-full h-full object-cover" />
+               </div>
+            </div>
+         </button>
+      );
+   };
    const foundationPiles = (Object.values(gameState.piles) as Pile[]).filter(p => p.type === 'foundation').sort((a, b) => a.id.localeCompare(b.id));
    const tableauPiles = (Object.values(gameState.piles) as Pile[]).filter(p => p.type === 'tableau').sort((a, b) => {
       // Sort tableau piles: regular tableau (0-6) first, then babel piles (0-3)
@@ -3532,15 +3690,6 @@ export default function SolitaireEngine({
       )}
 
       <div className="fixed bottom-0 left-0 w-full z-50 flex flex-col justify-end pointer-events-none">
-         {/* Hand cards - positioned relative to bottom panel */}
-         <div className="w-full flex justify-center pointer-events-none">
-             <div className="relative w-full max-w-md h-0">
-                 <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-0 pointer-events-auto">
-                    {gameState.piles.hand.cards.map((c, i) => renderCard(c, i, 'hand', gameState.piles.hand.cards.length))}
-                 </div>
-             </div>
-         </div>
-         
          {/* Bottom control bar - always at bottom, with drawer expanding up from its top */}
          <div className={`bg-slate-900 border-t border-slate-800 p-2 w-full max-w-md mx-auto relative pointer-events-auto overflow-visible`}>
             {/* Drawer Content - positioned absolutely above the bottom bar, grows up until screen top then scrolls */}
@@ -3579,7 +3728,15 @@ export default function SolitaireEngine({
                               <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('resign')}><img src="/icons/resign.png" alt="" className="w-8 h-8" /></button>
                               <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('feedback')}><img src="/icons/feedback.png" alt="" className="w-8 h-8" /></button>
                               <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('test')}><FlaskConical size={32} /></button>
-                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><img src="/icons/settings.png" alt="" className="w-8 h-8" /></button>                           </div>
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><img src="/icons/settings.png" alt="" className="w-8 h-8" /></button>
+                           </div>
+                        ) : activeDrawer === 'inventory' ? (
+                           <div className="grid grid-cols-4 gap-1">
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('exploit')} aria-label="Exploits"><ResponsiveIcon name="exploit" fallbackType="exploit" size={32} className="w-8 h-8" /></button>
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('blessing')} aria-label="Blessings"><ResponsiveIcon name="blessing" fallbackType="blessing" size={32} className="w-8 h-8" /></button>
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('patterns')} aria-label="Patterns"><ResponsiveIcon name="pattern_scoring" fallbackType="exploit" size={32} className="w-8 h-8" /></button>
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')} aria-label="Options"><img src="/icons/settings.png" alt="" className="w-8 h-8" /></button>
+                           </div>
                         ) : activeDrawer === 'shop' ? (
                            <div className="flex flex-col gap-2">
                               <div className="grid grid-cols-1 gap-2">
@@ -3994,8 +4151,35 @@ export default function SolitaireEngine({
             {/* Bottom Bar - Different for Classic vs Coronata modes */}
             {!CLASSIC_GAMES[selectedMode] ? (
                <>
-                  {/* Coronata Mode - Run Progress Bar */}
-                  <div className="flex justify-between px-1 mb-2 gap-0.5 relative group">
+                  {/* Coronata Mode - Compact HUD: left menu card, centered hand (rendered above), right discard card */}
+                  <div className="flex w-full items-end justify-between gap-2">
+                     {/* Left card-shaped menu button (Bag of Holding icon) */}
+                     <div className="relative">
+                        <button onClick={() => { setActiveDrawer('inventory'); }} className={`relative w-11 max-w-[44px] h-16 max-h-[64px] rounded border border-slate-700 shadow-md overflow-hidden bg-slate-800 flex items-center justify-center pointer-events-auto`} aria-label="Inventory">
+                           <img src="/icons/bagofholding.png" alt="Bag of Holding" className="w-7 h-7" />
+                        </button>
+                     </div>
+
+                     {/* Center: player's hand icons (card-sized icons between left/right buttons) */}
+                     <div className="flex-1 flex items-end justify-center pointer-events-none">
+                        <div className="flex items-center gap-2 pointer-events-auto">
+                           {gameState.piles.hand.cards.map((c, i) => renderHandCardHUD(c, i))}
+                        </div>
+                     </div>
+
+                     {/* Right card-shaped discard/draw button (no card back) */}
+                     <div>
+                        <button type="button" onClick={() => discardAndDrawHand()} aria-label="Discard/Draw" className="relative w-11 max-w-[44px] h-16 max-h-[64px] rounded border border-blue-700 shadow-md overflow-hidden bg-blue-900 flex items-center justify-center pointer-events-auto hover:brightness-110">
+                           <img src="/icons/foundation.png" alt="Discard" className="w-6 h-6 opacity-90" />
+                           {gameState.piles.deck.cards.length > 0 && (
+                              <span className="absolute -top-1 -right-1 bg-slate-700 text-[10px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
+                           )}
+                        </button>
+                     </div>
+                  </div>
+
+                  {/* Coronata Mode - Run Progress Bar (between player hand & score bar) */}
+                  <div className="flex justify-between px-1 my-2 gap-0.5 relative group">
                      {runPlan.map((enc, i) => {
                         const eff = effectsRegistry.find(e => e.id === enc.effectId);
                         const isCompleted = i < gameState.runIndex;
@@ -4018,136 +4202,13 @@ export default function SolitaireEngine({
                      })}
                   </div>
 
-                  {/* Coronata Mode - Score Bar */}
-                  <div className="flex items-center gap-2 mb-2">
+                  {/* Coronata Mode - Score Bar (below player hand) */}
+                  <div className="flex items-center gap-2 mt-0 mb-2">
                      <div className="flex-1">
                         <div className="w-full bg-slate-800 h-5 rounded-full overflow-hidden border border-slate-700 relative flex items-center justify-center px-1">
                            <div className="absolute inset-0 bg-emerald-500 h-full transition-all duration-500" style={{ width: `${Math.min(100, (gameState.score / gameState.currentScoreGoal) * 100)}%` }} />
                            <span className="relative z-10 text-[9px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{gameState.score} / {gameState.currentScoreGoal}</span>
                         </div>
-                     </div>
-                  </div>
-
-                  {/* Coronata Mode - Compact HUD: left menu card, centered hand (rendered above), right discard card */}
-                  <div className="flex w-full items-end justify-between gap-2">
-                     {/* Left card-shaped menu button */}
-                     <div className="relative">
-                        <button onClick={() => { setLeftMenuOpen(prev => !prev); if (!leftMenuOpen) setLeftSubMenu(null); setOptionsSubMenu(null); }} className={`relative w-11 max-w-[44px] h-16 max-h-[64px] rounded border border-slate-700 shadow-md overflow-hidden bg-transparent pointer-events-auto`} aria-label="Menu">
-                           <img src={`/icons/${settings.cardBack}.png`} alt="Menu card" className="w-full h-full object-cover" />
-                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                              <img src={categoryIcons['exploit']} alt="exploit" className="w-6 h-6 opacity-90" />
-                           </div>
-                        </button>
-
-                        {/* Floating mini buttons (icons) above the card */}
-                        {leftMenuOpen && (
-                           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 flex items-center gap-2 pointer-events-auto z-50">
-                              <button onClick={() => setLeftSubMenu(leftSubMenu === 'exploits' ? null : 'exploits')} className={`w-9 h-9 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center text-white`} aria-label="Exploits">
-                                 <ResponsiveIcon name="exploit" fallbackType="exploit" size={18} className="w-5 h-5" />
-                              </button>
-                              <button onClick={() => setLeftSubMenu(leftSubMenu === 'blessings' ? null : 'blessings')} className={`w-9 h-9 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center text-white`} aria-label="Blessings">
-                                 <ResponsiveIcon name="blessing" fallbackType="blessing" size={18} className="w-5 h-5" />
-                              </button>
-                              <button onClick={() => setLeftSubMenu(leftSubMenu === 'patterns' ? null : 'patterns')} className={`w-9 h-9 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center text-white`} aria-label="Patterns">
-                                 <ResponsiveIcon name="pattern_scoring" fallbackType="exploit" size={18} className="w-5 h-5" />
-                              </button>
-                              <button onClick={() => setLeftSubMenu(leftSubMenu === 'options' ? null : 'options')} className={`w-9 h-9 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center text-white`} aria-label="Options">
-                                 <ResponsiveIcon name="settings" fallbackType="exploit" size={18} className="w-5 h-5" />
-                              </button>
-                           </div>
-                        )}
-
-                        {/* Expanded panel showing lists / options */}
-                        {leftMenuOpen && leftSubMenu && (
-                           <div className="absolute bottom-full left-0 mb-2 w-72 bg-slate-800 border border-slate-700 rounded p-2 z-50 shadow-lg pointer-events-auto">
-                              <div className="max-h-48 overflow-y-auto text-sm">
-                                 {/* Exploits list */}
-                                 {leftSubMenu === 'exploits' && (() => {
-                                    const ownedExploits = effectsRegistry.filter(e => (['exploit','epic','legendary','rare','uncommon'].includes(e.type)) && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll));
-                                    if (ownedExploits.length === 0) return <div className="text-xs text-slate-400">No exploits owned.</div>;
-                                    return ownedExploits.map(e => (
-                                       <div key={e.id} className="flex items-start gap-2 p-2 rounded hover:bg-slate-700/50">
-                                          <ResponsiveIcon name={e.id || e.name} fallbackType="exploit" size={28} className="w-7 h-7" />
-                                          <div className="flex-1">
-                                             <div className="font-bold text-xs truncate">{e.name}</div>
-                                             <div className="text-[11px] text-slate-400">{e.description}</div>
-                                          </div>
-                                          <button onClick={() => toggleEffect(e.id)} className={`text-xs px-2 py-1 rounded ${activeEffects.includes(e.id) ? 'bg-green-600' : 'bg-blue-600'}`}>{activeEffects.includes(e.id) ? 'On' : 'Use'}</button>
-                                       </div>
-                                    ));
-                                 })()}
-
-                                 {/* Blessings list */}
-                                 {leftSubMenu === 'blessings' && (() => {
-                                    const ownedBlessings = effectsRegistry.filter(e => e.type === 'blessing' && (gameState.ownedEffects.includes(e.id) || gameState.debugUnlockAll));
-                                    if (ownedBlessings.length === 0) return <div className="text-xs text-slate-400">No blessings owned.</div>;
-                                    return ownedBlessings.map(e => (
-                                       <div key={e.id} className="flex items-start gap-2 p-2 rounded hover:bg-slate-700/50">
-                                          <ResponsiveIcon name={e.id || e.name} fallbackType="blessing" size={28} className="w-7 h-7" />
-                                          <div className="flex-1">
-                                             <div className="font-bold text-xs truncate">{e.name}</div>
-                                             <div className="text-[11px] text-slate-400">{e.description}</div>
-                                          </div>
-                                          <button onClick={() => toggleEffect(e.id, true)} className={`text-xs px-2 py-1 rounded ${activeEffects.includes(e.id) ? 'bg-green-600' : 'bg-blue-600'}`}>{activeEffects.includes(e.id) ? 'Active' : 'Activate'}</button>
-                                       </div>
-                                    ));
-                                 })()}
-
-                                 {/* Patterns list */}
-                                 {leftSubMenu === 'patterns' && (() => {
-                                    if (!PATTERN_DEFINITIONS || PATTERN_DEFINITIONS.length === 0) return <div className="text-xs text-slate-400">No patterns defined.</div>;
-                                    return PATTERN_DEFINITIONS.map(p => (
-                                       <div key={p.id} className="flex items-start gap-2 p-2 rounded hover:bg-slate-700/50">
-                                          <div className="w-7 h-7 bg-slate-700 rounded flex items-center justify-center text-[12px]">🔷</div>
-                                          <div className="flex-1">
-                                             <div className="font-bold text-xs truncate">{p.name}</div>
-                                             <div className="text-[11px] text-slate-400">{p.description}</div>
-                                          </div>
-                                       </div>
-                                    ));
-                                 })()}
-
-                                 {/* Options */}
-                                 {leftSubMenu === 'options' && (
-                                    <div className="space-y-2">
-                                       {!optionsSubMenu && (
-                                          <>
-                                             <button onClick={() => { localStorage.setItem('coronata_quick_save', JSON.stringify(gameState)); alert('Game saved'); }} className="w-full text-left p-2 rounded bg-slate-700 text-xs">Save</button>
-                                             <button onClick={() => setActiveDrawer('resign')} className="w-full text-left p-2 rounded bg-slate-700 text-xs">Quit</button>
-                                             <button onClick={() => setActiveDrawer('test')} className="w-full text-left p-2 rounded bg-slate-700 text-xs">Testing</button>
-                                             <button onClick={() => setActiveDrawer('feedback')} className="w-full text-left p-2 rounded bg-slate-700 text-xs">Feedback</button>
-                                             <button onClick={() => setOptionsSubMenu('settings')} className="w-full text-left p-2 rounded bg-slate-700 text-xs">Settings</button>
-                                          </>
-                                       )}
-
-                                       {optionsSubMenu === 'settings' && (
-                                          <div className="space-y-2">
-                                             <div className="flex items-center justify-between"><span className="text-xs">Sound Effects</span><button onClick={() => setSettings(s => ({...s, sfxEnabled: !s.sfxEnabled}))} className={`w-10 h-5 ${settings.sfxEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full ${settings.sfxEnabled ? 'right-0.5' : 'left-0.5'}`}></div></button></div>
-                                             <div className="flex items-center justify-between"><span className="text-xs">Music</span><button onClick={() => setSettings(s => ({...s, musicEnabled: !s.musicEnabled}))} className={`w-10 h-5 ${settings.musicEnabled ? 'bg-emerald-600' : 'bg-slate-600'} rounded-full relative`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full ${settings.musicEnabled ? 'right-0.5' : 'left-0.5'}`}></div></button></div>
-                                             <div className="flex items-center justify-between"><span className="text-xs">Theme</span><button onClick={() => setSettings(s => ({...s, theme: s.theme === 'dark' ? 'light' : 'dark'}))} className={`w-20 h-6 ${settings.theme === 'dark' ? 'bg-slate-700' : 'bg-amber-400'} rounded-full text-xs`}>{settings.theme === 'dark' ? 'Dark' : 'Light'}</button></div>
-                                          </div>
-                                       )}
-                                    </div>
-                                 )}
-                              </div>
-                           </div>
-                        )}
-                     </div>
-
-                     {/* Spacer - center hand is rendered above and positioned absolute; keep spacer to center left/right cards */}
-                     <div className="flex-1" />
-
-                     {/* Right card-shaped discard/draw button */}
-                     <div>
-                        <button type="button" onClick={() => discardAndDrawHand()} aria-label="Discard/Draw" className="relative w-11 max-w-[44px] h-16 max-h-[64px] rounded border border-blue-700 shadow-md overflow-hidden bg-blue-900 flex items-center justify-center pointer-events-auto hover:brightness-110">
-                           <img src={`/icons/${settings.cardBack}.png`} alt="Discard card" className="w-full h-full object-cover" />
-                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                              <img src="/icons/foundation.png" alt="Discard" className="w-6 h-6 opacity-90" />
-                           </div>
-                           {gameState.piles.deck.cards.length > 0 && (
-                              <span className="absolute -top-1 -right-1 bg-slate-700 text-[10px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
-                           )}
-                        </button>
                      </div>
                   </div>
                </>
