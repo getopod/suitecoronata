@@ -16,6 +16,10 @@ export interface BaseCardMeta {
   isFake?: boolean;
   isQuestItem?: boolean;
 
+  // Wild card lock-in (when wild card is played, it locks to target)
+  lockedRank?: Rank;
+  lockedSuit?: Suit;
+
   // Crown special (Mad King effect)
   crown?: boolean;
   virtualRanks?: Rank[];

@@ -1,6 +1,6 @@
 import { PATTERN_DEFINITIONS } from './engine/definitions/patterns';
 import React, { useState, useCallback, useEffect } from 'react';
-import { LayoutGrid, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, HelpCircle, RefreshCw, X, Gift, Trophy, ArrowLeftRight, SkipBack, SkipForward, MessageSquare, FlaskConical, Save, Flag, Settings, ChevronDown, Pause, ShoppingCart, User, Unlock, Map as MapIcon, BarChart3, Link as LinkIcon, Bug, Clock, Menu } from 'lucide-react';
+import { LayoutGrid, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, HelpCircle, RefreshCw, X, Gift, Trophy, ArrowLeftRight, SkipBack, SkipForward, MessageSquare, FlaskConical, Save, Flag, Settings, ChevronDown, Pause, ShoppingCart, User, Unlock, Map as MapIcon, BarChart3, Link as LinkIcon, Bug, Clock, Menu, Target, PlusCircle, Wand2, Ghost } from 'lucide-react';
 import { Card, GameState, Pile, Rank, Suit, MoveContext, Encounter, GameEffect, Wander, WanderChoice, WanderState, MinigameResult, PlayerStats, RunHistoryEntry, RunEncounterRecord } from './types';
 import { getCardColor, generateNewBoard, EFFECTS_REGISTRY, setEffectsRng, resetEffectsRng } from './data/effects';
 import { isHighestRank, isNextHigherInOrder, isNextLowerInOrder } from './utils/rankOrder';
@@ -96,24 +96,35 @@ const initialGameState = (mode: string = 'coronata'): GameState => {
   return generateNewBoard(0, 150, 1, 1, false, false, mode);
 };
 
+// Helper to get effective rank/suit (uses locked values if present)
+const getEffectiveRank = (card: Card): Rank => card.meta?.lockedRank ?? card.rank;
+const getEffectiveSuit = (card: Card): Suit => card.meta?.lockedSuit ?? card.suit;
+
 const isStandardMoveValid = (movingCards: Card[], targetPile: Pile, patriarchyMode: boolean = false): boolean => {
   if (movingCards.length === 0) return false;
   const leader = movingCards[0];
+  const leaderRank = getEffectiveRank(leader);
+  const leaderSuit = getEffectiveSuit(leader);
   const targetTop = targetPile.cards[targetPile.cards.length - 1];
+
   if (targetPile.type === 'tableau') {
     // Queen is high by default (stack rank 13), Kings high if patriarchy mode
-    if (!targetTop) return getStackRank(leader.rank, patriarchyMode) === 13;
+    if (!targetTop) return getStackRank(leaderRank, patriarchyMode) === 13;
+    const targetRank = getEffectiveRank(targetTop);
+    const targetSuit = getEffectiveSuit(targetTop);
     // Opposite color and target's stack rank must be one higher than leader's
-    return (getCardColor(leader.suit) !== getCardColor(targetTop.suit) && getStackRank(targetTop.rank, patriarchyMode) === getStackRank(leader.rank, patriarchyMode) + 1);
+    return (getCardColor(leaderSuit) !== getCardColor(targetSuit) && getStackRank(targetRank, patriarchyMode) === getStackRank(leaderRank, patriarchyMode) + 1);
   }
   if (targetPile.type === 'foundation') {
     if (movingCards.length > 1) return false;
     if (!targetTop) {
       // Aces can only go to their matching suit foundation
-      return leader.rank === 1 && targetPile.id === `foundation-${leader.suit}`;
+      return leaderRank === 1 && targetPile.id === `foundation-${leaderSuit}`;
     }
+    const targetRank = getEffectiveRank(targetTop);
+    const targetSuit = getEffectiveSuit(targetTop);
     // Must match suit of foundation's first card and be next rank (foundation uses normal rank order A,2,3...K)
-    return leader.suit === targetTop.suit && leader.rank === targetTop.rank + 1;
+    return leaderSuit === targetSuit && leaderRank === targetRank + 1;
   }
   return false;
 };
@@ -323,6 +334,10 @@ export default function SolitaireEngine({
    const [shopTab, setShopTab] = useState<'buy' | 'sell' | 'continue'>('buy');
    // Whether blessing select is shown before starting an encounter
    const [preEncounterBlessing, setPreEncounterBlessing] = useState(false);
+
+   // Game mode selector state
+   const [expandedModes, setExpandedModes] = useState<Set<string>>(new Set());
+   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
    // Reset any non-closable lock when the drawer is closed by other means
    React.useEffect(() => {
@@ -977,8 +992,13 @@ export default function SolitaireEngine({
      }
   };
 
-  const startRun = () => {
-    if (selectedMode === 'coronata') {
+  const startRun = (modeOverride?: string) => {
+    const mode = modeOverride || selectedMode;
+    // Ensure selectedMode state is updated if override is provided
+    if (modeOverride && modeOverride !== selectedMode) {
+      setSelectedMode(modeOverride);
+    }
+    if (mode === 'coronata') {
       // support seeded plan generation if a seed is set in localStorage
       const rawSeed = (() => { try { return localStorage.getItem('solitaire_seed_v1'); } catch { return null; } })();
       const seedNum = rawSeed ? Number(rawSeed) : null;
@@ -989,7 +1009,7 @@ export default function SolitaireEngine({
 
       const plan = generateRunPlan(effectsRegistry, rng);
       const firstEncounter = plan[0];
-      let freshState = initialGameState(selectedMode);
+      let freshState = initialGameState(mode);
       if (firstEncounter) freshState.currentScoreGoal = firstEncounter.goal;
 
       // Apply first encounter onActivate if present (mirror geminicoronata behavior)
@@ -1049,7 +1069,7 @@ export default function SolitaireEngine({
       setNonClosableDrawer('blessing_select');
     } else {
       // Classic mode
-      const freshState = initialGameState(selectedMode);
+      const freshState = initialGameState(mode);
       setGameState(freshState);
       setCurrentView('game');
       setActiveEffects([]);
@@ -1635,11 +1655,42 @@ export default function SolitaireEngine({
     const newSourceCards = sourcePile.cards.filter(c => !cardIds.includes(c.id) || (c.meta?.charges && c.meta.charges > 0));
     // Auto-flip top card when exposed (standard solitaire behavior)
     if (sourcePile.type === 'tableau' && newSourceCards.length > 0) { const newTop = newSourceCards[newSourceCards.length - 1]; if (!newTop.faceUp) newSourceCards[newSourceCards.length - 1] = { ...newTop, faceUp: true }; }
-    const newTargetCards = [...targetPile.cards, ...movingCards];
+
+    // Lock wild cards to the card they're played on
+    const lockedMovingCards = movingCards.map((card: Card) => {
+      if (card.meta?.isWild && !card.meta?.lockedRank && !card.meta?.lockedSuit) {
+        // Determine what card the wild is being played on
+        let lockToCard = null;
+        if (targetPile.cards.length > 0) {
+          // Lock to top card of target pile
+          lockToCard = targetPile.cards[targetPile.cards.length - 1];
+        } else if (targetPile.type === 'foundation') {
+          // On empty foundation, lock to Ace
+          lockToCard = { rank: 1 as Rank, suit: targetPile.meta?.requiredSuit || 'hearts' };
+        } else if (targetPile.type === 'tableau') {
+          // On empty tableau, lock to King
+          lockToCard = { rank: 13 as Rank, suit: card.suit };
+        }
+
+        if (lockToCard) {
+          return {
+            ...card,
+            meta: {
+              ...card.meta,
+              lockedRank: lockToCard.rank,
+              lockedSuit: lockToCard.suit
+            }
+          };
+        }
+      }
+      return card;
+    });
+
+    const newTargetCards = [...targetPile.cards, ...lockedMovingCards];
     const newPiles = { ...gameState.piles, [sourcePileId]: { ...sourcePile, cards: newSourceCards }, [finalTargetPileId]: { ...targetPile, cards: newTargetCards } };
 
     let scoreDelta = 0;
-    const card = movingCards[0];
+    const card = lockedMovingCards[0];
     const scoredTableau = gameState.effectState?.scoredTableau || [];
     const scoredFoundation = gameState.effectState?.scoredFoundation || [];
     
@@ -1669,7 +1720,7 @@ export default function SolitaireEngine({
     effects.forEach(eff => {
        if (eff.onMoveComplete) {
           const prevState = { ...nextState };
-          const result = eff.onMoveComplete(nextState, { source: sourcePileId, target: finalTargetPileId, cards: movingCards });
+          const result = eff.onMoveComplete(nextState, { source: sourcePileId, target: finalTargetPileId, cards: lockedMovingCards });
           if (result.triggerMinigame) minigameTrigger = result.triggerMinigame;
           nextState = { ...nextState, ...result };
 
@@ -1697,7 +1748,7 @@ export default function SolitaireEngine({
     const animClass = sourcePileId === 'hand' ? 'anim-hand-to-pile' :
                       targetPile.type === 'foundation' ? 'anim-to-foundation' :
                       'anim-move-stack';
-    triggerCardAnimation(movingCards.map(c => c.id), animClass);
+    triggerCardAnimation(lockedMovingCards.map(c => c.id), animClass);
 
     // Show floating score/coin indicators
     if (scoreDelta > 0 || coinDelta > 0 || multiplier > 1) {
@@ -2067,6 +2118,18 @@ export default function SolitaireEngine({
                    ) : visualCard.meta?.isWild ? (
                          <div className="relative h-full w-full rounded overflow-hidden">
                                <img src="/icons/charlatan.png" alt="Wild" className="absolute inset-0 w-full h-full object-cover" />
+                               {visualCard.meta?.lockedRank && visualCard.meta?.lockedSuit && (
+                                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                   <div className="text-center">
+                                     <div className={`text-xl font-bold ${visualCard.meta.lockedSuit === 'hearts' || visualCard.meta.lockedSuit === 'diamonds' ? 'text-red-500' : 'text-white'}`}>
+                                       {getRankDisplay(visualCard.meta.lockedRank)}
+                                     </div>
+                                     <div className={`text-2xl ${visualCard.meta.lockedSuit === 'hearts' || visualCard.meta.lockedSuit === 'diamonds' ? 'text-red-500' : 'text-white'}`}>
+                                       {visualCard.meta.lockedSuit === 'hearts' ? '♥' : visualCard.meta.lockedSuit === 'diamonds' ? '♦' : visualCard.meta.lockedSuit === 'clubs' ? '♣' : '♠'}
+                                     </div>
+                                   </div>
+                                 </div>
+                               )}
                          </div>
                    ) : (
                          <>
@@ -2180,6 +2243,18 @@ export default function SolitaireEngine({
                   ) : visualCard.meta?.isWild ? (
                            <div className="relative h-full w-full rounded overflow-hidden">
                                     <img src="/icons/charlatan.png" alt="Wild" className="absolute inset-0 w-full h-full object-cover" />
+                                    {visualCard.meta?.lockedRank && visualCard.meta?.lockedSuit && (
+                                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                        <div className="text-center">
+                                          <div className={`text-2xl md:text-3xl font-bold ${visualCard.meta.lockedSuit === 'hearts' || visualCard.meta.lockedSuit === 'diamonds' ? 'text-red-500' : 'text-white'}`}>
+                                            {getRankDisplay(visualCard.meta.lockedRank)}
+                                          </div>
+                                          <div className={`text-3xl md:text-5xl ${visualCard.meta.lockedSuit === 'hearts' || visualCard.meta.lockedSuit === 'diamonds' ? 'text-red-500' : 'text-white'}`}>
+                                            {visualCard.meta.lockedSuit === 'hearts' ? '♥' : visualCard.meta.lockedSuit === 'diamonds' ? '♦' : visualCard.meta.lockedSuit === 'clubs' ? '♣' : '♠'}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
                            </div>
                   ) : (
                            <>
@@ -2216,7 +2291,6 @@ export default function SolitaireEngine({
    const tableauCount = tableauPiles.length;
    const visibleTableauCount = tableauPiles.filter(p => !p.hidden).length;
    const foundationCount = foundationPiles.length + (gameState.piles['shadow-realm'] ? 1 : 0);
-   const maxItems = Math.max(tableauCount, foundationCount);
 
    // Improved zoom logic for classic/coronata modes
    let zoomScale = 1;
@@ -2229,13 +2303,23 @@ export default function SolitaireEngine({
       const requiredWidth = (tableauCount * cardWidth) + ((tableauCount - 1) * gap) + (margin * 2);
       zoomScale = Math.min(1, (screenWidth - 4) / requiredWidth);
    } else {
-      // Coronata mode: fit maxItems with 2px gaps and 2px margins
+      // Coronata mode: maintain consistent spacing, zoom out for extra tableaus
+      const BASE_TABLEAU_COUNT = 7;
       const cardWidth = 50;
       const gap = 2;
       const margin = 2;
       const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 360;
-      const requiredWidth = (maxItems * cardWidth) + ((maxItems - 1) * gap) + (margin * 2);
-      zoomScale = Math.min(1, (screenWidth - 4) / requiredWidth);
+
+      // Use base count for width calculation to maintain consistent spacing
+      const baseRequiredWidth = (Math.max(BASE_TABLEAU_COUNT, foundationCount) * cardWidth) + ((Math.max(BASE_TABLEAU_COUNT, foundationCount) - 1) * gap) + (margin * 2);
+
+      // Apply base responsive zoom
+      let baseZoom = Math.min(1, (screenWidth - 4) / baseRequiredWidth);
+
+      // Apply additional zoom if tableau count exceeds base
+      const tableauZoom = tableauCount > BASE_TABLEAU_COUNT ? BASE_TABLEAU_COUNT / tableauCount : 1;
+
+      zoomScale = baseZoom * tableauZoom;
    }
    const maxWidth = 'auto';
 
@@ -2309,56 +2393,157 @@ export default function SolitaireEngine({
          <button onClick={() => setShowSettings(true)} className="flex items-center justify-center"><img src="/icons/settings.png" alt="Settings" className="w-20 h-20" /></button>
       </div>
 
-           {/* MODES PANEL */}
-           {showModes && (
+           {/* MODES PANEL - Enhanced accordion style */}
+           {showModes && (() => {
+              const toggleMode = (id: string) => {
+                 if (expandedModes.has(id)) {
+                    // Collapse this mode
+                    setExpandedModes(new Set());
+                    setExpandedSections(prev => new Set(Array.from(prev).filter(s => !s.startsWith(`${id}-`))));
+                 } else {
+                    // Expand only this mode, collapse all others
+                    setExpandedModes(new Set([id]));
+                    setExpandedSections(new Set());
+                 }
+              };
+
+              const toggleSection = (id: string) => {
+                 const newExpanded = new Set(expandedSections);
+                 if (newExpanded.has(id)) newExpanded.delete(id);
+                 else newExpanded.add(id);
+                 setExpandedSections(newExpanded);
+              };
+
+              const renderDifficulty = (id: string) => {
+                 const difficulties: Record<string, number> = {
+                    'coronata': 5,
+                    'spider4': 5, 'fortythieves': 4, 'cruel': 4, 'scorpion': 4,
+                    'spider2': 3, 'yukon': 3, 'russian': 3,
+                    'klondike3': 2, 'freecell': 2, 'seahaven': 2,
+                    'klondike': 1, 'spider1': 1
+                 };
+                 const stars = difficulties[id] || 2;
+                 return '⭐'.repeat(stars);
+              };
+
+              return (
               <div className="fixed inset-0 bg-slate-900 z-50 p-4 flex flex-col animate-in slide-in-from-bottom-10">
                  <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
-                    <h2 className="text-2xl font-bold">Game Modes</h2>
+                    <h2 className="text-2xl font-bold">Select Game Mode</h2>
                     <button onClick={() => setShowModes(false)}><X /></button>
                  </div>
-                 <div className="flex-1 overflow-y-auto space-y-3">
-                    {gameModes.map(mode => (
-                       <div 
-                          key={mode.id}
-                          onClick={() => mode.unlocked && setSelectedMode(mode.id)}
-                          className={`w-full p-4 rounded-xl border text-left transition-all cursor-pointer ${
-                             selectedMode === mode.id 
-                             ? 'bg-purple-900/50 border-purple-500 ring- ring-purple-400' 
-                             : mode.unlocked 
-                                   ? 'bg-slate-800 border-slate-700 hover:border-slate-500' 
-                                   : 'bg-slate-800/50 border-slate-700/50 opacity-50 cursor-not-allowed pointer-events-none'
-                          }`}>
-                          <div className="flex items-center gap-3">
-                             <div className="flex-1">
-                                <div className="font-bold text-white flex items-center gap-2">
-                                   {mode.name}
-                                   {!mode.unlocked && <Lock size={10} className="text-slate-500" />}
-                                   {selectedMode === mode.id}
+                 <div className="flex-1 overflow-y-auto space-y-2">
+                    {gameModes.map(mode => {
+                       const isExpanded = expandedModes.has(mode.id);
+                       return (
+                          <div key={mode.id} className="bg-slate-800/50 rounded-lg border border-slate-700">
+                             <button
+                                onClick={() => toggleMode(mode.id)}
+                                className="w-full p-3 flex items-center justify-between hover:bg-slate-700/50 transition-colors rounded-lg"
+                             >
+                                <div className="flex items-center gap-3 flex-1">
+                                   <div className={`w-2 h-2 rounded-full ${selectedMode === mode.id ? 'bg-purple-500' : 'bg-transparent'}`} />
+                                   <div className="flex-1 text-left">
+                                      <div className="font-bold text-white flex items-center gap-2">
+                                         {mode.name}
+                                         {!mode.unlocked && <Lock size={12} className="text-slate-500" />}
+                                      </div>
+                                      <div className="text-xs text-slate-400">{renderDifficulty(mode.id)}</div>
+                                   </div>
                                 </div>
-                                <div className="text-sm text-slate-400">{mode.desc}</div>
-                             </div>
+                                <div className="text-slate-400">{isExpanded ? '▼' : '▶'}</div>
+                             </button>
 
+                             {isExpanded && (
+                                <div className="px-3 pb-3 space-y-2">
+                                   <div className="border-l-2 border-purple-500/30 pl-3">
+                                      <button
+                                         onClick={() => toggleSection(`${mode.id}-objective`)}
+                                         className="w-full flex items-center justify-between text-sm font-medium text-slate-300 hover:text-white py-1"
+                                      >
+                                         <span>Objective</span>
+                                         <span className="text-xs text-slate-500">
+                                            {expandedSections.has(`${mode.id}-objective`) ? '▼' : '▶'}
+                                         </span>
+                                      </button>
+                                      {expandedSections.has(`${mode.id}-objective`) && (
+                                         <div className="text-sm text-slate-400 mt-1 pl-2">{mode.desc}</div>
+                                      )}
+                                   </div>
+
+                                   <div className="border-l-2 border-purple-500/30 pl-3">
+                                      <button
+                                         onClick={() => toggleSection(`${mode.id}-howto`)}
+                                         className="w-full flex items-center justify-between text-sm font-medium text-slate-300 hover:text-white py-1"
+                                      >
+                                         <span>How to Play</span>
+                                         <span className="text-xs text-slate-500">
+                                            {expandedSections.has(`${mode.id}-howto`) ? '▼' : '▶'}
+                                         </span>
+                                      </button>
+                                      {expandedSections.has(`${mode.id}-howto`) && (
+                                         <div className="text-sm text-slate-400 mt-1 pl-2">
+                                            {mode.id === 'coronata' ? (
+                                               <div className="space-y-1">
+                                                  <p>• Build DOWN on tableaus, alternating colors</p>
+                                                  <p>• Build UP on foundations, same suit</p>
+                                                  <p>• Queens are high (Q→K→J→10...)</p>
+                                                  <p>• Score: tableaus (1x), foundations (2x)</p>
+                                               </div>
+                                            ) : mode.id.startsWith('klondike') ? (
+                                               <div className="space-y-1">
+                                                  <p>• Tableaus: DOWN, alternate colors</p>
+                                                  <p>• Foundations: UP, same suit (A→K)</p>
+                                                  <p>• Only Kings fill empty tableaus</p>
+                                               </div>
+                                            ) : mode.id.startsWith('spider') ? (
+                                               <div className="space-y-1">
+                                                  <p>• Build DOWN on tableaus (any suit)</p>
+                                                  <p>• Complete K→A sequences to remove</p>
+                                                  <p>• Stock deals 1 card to each tableau</p>
+                                               </div>
+                                            ) : mode.id === 'freecell' ? (
+                                               <div className="space-y-1">
+                                                  <p>• Tableaus: DOWN, alternate colors</p>
+                                                  <p>• 4 free cells for temporary storage</p>
+                                                  <p>• Foundations: UP, same suit</p>
+                                               </div>
+                                            ) : (<p>Standard solitaire rules apply</p>)}
+                                         </div>
+                                      )}
+                                   </div>
+
+                                   <button
+                                      onClick={() => {
+                                         setSelectedMode(mode.id);
+                                         setShowModes(false);
+                                         startRun(mode.id);
+                                      }}
+                                      disabled={!mode.unlocked}
+                                      className={`w-full mt-2 py-2 px-4 rounded-lg font-bold text-sm transition-all ${
+                                         'bg-emerald-600 hover:bg-emerald-500 text-white'
+                                      } ${!mode.unlocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                   >
+                                      PLAY
+                                   </button>
+                                </div>
+                             )}
                           </div>
-                       </div>
-                    ))}
-                    {/* Coming Soon */}
+                       );
+                    })}
+
                     <div className="mt-4 p-4 rounded-xl border border-dashed border-slate-600 bg-slate-800/30">
                        <div className="text-center">
-                          <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-slate-700 flex items-center justify-center"><RefreshCw size={18} className="text-slate-500" /></div>
-                          
+                          <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-slate-700 flex items-center justify-center">
+                             <RefreshCw size={18} className="text-slate-500" />
+                          </div>
                           <div className="text-xs text-slate-500 mt-1">More coming soon!</div>
                        </div>
                     </div>
                  </div>
-                 <div className="pt-4 border-t border-slate-700 mt-4">
-                    <button 
-                       onClick={() => { setShowModes(false); startRun(); }} 
-                       className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-lg flex items-center justify-center gap-2">
-                       <Play fill="currentColor" />{gameModes.find(m => m.id === selectedMode)?.name}
-                    </button>
-                 </div>
               </div>
-           )}
+              );
+           })()}
 
            {/* PROFILE PANEL */}
            {showProfile && (
@@ -2962,43 +3147,32 @@ export default function SolitaireEngine({
                              </div>
                              <div className="p-3 bg-slate-700/50 rounded-lg">
                                 <div className="font-medium text-sm mb-1">Feeling Lucky?</div>
-                                   <input 
-                                      type="text" 
-                                      value={settings.cheatCode} 
-                                      onChange={(e) => setSettings(s => ({...s, cheatCode: e.target.value}))} 
+                                <div className="flex gap-2">
+                                   <input
+                                      type="text"
+                                      value={settings.cheatCode}
+                                      onChange={(e) => setSettings(s => ({...s, cheatCode: e.target.value}))}
                                       placeholder=""
                                       className="flex-1 bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm"
                                    />
-                                   <button 
+                                   <button
                                       onClick={() => {
                                          const code = settings.cheatCode.toLowerCase().trim();
-                                         const responses: Record<string, string> = {
-                                            'iddqd': "This isn't DOOM, but nice try.",
-                                            'hesoyam': "GTA doesn't work here either.",
-                                            'konami': "↑↑↓↓←→←→BA... nothing happened.",
-                                            'motherlode': "The Sims called, they want their cheat back.",
-                                            'rosebud': "Seriously? That's ancient.",
-                                            'money': "Wouldn't that be nice.",
-                                            'god': "You wish.",
-                                            'win': "That's not how this works.",
-                                            'help': "No.",
-                                            'please': "Manners won't help you here.",
-                                            '': "You have to actually type something.",
-                                         };
-                                         setCheatResponse(responses[code] || "Nice try, but that's not a real cheat code.");
+                                         setCheatResponse("Nice try, but that's not a real cheat code.");
                                          setSettings(s => ({...s, cheatCode: ''}));
                                       }}
                                       className="bg-purple-600 hover:bg-purple-500 px-3 py-1 rounded text-sm font-bold"
                                    >
                                       Try
                                    </button>
-                                                {cheatResponse && (
-                                                   <div className="text-xs text-purple-400 mt-2 italic">{cheatResponse}</div>
-                                                )}
-                                             </div>
-                                          </div>
-                                       )}
-                              </div>
+                                </div>
+                                {cheatResponse && (
+                                   <div className="text-xs text-purple-400 mt-2 italic">{cheatResponse}</div>
+                                )}
+                             </div>
+                          </div>
+                       )}
+                    </div>
 
                     {/* Data - Collapsible */}
                     <div className="bg-slate-800/50 rounded-lg overflow-hidden">
@@ -3055,42 +3229,6 @@ export default function SolitaireEngine({
                                    <option value="ravenclaw">🦅 Ravenclaw</option>
                                    <option value="hufflepuff">🦡 Hufflepuff</option>
                                 </select>
-                             </div>
-                             <div className="p-3 bg-slate-700/50 rounded-lg">
-                               <>
-                                 <div className="font-medium text-sm mb-1">Feeling Lucky?</div>
-                                 <input 
-                                    type="text" 
-                                    value={settings.cheatCode} 
-                                    onChange={(e) => setSettings(s => ({...s, cheatCode: e.target.value}))} 
-                                    placeholder=""
-                                    className="flex-1 bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm"
-                                 />
-                                 <button 
-                                    onClick={() => {
-                                       const code = settings.cheatCode.toLowerCase().trim();
-                                       const responses: Record<string, string> = {
-                                          'iddqd': "This isn't DOOM, but nice try.",
-                                          'hesoyam': "GTA doesn't work here either.",
-                                          'konami': "↑↑↓↓←→←→BA... nothing happened.",
-                                          'motherlode': "The Sims called, they want their cheat back.",
-                                          'rosebud': "Seriously? That's ancient.",
-                                          'money': "Wouldn't that be nice.",
-                                          'god': "You wish.",
-                                          'win': "That's not how this works.",
-                                          'help': "No.",
-                                          'please': "Manners won't help you here.",
-                                          '': "You have to actually type something.",
-                                       };
-                                       setCheatResponse(responses[code] || "Nice try, but that's not a real cheat code.");
-                                       setSettings(s => ({...s, cheatCode: ''}));
-                                    }}
-                                    className="bg-purple-600 hover:bg-purple-500 px-3 py-1 rounded text-sm font-bold"
-                                 >
-                                    Try
-                                 </button>
-                                 {cheatResponse && <div className="text-xs text-purple-400 mt-2 italic">{cheatResponse}</div>}
-                               </>
                              </div>
                           </div>
                        )}
@@ -3507,7 +3645,17 @@ export default function SolitaireEngine({
 
       {/* Classic Game Layout - Uses absolute positioning from layout() */}
       {CLASSIC_GAMES[selectedMode] ? (
-        <div className="flex-1 w-full mx-auto pb-40 overflow-x-auto overflow-visible relative" style={{ height: 'calc(100vh - 140px)' }}>
+        <div
+          className="flex-1 w-full mx-auto pb-40 overflow-x-auto overflow-visible relative"
+          style={{ height: 'calc(100vh - 140px)' }}
+          onClick={() => {
+            // Deselect cards when clicking background
+            setSelectedPileId(null);
+            setSelectedCardIndex(null);
+            setHintTargets([]);
+            setSelectionColor('none');
+          }}
+        >
           {(() => {
             const classicGame = CLASSIC_GAMES[selectedMode];
             const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 360;
@@ -3536,7 +3684,10 @@ export default function SolitaireEngine({
                         type="button"
                         aria-label={`Empty ${config.type} ${config.id}`}
                         className="absolute inset-0 w-full h-full bg-transparent"
-                        onClick={() => handleCardClick(config.id, -1)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCardClick(config.id, -1);
+                        }}
                       />
                     </div>
                   );
@@ -4059,11 +4210,50 @@ export default function SolitaireEngine({
                               <button className="text-xs text-slate-500 underline mt-2" onClick={() => setActiveDrawer('pause')}>Back to Menu</button>
                            </div>
                         ) : activeDrawer === 'test' ? (
-                           <div className="flex flex-col gap-1">
-                              <button className="bg-blue-600 text-white px-2 py-1 rounded text-sm font-medium" onClick={() => setGameState(p => ({ ...p, score: p.currentScoreGoal }))}>Complete Goal</button>
-                              <button className="bg-green-600 text-white px-2 py-1 rounded text-sm font-medium" onClick={() => setGameState(p => ({ ...p, coins: p.coins + 100 }))}>+100 Coins</button>
-                              <button className="bg-red-600 text-white px-2 py-1 rounded text-sm font-medium" onClick={() => setGameState(p => ({ ...p, coins: p.coins - 50 }))}>-50 Coins</button>
-                              <button className="bg-purple-600 text-white px-2 py-1 rounded text-sm font-medium flex items-center justify-center gap-1" onClick={() => setGameState(p => ({...p, debugUnlockAll: !p.debugUnlockAll}))}><Unlock size={14} /> Toggle All</button>
+                           <div className="flex flex-col gap-2 p-2">
+                              <div className="text-xs text-slate-400 uppercase font-bold">Quick Actions</div>
+                              <div className="flex gap-2">
+                                 <button className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded flex items-center justify-center" onClick={() => setGameState(p => ({ ...p, score: p.currentScoreGoal }))} title="Complete Goal"><Target size={18} /></button>
+                                 <button className="bg-green-600 hover:bg-green-700 text-white p-2 rounded flex items-center justify-center" onClick={() => setGameState(p => ({ ...p, coins: p.coins + 100 }))} title="+100 Coins"><PlusCircle size={18} /></button>
+                                 <button className="bg-purple-600 hover:bg-purple-700 text-white p-2 rounded flex items-center justify-center" onClick={() => setGameState(p => ({...p, debugUnlockAll: !p.debugUnlockAll}))} title="Toggle All Unlocks"><Unlock size={18} /></button>
+                              </div>
+
+                              <div className="text-xs text-slate-400 uppercase font-bold mt-2">Trigger Effect</div>
+                              <select className="bg-slate-800 text-white px-2 py-1.5 rounded text-sm border border-slate-600" onChange={(e) => {
+                                 const effectId = e.target.value;
+                                 if (effectId) {
+                                    setGameState(p => ({ ...p, ownedEffects: [...p.ownedEffects, effectId] }));
+                                    toggleEffect(effectId, true);
+                                    e.target.value = '';
+                                 }
+                              }}>
+                                 <option value="">Select exploit/pattern...</option>
+                                 {effectsRegistry.filter(e => e.type === 'exploit' || e.type === 'pattern').map(effect => (
+                                    <option key={effect.id} value={effect.id}>{effect.name} ({effect.type})</option>
+                                 ))}
+                              </select>
+
+                              <div className="text-xs text-slate-400 uppercase font-bold mt-2">Force Curse</div>
+                              <select className="bg-slate-800 text-white px-2 py-1.5 rounded text-sm border border-slate-600" onChange={(e) => {
+                                 const curseId = e.target.value;
+                                 if (curseId) {
+                                    // Find next encounter index
+                                    const nextIndex = gameState.runIndex + 1;
+                                    if (nextIndex < runPlan.length) {
+                                       // Update run plan to use this curse
+                                       const newPlan = [...runPlan];
+                                       newPlan[nextIndex] = { ...newPlan[nextIndex], effectId: curseId };
+                                       setRunPlan(newPlan);
+                                    }
+                                    e.target.value = '';
+                                 }
+                              }}>
+                                 <option value="">Select curse for next encounter...</option>
+                                 {effectsRegistry.filter(e => e.type === 'curse').map(curse => (
+                                    <option key={curse.id} value={curse.id}>{curse.name}</option>
+                                 ))}
+                              </select>
+
                               <button className="text-xs text-slate-500 underline mt-2" onClick={() => setActiveDrawer('pause')}>Back to Menu</button>
                            </div>
                         ) : activeDrawer === 'blessing_select' ? (

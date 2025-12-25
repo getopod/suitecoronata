@@ -554,10 +554,18 @@ export const specialRankPatterns: Record<SpecialRankPatternId, MovementEvaluator
   },
 
   /**
-   * Wild card - can go anywhere
+   * Wild card - can go anywhere (unless locked)
+   * Once a wild card is played, it locks to that card's rank/suit for the encounter
    */
   wild_card: (ctx) => {
-    return ctx.moving.meta?.isWild === true;
+    if (ctx.moving.meta?.isWild !== true) return false;
+
+    // If wild card is locked, it no longer acts as wild
+    if (ctx.moving.meta?.lockedRank !== undefined || ctx.moving.meta?.lockedSuit !== undefined) {
+      return false;
+    }
+
+    return true;
   },
 };
 
