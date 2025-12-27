@@ -5013,58 +5013,56 @@ export default function SolitaireEngine({
             ) : (
                <>
                   {/* Classic Mode - Standardized HUD */}
-                  <div className="relative w-full h-[73px] flex items-end justify-center gap-1">
-                     {/* Left: Card-shaped pause button */}
-                     <div className="absolute left-[1px] bottom-0">
-                        <button
-                           onClick={() => toggleDrawer('pause')}
-                           className={`relative w-[50px] h-[73px] rounded border border-slate-700 shadow-md overflow-hidden bg-slate-800 flex items-center justify-center pointer-events-auto hover:brightness-110 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}
-                           aria-label="Pause">
-                           <img src="/icons/pause.png" alt="Pause" className="w-7 h-7" />
-                        </button>
-                     </div>
-
-                     {/* Center: Info buttons and stats */}
-                     <div className="absolute left-[52px] right-[52px] bottom-0 flex items-center justify-center gap-1">
-                        {/* How to Play button */}
-                        <button
-                           onClick={() => toggleDrawer('howtoplay')}
-                           className={`w-[50px] h-[73px] bg-slate-800 hover:bg-slate-700 rounded border border-slate-700 flex items-center justify-center ${activeDrawer === 'howtoplay' ? 'bg-slate-700' : ''}`}>
-                           <img src="/icons/howto.png" alt="How to Play" className="w-7 h-7" />
-                        </button>
-
+                  <div className="relative w-full h-[73px] flex flex-col">
+                     {/* Top row: Stats */}
+                     <div className="flex items-center justify-center gap-4 py-1">
                         {/* Move Count */}
-                        <div className="w-[50px] h-[73px] rounded border border-slate-700 bg-slate-800 flex flex-col items-center justify-center">
-                           <img src="/icons/moves.png" alt="Moves" className="w-5 h-5" />
+                        <div className="flex items-center gap-1">
+                           <img src="/icons/moves.png" alt="Moves" className="w-4 h-4" />
                            <span className="text-xs font-bold text-slate-300">{gameState.moves}</span>
                         </div>
 
                         {/* Score */}
-                        <div className="w-[50px] h-[73px] rounded border border-slate-700 bg-slate-800 flex flex-col items-center justify-center">
-                           <img src="/icons/coin.png" alt="Score" className="w-5 h-5" />
+                        <div className="flex items-center gap-1">
+                           <img src="/icons/score.png" alt="Score" className="w-4 h-4" />
                            <span className="text-xs font-bold text-yellow-400">{gameState.score}</span>
                         </div>
 
                         {/* Timer */}
-                        <div className="w-[50px] h-[73px] rounded border border-slate-700 bg-slate-800 flex flex-col items-center justify-center">
-                           <Clock size={16} className="text-slate-400" />
-                           <span className="text-[10px] font-bold text-slate-300">{formatTime(elapsedTime)}</span>
+                        <div className="flex items-center gap-1">
+                           <Clock size={14} className="text-slate-400" />
+                           <span className="text-xs font-bold text-slate-300">{formatTime(elapsedTime)}</span>
                         </div>
 
                         {/* Mode-specific: Spider completed runs */}
                         {selectedMode.startsWith('spider') && (
-                           <div className="w-[50px] h-[73px] rounded border border-green-700/50 bg-gradient-to-br from-green-900/30 to-slate-800 flex flex-col items-center justify-center">
-                              <div className="text-[10px] text-green-400/70 font-bold">RUN</div>
-                              <span className="text-lg font-bold text-green-400">
-                                 {gameState.piles.completed ? Math.floor(gameState.piles.completed.cards.length / 13) : 0}
+                           <div className="flex items-center gap-1">
+                              <div className="text-xs text-green-400/70 font-bold">RUN:</div>
+                              <span className="text-xs font-bold text-green-400">
+                                 {gameState.piles.completed ? Math.floor(gameState.piles.completed.cards.length / 13) : 0}/8
                               </span>
-                              <div className="text-[9px] text-green-500/50">/8</div>
                            </div>
                         )}
                      </div>
 
-                     {/* Right: Card-shaped undo button */}
-                     <div className="absolute right-[1px] bottom-0">
+                     {/* Bottom row: Buttons */}
+                     <div className="flex items-center justify-between px-2">
+                        {/* Left: Pause button */}
+                        <button
+                           onClick={() => toggleDrawer('pause')}
+                           className="flex items-center justify-center pointer-events-auto hover:brightness-110"
+                           aria-label="Pause">
+                           <img src="/icons/pause.png" alt="Pause" className="w-8 h-8" />
+                        </button>
+
+                        {/* Center: How to Play button */}
+                        <button
+                           onClick={() => toggleDrawer('howtoplay')}
+                           className="flex items-center justify-center hover:brightness-110">
+                           <img src="/icons/howto.png" alt="How to Play" className="w-8 h-8" />
+                        </button>
+
+                        {/* Right: Undo button */}
                         <button
                            onClick={() => {
                               if (gameState.history && gameState.history.length > 0) {
@@ -5073,9 +5071,9 @@ export default function SolitaireEngine({
                               }
                            }}
                            disabled={!gameState.history || gameState.history.length === 0}
-                           className="relative w-[50px] h-[73px] rounded border border-slate-700 shadow-md overflow-hidden bg-slate-800 flex items-center justify-center pointer-events-auto hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                           className="flex items-center justify-center pointer-events-auto hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
                            aria-label="Undo">
-                           <img src="/icons/newgame.png" alt="Undo" className="w-7 h-7" />
+                           <img src="/icons/newgame.png" alt="Undo" className="w-8 h-8" />
                         </button>
                      </div>
                   </div>
