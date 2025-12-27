@@ -102,7 +102,7 @@ export const convertCoronataCardToClassic = (card: Card): ClassicCardData => ({
 export const convertClassicPilesToCoronata = (classicPiles: Record<string, ClassicCardData[]>): Record<string, Pile> => {
   const coronataPiles: Record<string, Pile> = {};
 
-  // Ensure basic piles exist
+  // Ensure basic piles exist (for non-classic modes)
   coronataPiles['deck'] = { id: 'deck', type: 'deck', cards: [] };
   coronataPiles['hand'] = { id: 'hand', type: 'hand', cards: [] };
 
@@ -110,14 +110,26 @@ export const convertClassicPilesToCoronata = (classicPiles: Record<string, Class
     let pileType: 'deck' | 'hand' | 'foundation' | 'tableau' = 'tableau';
 
     if (pileId === 'stock') {
-      pileType = 'deck';
+      // Keep stock as stock (don't convert to deck)
+      coronataPiles['stock'] = {
+        id: 'stock',
+        type: 'deck',
+        cards: cards.map(convertClassicCardToCoronata)
+      };
+      // Also populate deck for compatibility
       coronataPiles['deck'] = {
         id: 'deck',
         type: 'deck',
         cards: cards.map(convertClassicCardToCoronata)
       };
     } else if (pileId === 'waste') {
-      pileType = 'hand';
+      // Keep waste as waste (don't convert to hand)
+      coronataPiles['waste'] = {
+        id: 'waste',
+        type: 'hand',
+        cards: cards.map(convertClassicCardToCoronata)
+      };
+      // Also populate hand for compatibility
       coronataPiles['hand'] = {
         id: 'hand',
         type: 'hand',
@@ -135,6 +147,13 @@ export const convertClassicPilesToCoronata = (classicPiles: Record<string, Class
       coronataPiles[pileId] = {
         id: pileId,
         type: pileType,
+        cards: cards.map(convertClassicCardToCoronata)
+      };
+    } else {
+      // For any other pile types (like completed, reserve, etc), keep them as-is
+      coronataPiles[pileId] = {
+        id: pileId,
+        type: 'tableau',
         cards: cards.map(convertClassicCardToCoronata)
       };
     }

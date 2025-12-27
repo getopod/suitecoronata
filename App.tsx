@@ -13,6 +13,9 @@ import { useEffectDebugger } from './hooks/useEffectDebugger';
 import { detectConflicts } from './utils/effectDebug';
 import { CLASSIC_GAMES } from './src/classic/games';
 import { convertCoronataPilesToClassic, convertClassicPilesToCoronata } from './src/classic/types';
+import { Card as ClassicCard } from './src/classic/components/Card';
+import { Pile as ClassicPile } from './src/classic/components/Pile';
+import type { GameSettings as ClassicGameSettings } from './src/classic/types';
 
 // ==========================================
 // INJECTABLE REGISTRIES (defaults to empty for decoupled UI)
@@ -570,6 +573,35 @@ export default function SolitaireEngine({
       cheatCode: '',
     };
   });
+
+  // Classic game settings
+  const [classicSettings, setClassicSettings] = useState<ClassicGameSettings>(() => {
+    try {
+      const saved = localStorage.getItem('classic-settings');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error('Failed to load classic settings:', e);
+    }
+    return {
+      cardBack: 'classic-blue',
+      cardFace: 'standard',
+      background: 'green-felt',
+      animationSpeed: 'normal',
+      sound: false,
+      timer: true,
+      moveCount: true,
+      autoComplete: true,
+      leftHandMode: false,
+    };
+  });
+
+  // Save classic settings to localStorage when they change
+  React.useEffect(() => {
+    localStorage.setItem('classic-settings', JSON.stringify(classicSettings));
+  }, [classicSettings]);
+
   const [callParentsCount, setCallParentsCount] = useState(0);
   const [showParentsPopup, setShowParentsPopup] = useState(false);
   const [cheatResponse, setCheatResponse] = useState('');
@@ -1395,19 +1427,19 @@ export default function SolitaireEngine({
       }
 
       // Handle card clicks for classic games
-      if (pileId.startsWith('tableau') || pileId.startsWith('foundation') || pileId === 'waste') {
+      if (pileId.startsWith('tableau') || pileId.startsWith('foundation') || pileId === 'waste' || pileId.startsWith('cell')) {
         if (!clickedCard && cardIndex === -1) {
           // Empty pile click - try to move selected cards here
-          if (gameState.selectedCardIds) {
-            const moved = attemptMove(gameState.selectedCardIds, selectedPileId!, pileId);
+          if (gameState.selectedCardIds && selectedPileId) {
+            const moved = attemptMove(gameState.selectedCardIds, selectedPileId, pileId);
             if (moved) clearSelection();
           }
           return;
         }
         if (clickedCard) {
-          if (gameState.selectedCardIds) {
+          if (gameState.selectedCardIds && selectedPileId) {
             // Try to move to this card's pile
-            const moved = attemptMove(gameState.selectedCardIds, selectedPileId!, pileId);
+            const moved = attemptMove(gameState.selectedCardIds, selectedPileId, pileId);
             if (moved) {
               clearSelection();
               return;
@@ -1562,6 +1594,13 @@ export default function SolitaireEngine({
     const effects = getEffects();
     const sourcePile = gameState.piles[sourcePileId];
     let targetPile = gameState.piles[targetPileId];
+
+    // Safety check for undefined piles
+    if (!sourcePile || !targetPile) {
+      console.log('Invalid pile in attemptMove:', { sourcePileId, targetPileId, hasSource: !!sourcePile, hasTarget: !!targetPile });
+      return false;
+    }
+
     const movingCards = sourcePile.cards.filter(c => cardIds.includes(c.id));
     if (movingCards.length === 0) return false;
 
@@ -2804,131 +2843,120 @@ export default function SolitaireEngine({
                              <div className="text-center py-8 text-slate-400">Loading...</div>
                           ) : auth.user ? (
                              <>
-                                {/* Logged in view */}
-                                <div className="bg-slate-800 p-4 rounded-xl space-y-3">
-                                   <div className="flex items-center justify-center gap-3">
-                                      <User size={48} className="text-purple-400" />
-                                   </div>
-                                   <div className="text-center">
-                                      <div className="text-sm text-slate-400">Signed in as</div>
-                                      <div className="font-bold text-white">{auth.user.email || 'Anonymous'}</div>
-                                      {auth.isAnonymous && (
-                                         <div className="text-xs text-yellow-500 mt-1">Anonymous Account</div>
-                                      )}
-                                   </div>
-                                   {auth.isAnonymous && (
-                                      <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-3 text-sm text-yellow-200">
-                                         <div className="font-bold mb-1">Save your progress!</div>
-                                         <div className="text-xs text-yellow-300/80">Create an account to sync your data across devices.</div>
-                                      </div>
-                                   )}
-                                </div>
-
                                 {auth.isAnonymous ? (
                                    <>
-                                      <div className="text-sm text-slate-400 text-center mb-3">Link your account to save progress</div>
-
-                                      {/* Social Sign-In Options for Anonymous Users */}
-                                      <div className="space-y-2 mb-4">
-                                         <button
-                                            onClick={async () => {
-                                               try {
-                                                  await auth.signInWithGoogle();
-                                               } catch (error: any) {
-                                                  alert(error.message || 'Failed to link with Google');
-                                               }
-                                            }}
-                                            className="w-full bg-white hover:bg-gray-100 text-gray-800 py-2.5 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 text-sm">
-                                            <svg className="w-5 h-5" viewBox="0 0 24 24">
-                                               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                                               <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                                               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                                               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                                            </svg>
-                                            Link with Google
-                                         </button>
-                                         <button
-                                            onClick={async () => {
-                                               try {
-                                                  await auth.signInWithApple();
-                                               } catch (error: any) {
-                                                  alert(error.message || 'Failed to link with Apple');
-                                               }
-                                            }}
-                                            className="w-full bg-black hover:bg-gray-900 text-white py-2.5 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 text-sm">
-                                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                                               <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-                                            </svg>
-                                            Link with Apple
-                                         </button>
-                                         <button
-                                            onClick={async () => {
-                                               try {
-                                                  await auth.signInWithFacebook();
-                                               } catch (error: any) {
-                                                  alert(error.message || 'Failed to link with Facebook');
-                                               }
-                                            }}
-                                            className="w-full bg-[#1877F2] hover:bg-[#166FE5] text-white py-2.5 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 text-sm">
-                                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                                               <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                                            </svg>
-                                            Link with Facebook
-                                         </button>
-                                      </div>
-
-                                      <div className="relative my-3">
-                                         <div className="absolute inset-0 flex items-center">
-                                            <div className="w-full border-t border-slate-700"></div>
+                                      <div className="text-center">
+                                         <div className="bg-slate-800/50 rounded-2xl p-6 mb-6">
+                                            <User size={48} className="mx-auto text-slate-500 mb-3" />
+                                            <div className="text-sm text-slate-400 mb-1">not signed in</div>
+                                            <p className="text-slate-300">Link your account to save your progress</p>
                                          </div>
-                                         <div className="relative flex justify-center text-xs uppercase">
-                                            <span className="bg-slate-900 px-2 text-slate-500">Or use email</span>
+                                         <div className="flex justify-center gap-4">
+                                            <button
+                                               onClick={async () => {
+                                                  try {
+                                                     await auth.signInWithGoogle();
+                                                  } catch (error: any) {
+                                                     alert(error.message || 'Failed to link with Google');
+                                                  }
+                                               }}
+                                               className="w-16 h-16 bg-white hover:bg-gray-100 rounded-full flex items-center justify-center transition-colors shadow-lg">
+                                               <svg className="w-8 h-8" viewBox="0 0 24 24">
+                                                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                                               </svg>
+                                            </button>
+                                            <button
+                                               onClick={async () => {
+                                                  try {
+                                                     await auth.signInWithApple();
+                                                  } catch (error: any) {
+                                                     alert(error.message || 'Failed to link with Apple');
+                                                  }
+                                               }}
+                                               className="w-16 h-16 bg-black hover:bg-gray-900 text-white rounded-full flex items-center justify-center transition-colors shadow-lg">
+                                               <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                                                  <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                                               </svg>
+                                            </button>
+                                            <button
+                                               onClick={async () => {
+                                                  try {
+                                                     await auth.signInWithFacebook();
+                                                  } catch (error: any) {
+                                                     alert(error.message || 'Failed to link with Facebook');
+                                                  }
+                                               }}
+                                               className="w-16 h-16 bg-[#1877F2] hover:bg-[#166FE5] text-white rounded-full flex items-center justify-center transition-colors shadow-lg">
+                                               <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                                                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                                               </svg>
+                                            </button>
+                                            <button
+                                               onClick={() => setIsSignup(!isSignup)}
+                                               className="w-16 h-16 bg-slate-700 hover:bg-slate-600 text-white rounded-full flex items-center justify-center transition-colors shadow-lg">
+                                               <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                                  <polyline points="22,6 12,13 2,6"/>
+                                               </svg>
+                                            </button>
                                          </div>
                                       </div>
-
-                                      <div className="space-y-3">
-                                         <input
-                                            type="email"
-                                            placeholder="Email"
-                                            value={loginEmail}
-                                            onChange={(e) => setLoginEmail(e.target.value)}
-                                            className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-sm text-white"
-                                         />
-                                         <input
-                                            type="password"
-                                            placeholder="Password"
-                                            value={loginPassword}
-                                            onChange={(e) => setLoginPassword(e.target.value)}
-                                            className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-sm text-white"
-                                         />
-                                         <button
-                                            onClick={async () => {
-                                               try {
-                                                  await auth.signUp(loginEmail, loginPassword);
-                                                  alert('Account created successfully!');
-                                                  setLoginEmail('');
-                                                  setLoginPassword('');
-                                               } catch (error: any) {
-                                                  alert(error.message || 'Failed to create account');
-                                               }
-                                            }}
-                                            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-bold transition-colors">
-                                            Create Account & Link Progress
-                                         </button>
-                                         <button
-                                            onClick={async () => {
-                                               try {
-                                                  await auth.signIn(loginEmail, loginPassword);
-                                                  setLoginEmail('');
-                                                  setLoginPassword('');
-                                               } catch (error: any) {
-                                                  alert(error.message || 'Failed to sign in');
-                                               }
-                                            }}
-                                            className="w-full bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-lg font-bold transition-colors">
-                                            Sign In to Existing Account
-                                         </button>
-                                      </div>
+                                      {isSignup && (
+                                         <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                                            <input
+                                               type="email"
+                                               placeholder="Email"
+                                               value={loginEmail}
+                                               onChange={(e) => setLoginEmail(e.target.value)}
+                                               className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-sm text-white"
+                                            />
+                                            <input
+                                               type="password"
+                                               placeholder="Password"
+                                               value={loginPassword}
+                                               onChange={(e) => setLoginPassword(e.target.value)}
+                                               className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-sm text-white"
+                                            />
+                                            <button
+                                               onClick={async () => {
+                                                  if (!loginEmail || !loginPassword) {
+                                                     alert('Please enter email and password');
+                                                     return;
+                                                  }
+                                                  try {
+                                                     await auth.signUp(loginEmail, loginPassword);
+                                                     alert('Account linked successfully!');
+                                                     setLoginEmail('');
+                                                     setLoginPassword('');
+                                                     setIsSignup(false);
+                                                  } catch (error: any) {
+                                                     alert(error.message || 'Failed to link account');
+                                                  }
+                                               }}
+                                               className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-bold transition-colors">
+                                               Link with Email
+                                            </button>
+                                            <button
+                                               onClick={async () => {
+                                                  if (!loginEmail) {
+                                                     alert('Please enter your email address');
+                                                     return;
+                                                  }
+                                                  try {
+                                                     await auth.resetPassword(loginEmail);
+                                                     alert('Password reset email sent! Check your inbox.');
+                                                  } catch (error: any) {
+                                                     alert(error.message || 'Failed to send reset email');
+                                                  }
+                                               }}
+                                               className="w-full text-sm text-blue-400 hover:text-blue-300">
+                                               Forgot password?
+                                            </button>
+                                         </div>
+                                      )}
                                    </>
                                 ) : (
                                    <button
@@ -2945,138 +2973,117 @@ export default function SolitaireEngine({
                           ) : (
                              <>
                                 {/* Not logged in view */}
-                                <div className="text-center py-4">
-                                   <User size={64} className="mx-auto text-slate-600 mb-3" />
-                                   <h3 className="text-lg font-bold mb-2">{isSignup ? 'Create Account' : 'Sign In'}</h3>
-                                   <p className="text-sm text-slate-400">Sync your progress across devices</p>
-                                </div>
-
-                                {/* Social Sign-In Buttons */}
-                                <div className="space-y-2">
-                                   <button
-                                      onClick={async () => {
-                                         try {
-                                            await auth.signInWithGoogle();
-                                         } catch (error: any) {
-                                            alert(error.message || 'Failed to sign in with Google');
-                                         }
-                                      }}
-                                      className="w-full bg-white hover:bg-gray-100 text-gray-800 py-3 rounded-lg font-bold transition-colors flex items-center justify-center gap-2">
-                                      <svg className="w-5 h-5" viewBox="0 0 24 24">
-                                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                                         <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                                         <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                                         <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                                      </svg>
-                                      Continue with Google
-                                   </button>
-                                   <button
-                                      onClick={async () => {
-                                         try {
-                                            await auth.signInWithApple();
-                                         } catch (error: any) {
-                                            alert(error.message || 'Failed to sign in with Apple');
-                                         }
-                                      }}
-                                      className="w-full bg-black hover:bg-gray-900 text-white py-3 rounded-lg font-bold transition-colors flex items-center justify-center gap-2">
-                                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                                         <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-                                      </svg>
-                                      Continue with Apple
-                                   </button>
-                                   <button
-                                      onClick={async () => {
-                                         try {
-                                            await auth.signInWithFacebook();
-                                         } catch (error: any) {
-                                            alert(error.message || 'Failed to sign in with Facebook');
-                                         }
-                                      }}
-                                      className="w-full bg-[#1877F2] hover:bg-[#166FE5] text-white py-3 rounded-lg font-bold transition-colors flex items-center justify-center gap-2">
-                                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                                         <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                                      </svg>
-                                      Continue with Facebook
-                                   </button>
-                                </div>
-
-                                <div className="relative my-4">
-                                   <div className="absolute inset-0 flex items-center">
-                                      <div className="w-full border-t border-slate-700"></div>
+                                <div className="text-center">
+                                   <div className="bg-slate-800/50 rounded-2xl p-6 mb-6">
+                                      <User size={48} className="mx-auto text-slate-500 mb-3" />
+                                      <div className="text-sm text-slate-400 mb-1">not signed in</div>
+                                      <p className="text-slate-300">Link your account to save your progress</p>
                                    </div>
-                                   <div className="relative flex justify-center text-xs uppercase">
-                                      <span className="bg-slate-900 px-2 text-slate-500">Or continue with email</span>
+                                   <div className="flex justify-center gap-4">
+                                      <button
+                                         onClick={async () => {
+                                            try {
+                                               await auth.signInWithGoogle();
+                                            } catch (error: any) {
+                                               alert(error.message || 'Failed to sign in with Google');
+                                            }
+                                         }}
+                                         className="w-16 h-16 bg-white hover:bg-gray-100 rounded-full flex items-center justify-center transition-colors shadow-lg">
+                                         <svg className="w-8 h-8" viewBox="0 0 24 24">
+                                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                                         </svg>
+                                      </button>
+                                      <button
+                                         onClick={async () => {
+                                            try {
+                                               await auth.signInWithApple();
+                                            } catch (error: any) {
+                                               alert(error.message || 'Failed to sign in with Apple');
+                                            }
+                                         }}
+                                         className="w-16 h-16 bg-black hover:bg-gray-900 text-white rounded-full flex items-center justify-center transition-colors shadow-lg">
+                                         <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                                         </svg>
+                                      </button>
+                                      <button
+                                         onClick={async () => {
+                                            try {
+                                               await auth.signInWithFacebook();
+                                            } catch (error: any) {
+                                               alert(error.message || 'Failed to sign in with Facebook');
+                                            }
+                                         }}
+                                         className="w-16 h-16 bg-[#1877F2] hover:bg-[#166FE5] text-white rounded-full flex items-center justify-center transition-colors shadow-lg">
+                                         <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                                         </svg>
+                                      </button>
+                                      <button
+                                         onClick={() => setIsSignup(!isSignup)}
+                                         className="w-16 h-16 bg-slate-700 hover:bg-slate-600 text-white rounded-full flex items-center justify-center transition-colors shadow-lg">
+                                         <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                            <polyline points="22,6 12,13 2,6"/>
+                                         </svg>
+                                      </button>
                                    </div>
-                                </div>
-
-                                <div className="space-y-3">
-                                   <input
-                                      type="email"
-                                      placeholder="Email"
-                                      value={loginEmail}
-                                      onChange={(e) => setLoginEmail(e.target.value)}
-                                      className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-sm text-white"
-                                   />
-                                   <input
-                                      type="password"
-                                      placeholder="Password"
-                                      value={loginPassword}
-                                      onChange={(e) => setLoginPassword(e.target.value)}
-                                      className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-sm text-white"
-                                   />
-                                   {!isSignup && (
-                                      <button
-                                         onClick={async () => {
-                                            if (!loginEmail) {
-                                               alert('Please enter your email address');
-                                               return;
-                                            }
-                                            try {
-                                               await auth.resetPassword(loginEmail);
-                                               alert('Password reset email sent! Check your inbox.');
-                                            } catch (error: any) {
-                                               alert(error.message || 'Failed to send reset email');
-                                            }
-                                         }}
-                                         className="w-full text-sm text-blue-400 hover:text-blue-300 text-right">
-                                         Forgot password?
-                                      </button>
+                                   {isSignup && (
+                                      <div className="space-y-3 animate-in fade-in slide-in-from-top-2 mt-4">
+                                         <input
+                                            type="email"
+                                            placeholder="Email"
+                                            value={loginEmail}
+                                            onChange={(e) => setLoginEmail(e.target.value)}
+                                            className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-sm text-white"
+                                         />
+                                         <input
+                                            type="password"
+                                            placeholder="Password"
+                                            value={loginPassword}
+                                            onChange={(e) => setLoginPassword(e.target.value)}
+                                            className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-sm text-white"
+                                         />
+                                         <button
+                                            onClick={async () => {
+                                               if (!loginEmail || !loginPassword) {
+                                                  alert('Please enter email and password');
+                                                  return;
+                                               }
+                                               try {
+                                                  await auth.signIn(loginEmail, loginPassword);
+                                                  alert('Signed in successfully!');
+                                                  setLoginEmail('');
+                                                  setLoginPassword('');
+                                                  setIsSignup(false);
+                                               } catch (error: any) {
+                                                  alert(error.message || 'Failed to sign in');
+                                               }
+                                            }}
+                                            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-bold transition-colors">
+                                            Sign In with Email
+                                         </button>
+                                         <button
+                                            onClick={async () => {
+                                               if (!loginEmail) {
+                                                  alert('Please enter your email address');
+                                                  return;
+                                               }
+                                               try {
+                                                  await auth.resetPassword(loginEmail);
+                                                  alert('Password reset email sent! Check your inbox.');
+                                               } catch (error: any) {
+                                                  alert(error.message || 'Failed to send reset email');
+                                               }
+                                            }}
+                                            className="w-full text-sm text-blue-400 hover:text-blue-300">
+                                            Forgot password?
+                                         </button>
+                                      </div>
                                    )}
-                                   {isSignup ? (
-                                      <button
-                                         onClick={async () => {
-                                            try {
-                                               await auth.signUp(loginEmail, loginPassword);
-                                               alert('Account created successfully!');
-                                               setLoginEmail('');
-                                               setLoginPassword('');
-                                            } catch (error: any) {
-                                               alert(error.message || 'Failed to create account');
-                                            }
-                                         }}
-                                         className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-bold transition-colors">
-                                         Create Account
-                                      </button>
-                                   ) : (
-                                      <button
-                                         onClick={async () => {
-                                            try {
-                                               await auth.signIn(loginEmail, loginPassword);
-                                               setLoginEmail('');
-                                               setLoginPassword('');
-                                            } catch (error: any) {
-                                               alert(error.message || 'Failed to sign in');
-                                            }
-                                         }}
-                                         className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-bold transition-colors">
-                                         Sign In
-                                      </button>
-                                   )}
-                                   <button
-                                      onClick={() => setIsSignup(!isSignup)}
-                                      className="w-full text-sm text-slate-400 hover:text-slate-300">
-                                      {isSignup ? 'Already have an account? Sign in' : 'Need an account? Sign up'}
-                                   </button>
                                 </div>
                              </>
                           )}
@@ -3689,92 +3696,133 @@ export default function SolitaireEngine({
 
            {/* FEEDBACK PANEL */}
            {showFeedback && (
-              <div className="fixed inset-0 bg-slate-900 z-50 flex flex-col animate-in slide-in-from-bottom-10">
-                 <div className="flex justify-between items-center p-4 border-b border-slate-700">
+              <div className="fixed inset-0 bg-slate-900 z-50 p-4 flex flex-col animate-in slide-in-from-bottom-10">
+                 <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
                     <h2 className="text-2xl font-bold">Feedback</h2>
                     <button onClick={() => setShowFeedback(false)}><X /></button>
                  </div>
 
                  {/* Feedback Type Buttons */}
-                 <div className="p-4 border-b border-slate-700">
-                    <div className="flex gap-2">
-                       {['bug', 'ui', 'effect', 'request'].map(t => (
-                          <button key={t} onClick={() => setFeedbackType(t)} className={`flex-1 px-3 py-2 rounded text-xs uppercase font-bold ${feedbackType === t ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'}`}>{t}</button>
-                       ))}
-                    </div>
+                 <div className="flex gap-2 mb-4">
+                    {['bug', 'ui', 'effect', 'request'].map(t => (
+                       <button
+                          key={t}
+                          onClick={() => setFeedbackType(t)}
+                          className={`flex-1 px-3 py-2 rounded-lg text-xs uppercase font-bold transition-all ${
+                             feedbackType === t
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                          }`}>
+                          {t}
+                       </button>
+                    ))}
                  </div>
 
                  {/* Description Textarea */}
-                 <div className="p-4 border-b border-slate-700">
-                    <textarea className="w-full h-24 bg-slate-800 border border-slate-600 rounded p-3 text-sm text-white resize-none" placeholder="Describe issue or idea..." value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} />
+                 <div className="mb-4">
+                    <textarea
+                       className="w-full h-24 bg-slate-800 border border-slate-600 rounded-lg p-3 text-sm text-white resize-none"
+                       placeholder="Describe issue or idea..."
+                       value={feedbackText}
+                       onChange={(e) => setFeedbackText(e.target.value)}
+                    />
                  </div>
 
-                 {/* Category Tabs */}
-                 <div className="px-4 pt-2">
-                    <div className="text-sm text-slate-400 mb-2 uppercase font-bold">Related Effects</div>
-                    <div className="grid grid-cols-4 gap-2">
-                       {(['blessings', 'exploits', 'curses', 'patterns'] as const).map(cat => (
-                          <button
-                             key={cat}
-                             onClick={() => setFeedbackTab(cat)}
-                             className={`px-2 py-2 rounded-lg text-xs font-bold flex flex-col items-center gap-1 transition-all ${
-                                feedbackTab === cat
-                                   ? 'bg-slate-700 text-white'
-                                   : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
-                             }`}>
-                             <img src={categoryIcons[cat]} alt="" className="w-6 h-6" />
-                             <span className="capitalize">{cat}</span>
-                          </button>
-                       ))}
-                    </div>
+                 {/* Category Tabs - matching glossary style */}
+                 <div className="flex gap-1 overflow-x-auto pb-2 mb-2">
+                    {(['blessings', 'exploits', 'curses', 'patterns'] as const).map(cat => (
+                       <button
+                          key={cat}
+                          onClick={() => setFeedbackTab(cat)}
+                          className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold flex flex-col items-center gap-1 transition-all ${
+                             feedbackTab === cat
+                                ? 'bg-slate-700 text-white'
+                                : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
+                          }`}>
+                          <img src={categoryIcons[cat]} alt="" className="w-10 h-10" />
+                          <span className="capitalize">{cat}</span>
+                       </button>
+                    ))}
                  </div>
 
-                 {/* Effects List - Flex-1 to fill space */}
-                 <div className="flex-1 overflow-y-auto p-4 min-h-0">
+                 {/* Effects List - matching glossary style */}
+                 <div className="flex-1 overflow-y-auto space-y-2 mb-4">
                     {feedbackTab === 'patterns' ? (
-                       <div className="space-y-2">
-                          {PATTERN_DEFINITIONS.map(p => (
-                             <label key={p.id} className="flex items-center gap-3 p-2 rounded bg-slate-800/50 hover:bg-slate-800 cursor-pointer">
+                       PATTERN_DEFINITIONS.map(p => {
+                          const rarityColors = getRarityColor(p.rarity);
+                          const isChecked = !!feedbackChecks[p.id];
+                          return (
+                             <label
+                                key={p.id}
+                                className={`p-3 rounded border flex gap-3 cursor-pointer transition-all ${
+                                   isChecked
+                                      ? 'bg-blue-900/30 border-blue-600'
+                                      : `${rarityColors?.bg || 'bg-slate-800'} ${rarityColors?.border || 'border-slate-700'} hover:border-slate-600`
+                                }`}>
                                 <input
                                    type="checkbox"
-                                   checked={!!feedbackChecks[p.id]}
+                                   checked={isChecked}
                                    onChange={() => setFeedbackChecks(prev => ({...prev, [p.id]: !prev[p.id]}))}
-                                   className="rounded bg-slate-700 border-slate-500"
+                                   className="mt-1 rounded bg-slate-700 border-slate-500"
                                 />
-                                <ResponsiveIcon name={p.id || p.name} fallbackType="exploit" size={32} className="w-8 h-8 rounded shrink-0" alt={p.name} />
-                                <span className="text-sm text-slate-300 flex-1">{p.name}</span>
+                                <ResponsiveIcon name={p.id || p.name} fallbackType="exploit" size={40} className="w-10 h-10 rounded shrink-0" alt={p.name} />
+                                <div className="flex-1 min-w-0">
+                                   <div className="flex justify-between items-start gap-2">
+                                      <div className="font-bold text-white truncate">{p.name}</div>
+                                      <div className={`text-[14px] uppercase px-1.5 py-0.5 rounded font-bold shrink-0 ${rarityColors?.text || ''} ${rarityColors?.bg || ''} border ${rarityColors?.border || ''}`}>
+                                         {p.rarity || 'Common'}
+                                      </div>
+                                   </div>
+                                   <div className="text-slate-300 text-sm mt-1">{p.description}</div>
+                                </div>
                              </label>
-                          ))}
-                       </div>
+                          );
+                       })
                     ) : (
-                       <div className="space-y-2">
-                          {effectsRegistry.filter(e => {
-                             if (feedbackTab === 'blessings') return e.type === 'blessing';
-                             if (feedbackTab === 'exploits') return ['exploit', 'epic', 'legendary', 'rare', 'uncommon'].includes(e.type);
-                             if (feedbackTab === 'curses') return e.type === 'curse';
-                             return false;
-                          }).map(e => {
-                             const effectType = e.type === 'blessing' ? 'blessing' : e.type === 'curse' ? 'curse' : 'exploit';
-                             return (
-                                <label key={e.id} className="flex items-center gap-3 p-2 rounded bg-slate-800/50 hover:bg-slate-800 cursor-pointer">
-                                   <input
-                                      type="checkbox"
-                                      checked={!!feedbackChecks[e.id]}
-                                      onChange={() => setFeedbackChecks(prev => ({...prev, [e.id]: !prev[e.id]}))}
-                                      className="rounded bg-slate-700 border-slate-500"
-                                   />
-                                   <ResponsiveIcon name={e.id || e.name} fallbackType={effectType} size={32} className="w-8 h-8 rounded shrink-0" alt={e.name} />
-                                   <span className="text-sm text-slate-300 flex-1">{e.name}</span>
-                                </label>
-                             );
-                          })}
-                       </div>
+                       effectsRegistry.filter(e => {
+                          if (feedbackTab === 'blessings') return e.type === 'blessing';
+                          if (feedbackTab === 'exploits') return ['exploit', 'epic', 'legendary', 'rare', 'uncommon'].includes(e.type);
+                          if (feedbackTab === 'curses') return e.type === 'curse';
+                          return false;
+                       }).map(e => {
+                          const rarityColors = getRarityColor(e.rarity);
+                          const effectType = e.type === 'blessing' ? 'blessing' : e.type === 'curse' ? 'curse' : 'exploit';
+                          const isChecked = !!feedbackChecks[e.id];
+                          return (
+                             <label
+                                key={e.id}
+                                className={`p-3 rounded border flex gap-3 cursor-pointer transition-all ${
+                                   isChecked
+                                      ? 'bg-blue-900/30 border-blue-600'
+                                      : `${rarityColors.bg} ${rarityColors.border} hover:border-slate-600`
+                                }`}>
+                                <input
+                                   type="checkbox"
+                                   checked={isChecked}
+                                   onChange={() => setFeedbackChecks(prev => ({...prev, [e.id]: !prev[e.id]}))}
+                                   className="mt-1 rounded bg-slate-700 border-slate-500"
+                                />
+                                <ResponsiveIcon name={e.id || e.name} fallbackType={effectType} size={40} className="w-10 h-10 rounded shrink-0" alt={e.name} />
+                                <div className="flex-1 min-w-0">
+                                   <div className="flex justify-between items-start gap-2">
+                                      <div className="font-bold text-white truncate">{e.name}</div>
+                                      <div className={`text-[14px] uppercase px-1.5 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} ${rarityColors.bg} border ${rarityColors.border}`}>
+                                         {e.rarity || 'Common'}
+                                      </div>
+                                   </div>
+                                   <div className="text-slate-300 text-sm mt-1">{e.description}</div>
+                                   {Boolean(e.cost) && <div className="text-xs text-yellow-500 mt-1 flex items-center gap-1"><Coins size={10}/> {e.cost}</div>}
+                                </div>
+                             </label>
+                          );
+                       })
                     )}
                  </div>
 
-                 {/* Submit Button - Always at bottom */}
-                 <div className="p-4 border-t border-slate-700">
-                    <button className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-bold transition-colors" onClick={async () => {
+                 {/* Submit Button */}
+                 <button
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-bold transition-colors"
+                    onClick={async () => {
                        try {
                           const { submitFeedback } = await import('./services/simpleLogger');
                           await submitFeedback({
@@ -3791,8 +3839,9 @@ export default function SolitaireEngine({
                           console.error("Failed to send feedback:", error);
                           alert("Failed to send feedback. Please try again.");
                        }
-                    }}>Submit Report</button>
-                 </div>
+                    }}>
+                    Submit Report
+                 </button>
               </div>
            )}
 
@@ -3805,15 +3854,15 @@ export default function SolitaireEngine({
                     </div>
                     <div className="flex gap-1 overflow-x-auto pb-2 mb-2">
                        {(['blessings', 'exploits', 'curses', 'patterns'] as const).map(cat => (
-                          <button 
-                             key={cat} 
-                             onClick={() => setGlossaryTab(cat)} 
+                          <button
+                             key={cat}
+                             onClick={() => setGlossaryTab(cat)}
                              className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold flex flex-col items-center gap-1 transition-all ${
-                                glossaryTab === cat 
-                                   ? 'bg-slate-700 text-white' 
+                                glossaryTab === cat
+                                   ? 'bg-slate-700 text-white'
                                    : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
                              }`}>
-                                           <img src={categoryIcons[cat]} alt="" className="w-6 h-6" />
+                                           <img src={categoryIcons[cat]} alt="" className="w-10 h-10" />
                           <span className="capitalize">{cat}</span>
                        </button>
                     ))}
@@ -3972,10 +4021,30 @@ export default function SolitaireEngine({
       )}
 
       {/* Classic Game Layout - Uses absolute positioning from layout() */}
-      {CLASSIC_GAMES[selectedMode] && !selectedMode.startsWith('spider') ? (
+      {CLASSIC_GAMES[selectedMode] ? (
         <div
           className="flex-1 w-full mx-auto pb-40 overflow-x-auto overflow-visible relative"
-          style={{ height: 'calc(100vh - 140px)' }}
+          style={{
+            height: 'calc(100vh - 140px)',
+            background: (() => {
+              switch (classicSettings.background) {
+                case 'blue-felt':
+                  return 'radial-gradient(circle at 50% 50%, #1e3a8a 0%, #1e293b 100%)';
+                case 'wood':
+                  return 'repeating-linear-gradient(45deg, #4a2c1a 0px, #4a2c1a 10px, #3d1f10 10px, #3d1f10 20px)';
+                case 'crimson':
+                  return 'radial-gradient(circle at 50% 50%, #991b1b 0%, #7f1d1d 100%)';
+                case 'charcoal':
+                  return 'radial-gradient(circle at 50% 50%, #374151 0%, #1f2937 100%)';
+                case 'midnight':
+                  return 'radial-gradient(circle at 50% 50%, #1e3a8a 0%, #0f172a 100%)';
+                case 'green-felt':
+                default:
+                  return 'radial-gradient(circle at 50% 50%, #15803d 0%, #065f46 100%)';
+              }
+            })(),
+            backgroundSize: classicSettings.background === 'wood' ? '20px 20px' : 'cover'
+          }}
           onClick={() => {
             // Deselect cards when clicking background
             setSelectedPileId(null);
@@ -3996,76 +4065,32 @@ export default function SolitaireEngine({
               if (!pile) return null;
 
               const isHighlighted = highlightedMoves.foundationIds.includes(config.id) || highlightedMoves.tableauIds.includes(config.id);
-              const ringColor = selectionColor === 'green' ? 'ring-green-400' : selectionColor === 'yellow' ? 'ring-amber-300' : 'ring-red-400';
 
-              // Render cards in this pile
-              const renderPileCards = () => {
-                if (pile.cards.length === 0) {
-                  // Empty pile placeholder
-                  return (
-                    <div className={`w-full h-full bg-slate-800/30 rounded border border-slate-700 ${isHighlighted ? `ring-2 ${ringColor}` : ''} flex items-center justify-center`}>
-                      {config.type === 'stock' && <div className="text-slate-600 text-xs">Stock</div>}
-                      {config.type === 'waste' && <div className="text-slate-600 text-xs">Waste</div>}
-                      {config.type === 'foundation' && <div className="text-slate-600 text-2xl opacity-20">🃏</div>}
-                      {config.type === 'cell' && <div className="text-slate-600 text-xs">Cell</div>}
-                      <button
-                        type="button"
-                        aria-label={`Empty ${config.type} ${config.id}`}
-                        className="absolute inset-0 w-full h-full bg-transparent"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCardClick(config.id, -1);
-                        }}
-                      />
-                    </div>
-                  );
-                }
+              // Convert coronata cards to classic format
+              const classicCards = pile.cards.map(c => ({
+                id: c.id,
+                rank: c.rank,
+                suit: c.suit as 'H' | 'D' | 'C' | 'S',
+                faceUp: c.faceUp !== false,
+              }));
 
-                return pile.cards.map((card, idx) => {
-                  let top = 0;
-                  let left = 0;
-
-                  if (config.fan === 'down') {
-                    // Calculate top offset based on all previous cards
-                    const prevCards = pile.cards.slice(0, idx);
-                    top = prevCards.reduce((acc, c) => {
-                      // Face-up cards: use fanSpacing, face-down cards: use 15% of cardWidth
-                      return acc + (c.faceUp ? (config.fanSpacing || 25) : (cardWidth * 0.15));
-                    }, 0);
-                  } else if (config.fan === 'right') {
-                    left = idx * (config.fanSpacing || 20);
-                  }
-
-                  // Override the renderCard positioning for classic games
-                  const classicCard = renderCard(card, idx, config.id);
-                  return (
-                    <div key={`${card.id}-${idx}`} className="absolute" style={{ top: `${top}px`, left: `${left}px`, zIndex: idx }}>
-                      {classicCard}
-                    </div>
-                  );
-                });
-              };
+              const selectedCardId = selectedPileId === config.id && selectedCardIndex !== null
+                ? pile.cards[selectedCardIndex]?.id
+                : undefined;
 
               return (
-                <div
+                <ClassicPile
                   key={config.id}
-                  className="absolute"
-                  style={{
-                    left: `${config.x}px`,
-                    top: `${config.y}px`,
-                    width: `${cardWidth}px`,
-                    height: config.fan === 'down' ? 'auto' : `${cardHeight}px`,
-                    minHeight: `${cardHeight}px`
-                  }}
-                  onClick={(e) => {
-                    if (config.type === 'stock' && pile.cards.length > 0) {
-                      e.stopPropagation();
-                      handleCardClick(config.id, pile.cards.length - 1);
-                    }
-                  }}
-                >
-                  {renderPileCards()}
-                </div>
+                  config={config}
+                  cards={classicCards}
+                  cardWidth={cardWidth}
+                  cardHeight={cardHeight}
+                  settings={classicSettings}
+                  onCardClick={(cardIndex) => handleCardClick(config.id, cardIndex)}
+                  selectedCardId={selectedCardId}
+                  selectionType={selectionColor}
+                  isHighlighted={isHighlighted}
+                />
               );
             });
           })()}
@@ -4265,12 +4290,13 @@ export default function SolitaireEngine({
                      )}
                      <div className="flex justify-between items-center">
                         <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">
-                           {activeDrawer === 'pause' ? '' 
-                            : activeDrawer === 'shop' ? '' 
-                            : activeDrawer === 'feedback' ? 'Feedback' 
-                            : activeDrawer === 'test' ? '' 
-                            : activeDrawer === 'settings' ? 'Settings' 
-                            : activeDrawer === 'blessing_select' ? 'Select a Blessing' 
+                           {activeDrawer === 'pause' ? ''
+                            : activeDrawer === 'shop' ? ''
+                            : activeDrawer === 'feedback' ? 'Feedback'
+                            : activeDrawer === 'test' ? ''
+                            : activeDrawer === 'settings' ? 'Settings'
+                            : activeDrawer === 'howtoplay' ? 'How to Play'
+                            : activeDrawer === 'blessing_select' ? 'Select a Blessing'
                             : activeDrawer.charAt(0).toUpperCase() + activeDrawer.slice(1)}
                         </h3>
                         {nonClosableDrawer === activeDrawer ? (
@@ -4285,7 +4311,31 @@ export default function SolitaireEngine({
                            <button className=" rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600"><img src="/icons/save.png" alt="" className="w-8 h-8" /></button>
                               <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('resign')}><img src="/icons/resign.png" alt="" className="w-8 h-8" /></button>
                               <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('feedback')}><img src="/icons/feedback.png" alt="" className="w-8 h-8" /></button>
-                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('test')}><FlaskConical size={32} /></button>
+                              <button
+                                 className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600"
+                                 onClick={() => {
+                                    if (confirm('Start a new game? Your current progress will be lost.')) {
+                                       const classicGame = CLASSIC_GAMES[selectedMode];
+                                       if (classicGame) {
+                                          const newState = classicGame.deal();
+                                          const coronataPiles = convertClassicPilesToCoronata(newState.piles);
+                                          setGameState(prev => ({
+                                             ...initialGameState(selectedMode),
+                                             piles: coronataPiles,
+                                             score: newState.score ?? 0,
+                                             moves: newState.moves ?? 0,
+                                             history: [],
+                                             customData: newState.customData ?? {}
+                                          }));
+                                       } else {
+                                          setGameState(initialGameState(selectedMode));
+                                       }
+                                       setActiveDrawer(null);
+                                       setElapsedTime(0);
+                                    }
+                                 }}>
+                                 <Play size={32} />
+                              </button>
                               <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><img src="/icons/settings.png" alt="" className="w-8 h-8" /></button>
                            </div>
                         ) : activeDrawer === 'inventory' ? (
@@ -4555,6 +4605,46 @@ export default function SolitaireEngine({
                                  )}
                               </div>
                            </div>
+                        ) : activeDrawer === 'howtoplay' ? (
+                           <div className="flex flex-col gap-3 text-slate-300">
+                              {(() => {
+                                 const classicGame = CLASSIC_GAMES[selectedMode];
+                                 if (classicGame && classicGame.details) {
+                                    const { objective, controls, rules } = classicGame.details;
+                                    return (
+                                       <>
+                                          {objective && (
+                                             <div className="bg-slate-800/50 rounded-lg p-3">
+                                                <h4 className="font-bold text-emerald-400 mb-2 uppercase text-xs">Objective</h4>
+                                                <p className="text-sm">{objective}</p>
+                                             </div>
+                                          )}
+                                          {controls && (
+                                             <div className="bg-slate-800/50 rounded-lg p-3">
+                                                <h4 className="font-bold text-blue-400 mb-2 uppercase text-xs">Controls</h4>
+                                                <p className="text-sm">{controls}</p>
+                                             </div>
+                                          )}
+                                          {rules && rules.length > 0 && (
+                                             <div className="bg-slate-800/50 rounded-lg p-3">
+                                                <h4 className="font-bold text-yellow-400 mb-2 uppercase text-xs">Rules</h4>
+                                                <ul className="text-sm space-y-1 list-disc list-inside">
+                                                   {rules.map((rule, i) => (
+                                                      <li key={i}>{rule}</li>
+                                                   ))}
+                                                </ul>
+                                             </div>
+                                          )}
+                                       </>
+                                    );
+                                 }
+                                 return (
+                                    <div className="bg-slate-800/50 rounded-lg p-4 text-center text-slate-400">
+                                       <p>How to play information not available for this mode.</p>
+                                    </div>
+                                 );
+                              })()}
+                           </div>
                         ) : activeDrawer === 'gameplay_settings' ? (
                            <div className="flex flex-col gap-2">
                               <label className="flex items-center justify-between text-sm text-slate-300 bg-slate-700/30 p-2 rounded">
@@ -4771,7 +4861,7 @@ export default function SolitaireEngine({
             )}
 
             {/* Bottom Bar - Different for Classic vs Coronata modes */}
-            {!CLASSIC_GAMES[selectedMode] || selectedMode.startsWith('spider') ? (
+            {!CLASSIC_GAMES[selectedMode] ? (
                <>
                   {selectedMode.startsWith('spider') ? (
                      /* Spider Mode - Show stock pile and completed runs */
@@ -4913,32 +5003,72 @@ export default function SolitaireEngine({
                </>
             ) : (
                <>
-                  {/* Classic Mode - Single Row with all buttons */}
-                  <div className="flex w-full gap-1">
-                     <button onClick={() => toggleDrawer('pause')} className={`p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}>
-                        <img src="/icons/pause.png" alt="Pause" className="w-[18px] h-[18px]" />
-                     </button>
-                     <button type="button" onClick={() => {/* TODO: Undo logic */}} className="p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 border border-slate-700">
-                        <img src="/icons/back.png" alt="Undo" className="w-[18px] h-[18px]" />
-                     </button>
-                     <button type="button" onClick={() => discardAndDrawHand()} aria-label="Draw from deck" className="p-2 bg-blue-900 hover:bg-blue-800 rounded text-blue-300 border border-blue-700 relative">
-                        <img src="/icons/foundation.png" alt="Draw" className="w-[18px] h-[18px]" />
-                        {gameState.piles.deck?.cards?.length > 0 && (
-                           <span className="absolute -top-1 -right-1 bg-slate-700 text-[8px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
+                  {/* Classic Mode - Standardized HUD */}
+                  <div className="relative w-full h-[73px] flex items-end justify-center gap-1">
+                     {/* Left: Card-shaped pause button */}
+                     <div className="absolute left-[1px] bottom-0">
+                        <button
+                           onClick={() => toggleDrawer('pause')}
+                           className={`relative w-[50px] h-[73px] rounded border border-slate-700 shadow-md overflow-hidden bg-slate-800 flex items-center justify-center pointer-events-auto hover:brightness-110 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}
+                           aria-label="Pause">
+                           <Menu size={24} className="text-slate-400" />
+                        </button>
+                     </div>
+
+                     {/* Center: Info buttons and stats */}
+                     <div className="absolute left-[52px] right-[52px] bottom-0 flex items-center justify-center gap-1">
+                        {/* How to Play button */}
+                        <button
+                           onClick={() => toggleDrawer('howtoplay')}
+                           className={`px-3 h-[73px] bg-slate-800 hover:bg-slate-700 rounded border border-slate-700 flex items-center justify-center ${activeDrawer === 'howtoplay' ? 'bg-slate-700' : ''}`}>
+                           <span className="text-2xl">❓</span>
+                        </button>
+
+                        {/* Move Count */}
+                        <div className="flex-1 h-[73px] rounded border border-slate-700 bg-slate-800 flex flex-col items-center justify-center">
+                           <Play size={18} className="text-slate-400" />
+                           <span className="text-sm font-bold text-slate-300">{gameState.moves}</span>
+                        </div>
+
+                        {/* Score */}
+                        <div className="flex-1 h-[73px] rounded border border-slate-700 bg-slate-800 flex flex-col items-center justify-center">
+                           <span className="text-lg">📊</span>
+                           <span className="text-sm font-bold text-yellow-400">{gameState.score}</span>
+                        </div>
+
+                        {/* Timer */}
+                        <div className="flex-1 h-[73px] rounded border border-slate-700 bg-slate-800 flex flex-col items-center justify-center">
+                           <Clock size={18} className="text-slate-400" />
+                           <span className="text-sm font-bold text-slate-300">{formatTime(elapsedTime)}</span>
+                        </div>
+
+                        {/* Mode-specific: Spider completed runs */}
+                        {selectedMode.startsWith('spider') && (
+                           <div className="h-[73px] rounded border border-green-700/50 bg-gradient-to-br from-green-900/30 to-slate-800 flex flex-col items-center justify-center px-3">
+                              <div className="text-[10px] text-green-400/70 font-bold">DONE</div>
+                              <span className="text-xl font-bold text-green-400">
+                                 {gameState.piles.completed ? Math.floor(gameState.piles.completed.cards.length / 13) : 0}
+                              </span>
+                              <div className="text-[9px] text-green-500/50">/ 8</div>
+                           </div>
                         )}
-                     </button>
-                     <button className="flex-1 py-1.5 rounded text-[14px] font-bold border border-slate-700 bg-slate-800 text-slate-400 flex flex-col items-center justify-center gap-0.5">
-                        <Clock size={18} />
-                        <span>{formatTime(elapsedTime)}</span>
-                     </button>
-                     <button className="flex-1 py-1.5 rounded text-[14px] font-bold border border-slate-700 bg-slate-800 text-slate-400 flex flex-col items-center justify-center gap-0.5">
-                        <span className="text-[18px]">📊</span>
-                        <span>{gameState.score}</span>
-                     </button>
-                     <button className="flex-1 py-1.5 rounded text-[14px] font-bold border border-slate-700 bg-slate-800 text-slate-400 flex flex-col items-center justify-center gap-0.5">
-                        <Play size={18} />
-                        <span>{gameState.moves}</span>
-                     </button>
+                     </div>
+
+                     {/* Right: Card-shaped undo button */}
+                     <div className="absolute right-[1px] bottom-0">
+                        <button
+                           onClick={() => {
+                              if (gameState.history && gameState.history.length > 0) {
+                                 const prevState = gameState.history[gameState.history.length - 1];
+                                 setGameState({ ...prevState, history: prevState.history || [] });
+                              }
+                           }}
+                           disabled={!gameState.history || gameState.history.length === 0}
+                           className="relative w-[50px] h-[73px] rounded border border-slate-700 shadow-md overflow-hidden bg-slate-800 flex items-center justify-center pointer-events-auto hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                           aria-label="Undo">
+                           <RefreshCw size={24} className="text-slate-400" />
+                        </button>
+                     </div>
                   </div>
                </>
             )}
