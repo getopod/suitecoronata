@@ -24,20 +24,21 @@ export const CURSE_DEFINITIONS: EffectDefinition[] = [
     id: 'reverse_psychology',
     name: 'Reverse Psychology',
     type: 'curse',
-    description: 'Flip board every 5 moves. Foundations remove flips.',
-    originalDescription: 'Every 5 moves, flip gameboard horizontally, then vertically, then horizontally, then vertically, & so on. Completed foundations remove 1 flip from 4 possible.',
-    effectState: { pendingFlips: [] },
+    description: 'Rotate board 90° CCW every 5 moves. Foundations remove rotations.',
+    originalDescription: 'Every 5 moves, rotate gameboard 90° counter-clockwise. Completed foundations remove 1 rotation from 4 possible.',
+    effectState: { pendingFlips: [], rotation: 0 },
     custom: {
       onMoveComplete: (state) => {
         const moves = state.moves + 1;
-        const flips = state.effectState.pendingFlips || [];
+        const rotation = state.effectState.rotation || 0;
         if (moves % 5 === 0) {
-          const next = (flips.length % 2 === 0) ? 'horizontal' : 'vertical';
-          return { effectState: { ...state.effectState, pendingFlips: [...flips, next] } };
+          // Add 90° counter-clockwise rotation (270° clockwise)
+          const newRotation = (rotation + 270) % 360;
+          return { effectState: { ...state.effectState, rotation: newRotation } };
         }
         return {};
       },
-      onActivate: (state) => ({ effectState: { ...state.effectState, pendingFlips: [] } })
+      onActivate: (state) => ({ effectState: { ...state.effectState, pendingFlips: [], rotation: 0 } })
     }
   },
 

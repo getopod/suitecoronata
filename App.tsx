@@ -1,6 +1,7 @@
 import { PATTERN_DEFINITIONS } from './engine/definitions/patterns';
 import React, { useState, useCallback, useEffect } from 'react';
-import { LayoutGrid, Skull, Lock, Key, Smile, Coins, Play, Gamepad2, BookOpen, HelpCircle, RefreshCw, X, Gift, Trophy, ArrowLeftRight, SkipBack, SkipForward, MessageSquare, FlaskConical, Save, Flag, Settings, ChevronDown, Pause, ShoppingCart, User, Unlock, Map as MapIcon, BarChart3, Link as LinkIcon, Bug, Clock, Menu, Target, PlusCircle, Wand2, Ghost } from 'lucide-react';
+import { Skull, Lock, Key, Smile, Coins, Play, RefreshCw, X, Gift, Trophy, FlaskConical, ChevronDown, ShoppingCart, User, Unlock, Map as MapIcon, BarChart3, Link as LinkIcon, Bug, Clock, Menu, Target, PlusCircle, LogIn } from 'lucide-react';
+import { useAuth } from './contexts/AuthContext';
 import { Card, GameState, Pile, Rank, Suit, MoveContext, Encounter, GameEffect, Wander, WanderChoice, WanderState, MinigameResult, PlayerStats, RunHistoryEntry, RunEncounterRecord } from './types';
 import { getCardColor, generateNewBoard, EFFECTS_REGISTRY, setEffectsRng, resetEffectsRng } from './data/effects';
 import { isHighestRank, isNextHigherInOrder, isNextLowerInOrder } from './utils/rankOrder';
@@ -291,10 +292,11 @@ const categoryIcons: Record<string, string> = {
    patterns: '/icons/fortune.png',
 };
 
-export default function SolitaireEngine({ 
-   effectsRegistry = EFFECTS_REGISTRY, 
-   wanderRegistry = WANDER_REGISTRY 
+export default function SolitaireEngine({
+   effectsRegistry = EFFECTS_REGISTRY,
+   wanderRegistry = WANDER_REGISTRY
 }: SolitaireEngineProps = {}) {
+   const auth = useAuth();
    // Placeholder undo function. Replace with real undo logic as needed.
    function undoLastMove() {
       alert('Undo not yet implemented.');
@@ -474,11 +476,14 @@ export default function SolitaireEngine({
   const [showProfile, setShowProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showUpdates, setShowUpdates] = useState(false);
-  const [showHowTo, setShowHowTo] = useState(false);
-  const [howToPage, setHowToPage] = useState(0);
+  const [showFeedback, setShowFeedback] = useState(false);
   const [selectedMode, setSelectedMode] = useState('coronata');
   const [glossaryTab, setGlossaryTab] = useState<'blessings'|'exploits'|'curses'|'patterns'>('blessings');
-  const [profileTab, setProfileTab] = useState<'stats'|'feats'|'recaps'>('stats');
+  const [feedbackTab, setFeedbackTab] = useState<'blessings'|'exploits'|'curses'|'patterns'>('exploits');
+  const [profileTab, setProfileTab] = useState<'stats'|'feats'|'recaps'|'account'>('stats');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [isSignup, setIsSignup] = useState(false);
   const [expandedAchievement, setExpandedAchievement] = useState<number | null>(null);
   const [expandedSettingsSection, setExpandedSettingsSection] = useState<string | null>(null);
   
@@ -2084,10 +2089,11 @@ export default function SolitaireEngine({
       );
     }
 
-      // For classic games, don't apply positioning here (handled by parent container)
+      // For classic games and Spider tableaus, don't apply positioning here (handled by parent container)
       const isClassicGame = CLASSIC_GAMES[selectedMode];
+      const isSpiderTableau = selectedMode.startsWith('spider') && pileId.includes('tableau');
       const cardStyle = pileId === 'hand' ? handStyle :
-                                 isClassicGame ? { zIndex: index } :
+                                 (isClassicGame || isSpiderTableau) ? {} :
                                  { top: `${pileId.includes('tableau') ? index * 18 : 0}px`, zIndex: index };
 
       // Improved animation class logic
@@ -2099,7 +2105,7 @@ export default function SolitaireEngine({
              <button
                   key={`${card.id}-${pileId}-${index}`}
                   type="button"
-                  className={`${isClassicGame ? 'relative' : 'absolute'} w-[50px] h-[73px] bg-transparent perspective-1000 select-none transition-transform hover:scale-105 hover:brightness-110 cursor-pointer ${cardAnimClass}`}
+                  className={`${isClassicGame || isSpiderTableau ? '' : 'absolute'} w-[50px] h-[73px] bg-transparent perspective-1000 select-none transition-transform hover:scale-105 hover:brightness-110 cursor-pointer ${cardAnimClass}`}
                   style={cardStyle}
                   onClick={(e) => { e.stopPropagation(); handleCardClick(pileId, index); }}
                   onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick(pileId, index); }}
@@ -2287,15 +2293,15 @@ export default function SolitaireEngine({
       return aNum - bNum; // same type, sort by number
    });
 
-   // Calculate dynamic zoom based on actual tableau count and foundation count
+   // Calculate dynamic card sizing based on tableau count
    const tableauCount = tableauPiles.length;
    const visibleTableauCount = tableauPiles.filter(p => !p.hidden).length;
-   const foundationCount = foundationPiles.length + (gameState.piles['shadow-realm'] ? 1 : 0);
 
-   // Improved zoom logic for classic/coronata modes
+   // Calculate tableau card width for layout
    let zoomScale = 1;
+   let tableauCardWidth = 50; // Default card width
    if (CLASSIC_GAMES[selectedMode]) {
-      // Classic mode: fit tableaus with 2px gaps and 2px margins
+      // Classic mode: use transform scale to fit tableaus
       const cardWidth = 50;
       const gap = 2;
       const margin = 2;
@@ -2303,25 +2309,19 @@ export default function SolitaireEngine({
       const requiredWidth = (tableauCount * cardWidth) + ((tableauCount - 1) * gap) + (margin * 2);
       zoomScale = Math.min(1, (screenWidth - 4) / requiredWidth);
    } else {
-      // Coronata mode: maintain consistent spacing, zoom out for extra tableaus
-      const BASE_TABLEAU_COUNT = 7;
-      const cardWidth = 50;
+      // Coronata mode: calculate card width to fit, keep 2px gaps fixed (no transform scale)
+      const baseCardWidth = 50;
       const gap = 2;
-      const margin = 2;
+      const margin = 1;
       const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 360;
+      const maxWidth = selectedMode.startsWith('spider') ? screenWidth : 448;
 
-      // Use base count for width calculation to maintain consistent spacing
-      const baseRequiredWidth = (Math.max(BASE_TABLEAU_COUNT, foundationCount) * cardWidth) + ((Math.max(BASE_TABLEAU_COUNT, foundationCount) - 1) * gap) + (margin * 2);
+      // Calculate available width for cards (after accounting for fixed gaps and margins)
+      const availableWidth = maxWidth - (margin * 2) - ((tableauCount - 1) * gap);
 
-      // Apply base responsive zoom
-      let baseZoom = Math.min(1, (screenWidth - 4) / baseRequiredWidth);
-
-      // Apply additional zoom if tableau count exceeds base
-      const tableauZoom = tableauCount > BASE_TABLEAU_COUNT ? BASE_TABLEAU_COUNT / tableauCount : 1;
-
-      zoomScale = baseZoom * tableauZoom;
+      // Calculate what card width we can fit
+      tableauCardWidth = Math.min(baseCardWidth, availableWidth / tableauCount);
    }
-   const maxWidth = 'auto';
 
   const currentEncounter = runPlan[gameState.runIndex];
   const currentThreat = effectsRegistry.find(e => e.id === currentEncounter?.effectId);
@@ -2357,18 +2357,6 @@ export default function SolitaireEngine({
         { id: 'cruel', name: 'Cruel', desc: 'Aces start in foundations. Tableaus build down in suit.', unlocked: true, hasStars: false },
      ];
 
-     // How to play pages
-     const howToPages = [
-        { title: 'Goal', content: 'Score points by moving cards to the Foundation piles. Build up from Ace to Queen, same suit. Reach the target score to clear each encounter!' },
-        { title: 'Moving Cards', content: 'Tap a card to select it, then tap a valid destination. In tableau, stack cards in descending order, alternating colors (red on black, black on red).' },
-        { title: 'The Deck', content: 'Tap the deck to draw cards. You can move the top card of the draw pile to tableau or foundation piles.' },
-        { title: 'Encounters', content: 'Each run has 10 encounters. All encounters are Curses that apply negative effects. Completing a curse lets you pick a blessing.' },
-        { title: 'Effects', content: 'Exploits help you. Curses hurt you. Blessings are powerful cards added to your deck. Collect them from the shop and wanders!' },
-        { title: 'The Shop', content: 'After Fear encounters, visit the Trade. Spend coins on Exploits or take Curses for bonus coins. Choose wisely!' },
-        { title: 'Wanders', content: 'Between encounters, you\'ll face random events. Make choices that can reward you with coins, effects, or... consequences.' },
-        { title: 'Winning', content: 'Beat all 10 encounters to complete a run. Your final score depends on coins, effects collected, and time taken. Good luck!' },
-     ];
-
      // Updates/changelog data
      const updates = [
         { version: 'v0.4.0', date: 'Dec 18, 2025', changes: ['Added Modes & profile screen', 'Wired up Settings UI', 'Trimmed more effects (155 to 57)'] },
@@ -2378,19 +2366,19 @@ export default function SolitaireEngine({
      ];
 
      return (
-      <div className="h-screen w-full bg-slate-900 text-white flex flex-col items-center justify-center p-12 gap-8">
-      <div className="text-center space-y-6">
-         <img src="/icons/logo-48x72.png" alt="Coronata" className="w-20 h-auto mx-auto mb-2" />
-         <h1 className="text-5xl font-black ">CORONATA</h1>
+      <div className="h-screen w-full bg-slate-900 text-white flex flex-col items-center justify-center p-4 sm:p-12 gap-6 sm:gap-8">
+      <div className="text-center space-y-4 sm:space-y-6">
+         <img src="/icons/logo-48x72.png" alt="Coronata" className="w-16 sm:w-20 h-auto mx-auto mb-2" />
+         <h1 className="text-4xl sm:text-5xl font-black">CORONATA</h1>
 
       </div>
-      <div className="grid grid-cols-3 gap-8 w-full">
-         <button onClick={() => setShowModes(true)} className="flex items-center justify-center"><Play fill="currentcolor" className="w-20 h-20"/></button>
-         <button onClick={() => setShowHowTo(true)} className="flex items-center justify-center"><img src="/icons/howto.png" alt="How To" className="w-20 h-20" /></button>
-         <button className="flex items-center justify-center" onClick={() => setShowGlossary(true)}><img src="/icons/glossary.png" alt="Glossary" className="w-20 h-20" /></button>
-         <button onClick={() => setShowUpdates(true)} className="flex items-center justify-center"><RefreshCw size={65}/></button>
-         <button onClick={() => setShowProfile(true)} className="flex items-center justify-center"><User size={65}/></button>
-         <button onClick={() => setShowSettings(true)} className="flex items-center justify-center"><img src="/icons/settings.png" alt="Settings" className="w-20 h-20" /></button>
+      <div className="grid grid-cols-3 gap-3 sm:gap-6 w-full max-w-sm sm:max-w-md mx-auto px-2">
+         <button type="button" onClick={() => setShowModes(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><Play fill="currentcolor" className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none"/></button>
+         <button type="button" onClick={() => setShowFeedback(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><Bug className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none"/></button>
+         <button type="button" onClick={() => setShowGlossary(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/glossary.png" alt="Glossary" className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none" /></button>
+         <button type="button" onClick={() => setShowUpdates(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><RefreshCw className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none"/></button>
+         <button type="button" onClick={() => setShowProfile(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><User className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none"/></button>
+         <button type="button" onClick={() => setShowSettings(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/settings.png" alt="Settings" className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none" /></button>
       </div>
 
            {/* MODES PANEL - Enhanced accordion style */}
@@ -2399,7 +2387,7 @@ export default function SolitaireEngine({
                  if (expandedModes.has(id)) {
                     // Collapse this mode
                     setExpandedModes(new Set());
-                    setExpandedSections(prev => new Set(Array.from(prev).filter(s => !s.startsWith(`${id}-`))));
+                    setExpandedSections(prev => new Set(Array.from(prev).filter((s: string) => !s.startsWith(`${id}-`))));
                  } else {
                     // Expand only this mode, collapse all others
                     setExpandedModes(new Set([id]));
@@ -2555,7 +2543,7 @@ export default function SolitaireEngine({
 
                  {/* Profile Tab Bar */}
                  <div className="flex gap-1 mb-4">
-                    {(['stats', 'feats', 'recaps'] as const).map(tab => (
+                    {(['stats', 'feats', 'recaps', 'account'] as const).map(tab => (
                        <button
                           key={tab}
                           onClick={() => setProfileTab(tab)}
@@ -2567,6 +2555,7 @@ export default function SolitaireEngine({
                           {tab === 'stats' && <BarChart3 size={16} />}
                           {tab === 'feats' && <img src="/icons/feats.png" alt="" className="w-4 h-4" />}
                           {tab === 'recaps' && <img src="/icons/run history.png" alt="" className="w-4 h-4" />}
+                          {tab === 'account' && <LogIn size={16} />}
                           {tab === 'recaps' ? 'History' : tab.charAt(0).toUpperCase() + tab.slice(1)}
                        </button>
                     ))}
@@ -2806,6 +2795,292 @@ export default function SolitaireEngine({
                              )}
                           </div>
                        </>
+                    )}
+
+                    {/* ACCOUNT TAB */}
+                    {profileTab === 'account' && (
+                       <div className="space-y-4">
+                          {auth.loading ? (
+                             <div className="text-center py-8 text-slate-400">Loading...</div>
+                          ) : auth.user ? (
+                             <>
+                                {/* Logged in view */}
+                                <div className="bg-slate-800 p-4 rounded-xl space-y-3">
+                                   <div className="flex items-center justify-center gap-3">
+                                      <User size={48} className="text-purple-400" />
+                                   </div>
+                                   <div className="text-center">
+                                      <div className="text-sm text-slate-400">Signed in as</div>
+                                      <div className="font-bold text-white">{auth.user.email || 'Anonymous'}</div>
+                                      {auth.isAnonymous && (
+                                         <div className="text-xs text-yellow-500 mt-1">Anonymous Account</div>
+                                      )}
+                                   </div>
+                                   {auth.isAnonymous && (
+                                      <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-3 text-sm text-yellow-200">
+                                         <div className="font-bold mb-1">Save your progress!</div>
+                                         <div className="text-xs text-yellow-300/80">Create an account to sync your data across devices.</div>
+                                      </div>
+                                   )}
+                                </div>
+
+                                {auth.isAnonymous ? (
+                                   <>
+                                      <div className="text-sm text-slate-400 text-center mb-3">Link your account to save progress</div>
+
+                                      {/* Social Sign-In Options for Anonymous Users */}
+                                      <div className="space-y-2 mb-4">
+                                         <button
+                                            onClick={async () => {
+                                               try {
+                                                  await auth.signInWithGoogle();
+                                               } catch (error: any) {
+                                                  alert(error.message || 'Failed to link with Google');
+                                               }
+                                            }}
+                                            className="w-full bg-white hover:bg-gray-100 text-gray-800 py-2.5 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 text-sm">
+                                            <svg className="w-5 h-5" viewBox="0 0 24 24">
+                                               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                               <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                                            </svg>
+                                            Link with Google
+                                         </button>
+                                         <button
+                                            onClick={async () => {
+                                               try {
+                                                  await auth.signInWithApple();
+                                               } catch (error: any) {
+                                                  alert(error.message || 'Failed to link with Apple');
+                                               }
+                                            }}
+                                            className="w-full bg-black hover:bg-gray-900 text-white py-2.5 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 text-sm">
+                                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                                               <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                                            </svg>
+                                            Link with Apple
+                                         </button>
+                                         <button
+                                            onClick={async () => {
+                                               try {
+                                                  await auth.signInWithFacebook();
+                                               } catch (error: any) {
+                                                  alert(error.message || 'Failed to link with Facebook');
+                                               }
+                                            }}
+                                            className="w-full bg-[#1877F2] hover:bg-[#166FE5] text-white py-2.5 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 text-sm">
+                                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                                               <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                                            </svg>
+                                            Link with Facebook
+                                         </button>
+                                      </div>
+
+                                      <div className="relative my-3">
+                                         <div className="absolute inset-0 flex items-center">
+                                            <div className="w-full border-t border-slate-700"></div>
+                                         </div>
+                                         <div className="relative flex justify-center text-xs uppercase">
+                                            <span className="bg-slate-900 px-2 text-slate-500">Or use email</span>
+                                         </div>
+                                      </div>
+
+                                      <div className="space-y-3">
+                                         <input
+                                            type="email"
+                                            placeholder="Email"
+                                            value={loginEmail}
+                                            onChange={(e) => setLoginEmail(e.target.value)}
+                                            className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-sm text-white"
+                                         />
+                                         <input
+                                            type="password"
+                                            placeholder="Password"
+                                            value={loginPassword}
+                                            onChange={(e) => setLoginPassword(e.target.value)}
+                                            className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-sm text-white"
+                                         />
+                                         <button
+                                            onClick={async () => {
+                                               try {
+                                                  await auth.signUp(loginEmail, loginPassword);
+                                                  alert('Account created successfully!');
+                                                  setLoginEmail('');
+                                                  setLoginPassword('');
+                                               } catch (error: any) {
+                                                  alert(error.message || 'Failed to create account');
+                                               }
+                                            }}
+                                            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-bold transition-colors">
+                                            Create Account & Link Progress
+                                         </button>
+                                         <button
+                                            onClick={async () => {
+                                               try {
+                                                  await auth.signIn(loginEmail, loginPassword);
+                                                  setLoginEmail('');
+                                                  setLoginPassword('');
+                                               } catch (error: any) {
+                                                  alert(error.message || 'Failed to sign in');
+                                               }
+                                            }}
+                                            className="w-full bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-lg font-bold transition-colors">
+                                            Sign In to Existing Account
+                                         </button>
+                                      </div>
+                                   </>
+                                ) : (
+                                   <button
+                                      onClick={async () => {
+                                         if (confirm('Are you sure you want to sign out?')) {
+                                            await auth.signOut();
+                                         }
+                                      }}
+                                      className="w-full bg-red-600 hover:bg-red-500 text-white py-3 rounded-lg font-bold transition-colors">
+                                      Sign Out
+                                   </button>
+                                )}
+                             </>
+                          ) : (
+                             <>
+                                {/* Not logged in view */}
+                                <div className="text-center py-4">
+                                   <User size={64} className="mx-auto text-slate-600 mb-3" />
+                                   <h3 className="text-lg font-bold mb-2">{isSignup ? 'Create Account' : 'Sign In'}</h3>
+                                   <p className="text-sm text-slate-400">Sync your progress across devices</p>
+                                </div>
+
+                                {/* Social Sign-In Buttons */}
+                                <div className="space-y-2">
+                                   <button
+                                      onClick={async () => {
+                                         try {
+                                            await auth.signInWithGoogle();
+                                         } catch (error: any) {
+                                            alert(error.message || 'Failed to sign in with Google');
+                                         }
+                                      }}
+                                      className="w-full bg-white hover:bg-gray-100 text-gray-800 py-3 rounded-lg font-bold transition-colors flex items-center justify-center gap-2">
+                                      <svg className="w-5 h-5" viewBox="0 0 24 24">
+                                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                         <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                         <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                         <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                                      </svg>
+                                      Continue with Google
+                                   </button>
+                                   <button
+                                      onClick={async () => {
+                                         try {
+                                            await auth.signInWithApple();
+                                         } catch (error: any) {
+                                            alert(error.message || 'Failed to sign in with Apple');
+                                         }
+                                      }}
+                                      className="w-full bg-black hover:bg-gray-900 text-white py-3 rounded-lg font-bold transition-colors flex items-center justify-center gap-2">
+                                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                                         <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                                      </svg>
+                                      Continue with Apple
+                                   </button>
+                                   <button
+                                      onClick={async () => {
+                                         try {
+                                            await auth.signInWithFacebook();
+                                         } catch (error: any) {
+                                            alert(error.message || 'Failed to sign in with Facebook');
+                                         }
+                                      }}
+                                      className="w-full bg-[#1877F2] hover:bg-[#166FE5] text-white py-3 rounded-lg font-bold transition-colors flex items-center justify-center gap-2">
+                                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                                         <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                                      </svg>
+                                      Continue with Facebook
+                                   </button>
+                                </div>
+
+                                <div className="relative my-4">
+                                   <div className="absolute inset-0 flex items-center">
+                                      <div className="w-full border-t border-slate-700"></div>
+                                   </div>
+                                   <div className="relative flex justify-center text-xs uppercase">
+                                      <span className="bg-slate-900 px-2 text-slate-500">Or continue with email</span>
+                                   </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                   <input
+                                      type="email"
+                                      placeholder="Email"
+                                      value={loginEmail}
+                                      onChange={(e) => setLoginEmail(e.target.value)}
+                                      className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-sm text-white"
+                                   />
+                                   <input
+                                      type="password"
+                                      placeholder="Password"
+                                      value={loginPassword}
+                                      onChange={(e) => setLoginPassword(e.target.value)}
+                                      className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-sm text-white"
+                                   />
+                                   {!isSignup && (
+                                      <button
+                                         onClick={async () => {
+                                            if (!loginEmail) {
+                                               alert('Please enter your email address');
+                                               return;
+                                            }
+                                            try {
+                                               await auth.resetPassword(loginEmail);
+                                               alert('Password reset email sent! Check your inbox.');
+                                            } catch (error: any) {
+                                               alert(error.message || 'Failed to send reset email');
+                                            }
+                                         }}
+                                         className="w-full text-sm text-blue-400 hover:text-blue-300 text-right">
+                                         Forgot password?
+                                      </button>
+                                   )}
+                                   {isSignup ? (
+                                      <button
+                                         onClick={async () => {
+                                            try {
+                                               await auth.signUp(loginEmail, loginPassword);
+                                               alert('Account created successfully!');
+                                               setLoginEmail('');
+                                               setLoginPassword('');
+                                            } catch (error: any) {
+                                               alert(error.message || 'Failed to create account');
+                                            }
+                                         }}
+                                         className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-bold transition-colors">
+                                         Create Account
+                                      </button>
+                                   ) : (
+                                      <button
+                                         onClick={async () => {
+                                            try {
+                                               await auth.signIn(loginEmail, loginPassword);
+                                               setLoginEmail('');
+                                               setLoginPassword('');
+                                            } catch (error: any) {
+                                               alert(error.message || 'Failed to sign in');
+                                            }
+                                         }}
+                                         className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-bold transition-colors">
+                                         Sign In
+                                      </button>
+                                   )}
+                                   <button
+                                      onClick={() => setIsSignup(!isSignup)}
+                                      className="w-full text-sm text-slate-400 hover:text-slate-300">
+                                      {isSignup ? 'Already have an account? Sign in' : 'Need an account? Sign up'}
+                                   </button>
+                                </div>
+                             </>
+                          )}
+                       </div>
                     )}
                  </div>
               </div>
@@ -3412,58 +3687,111 @@ export default function SolitaireEngine({
               </div>
            )}
 
-           {/* HOW TO PLAY PANEL */}
-           {showHowTo && (
-              <div className="fixed inset-0 bg-slate-900 z-50 p-4 flex flex-col animate-in slide-in-from-bottom-10">
-                 <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
-                    <h2 className="text-2xl font-bold">How To Play</h2>
-                    <button onClick={() => { setShowHowTo(false); setHowToPage(0); }}><X /></button>
+           {/* FEEDBACK PANEL */}
+           {showFeedback && (
+              <div className="fixed inset-0 bg-slate-900 z-50 flex flex-col animate-in slide-in-from-bottom-10">
+                 <div className="flex justify-between items-center p-4 border-b border-slate-700">
+                    <h2 className="text-2xl font-bold">Feedback</h2>
+                    <button onClick={() => setShowFeedback(false)}><X /></button>
                  </div>
-                 <div className="flex-1 flex flex-col">
-                    {/* Page indicator */}
-                    <div className="flex justify-center gap-1.5 mb-6">
-                       {howToPages.map((_, i) => (
-                          <button 
-                             key={i} 
-                             onClick={() => setHowToPage(i)}
-                             className={`w-2 h-2 rounded-full transition-all ${i === howToPage ? 'bg-purple-500 w-6' : 'bg-slate-600'}`}
-                          />
+
+                 {/* Feedback Type Buttons */}
+                 <div className="p-4 border-b border-slate-700">
+                    <div className="flex gap-2">
+                       {['bug', 'ui', 'effect', 'request'].map(t => (
+                          <button key={t} onClick={() => setFeedbackType(t)} className={`flex-1 px-3 py-2 rounded text-xs uppercase font-bold ${feedbackType === t ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'}`}>{t}</button>
                        ))}
                     </div>
+                 </div>
 
-                    {/* Content */}
-                    <div className="flex-1 flex items-center justify-center">
-                       <div className="text-center max-w-sm">
-                          <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-slate-800 border-2 border-slate-600 flex items-center justify-center">
-                             <span className="text-2xl font-bold text-slate-400">{howToPage + 1}</span>
-                          </div>
-                          <h3 className="text-2xl font-bold mb-4">{howToPages[howToPage].title}</h3>
-                          <p className="text-slate-300 leading-relaxed">{howToPages[howToPage].content}</p>
+                 {/* Description Textarea */}
+                 <div className="p-4 border-b border-slate-700">
+                    <textarea className="w-full h-24 bg-slate-800 border border-slate-600 rounded p-3 text-sm text-white resize-none" placeholder="Describe issue or idea..." value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} />
+                 </div>
+
+                 {/* Category Tabs */}
+                 <div className="px-4 pt-2">
+                    <div className="text-sm text-slate-400 mb-2 uppercase font-bold">Related Effects</div>
+                    <div className="grid grid-cols-4 gap-2">
+                       {(['blessings', 'exploits', 'curses', 'patterns'] as const).map(cat => (
+                          <button
+                             key={cat}
+                             onClick={() => setFeedbackTab(cat)}
+                             className={`px-2 py-2 rounded-lg text-xs font-bold flex flex-col items-center gap-1 transition-all ${
+                                feedbackTab === cat
+                                   ? 'bg-slate-700 text-white'
+                                   : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
+                             }`}>
+                             <img src={categoryIcons[cat]} alt="" className="w-6 h-6" />
+                             <span className="capitalize">{cat}</span>
+                          </button>
+                       ))}
+                    </div>
+                 </div>
+
+                 {/* Effects List - Flex-1 to fill space */}
+                 <div className="flex-1 overflow-y-auto p-4 min-h-0">
+                    {feedbackTab === 'patterns' ? (
+                       <div className="space-y-2">
+                          {PATTERN_DEFINITIONS.map(p => (
+                             <label key={p.id} className="flex items-center gap-3 p-2 rounded bg-slate-800/50 hover:bg-slate-800 cursor-pointer">
+                                <input
+                                   type="checkbox"
+                                   checked={!!feedbackChecks[p.id]}
+                                   onChange={() => setFeedbackChecks(prev => ({...prev, [p.id]: !prev[p.id]}))}
+                                   className="rounded bg-slate-700 border-slate-500"
+                                />
+                                <ResponsiveIcon name={p.id || p.name} fallbackType="exploit" size={32} className="w-8 h-8 rounded shrink-0" alt={p.name} />
+                                <span className="text-sm text-slate-300 flex-1">{p.name}</span>
+                             </label>
+                          ))}
                        </div>
-                    </div>
+                    ) : (
+                       <div className="space-y-2">
+                          {effectsRegistry.filter(e => {
+                             if (feedbackTab === 'blessings') return e.type === 'blessing';
+                             if (feedbackTab === 'exploits') return ['exploit', 'epic', 'legendary', 'rare', 'uncommon'].includes(e.type);
+                             if (feedbackTab === 'curses') return e.type === 'curse';
+                             return false;
+                          }).map(e => {
+                             const effectType = e.type === 'blessing' ? 'blessing' : e.type === 'curse' ? 'curse' : 'exploit';
+                             return (
+                                <label key={e.id} className="flex items-center gap-3 p-2 rounded bg-slate-800/50 hover:bg-slate-800 cursor-pointer">
+                                   <input
+                                      type="checkbox"
+                                      checked={!!feedbackChecks[e.id]}
+                                      onChange={() => setFeedbackChecks(prev => ({...prev, [e.id]: !prev[e.id]}))}
+                                      className="rounded bg-slate-700 border-slate-500"
+                                   />
+                                   <ResponsiveIcon name={e.id || e.name} fallbackType={effectType} size={32} className="w-8 h-8 rounded shrink-0" alt={e.name} />
+                                   <span className="text-sm text-slate-300 flex-1">{e.name}</span>
+                                </label>
+                             );
+                          })}
+                       </div>
+                    )}
+                 </div>
 
-                    {/* Navigation */}
-                    <div className="flex gap-3 pt-4 border-t border-slate-700">
-                       <button 
-                          onClick={() => setHowToPage(p => Math.max(0, p - 1))}
-                          disabled={howToPage === 0}
-                          className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg font-bold">
-                          Previous
-                       </button>
-                       {howToPage < howToPages.length - 1 ? (
-                          <button 
-                             onClick={() => setHowToPage(p => p + 1)}
-                             className="flex-1 py-3 bg-purple-600 hover:bg-purple-500 rounded-lg font-bold">
-                             Next
-                          </button>
-                       ) : (
-                          <button 
-                             onClick={() => { setShowHowTo(false); setHowToPage(0); }}
-                             className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-lg font-bold">
-                             Got It!
-                          </button>
-                       )}
-                    </div>
+                 {/* Submit Button - Always at bottom */}
+                 <div className="p-4 border-t border-slate-700">
+                    <button className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-bold transition-colors" onClick={async () => {
+                       try {
+                          const { submitFeedback } = await import('./services/simpleLogger');
+                          await submitFeedback({
+                             feedbackType,
+                             feedback: feedbackText,
+                             relatedEffects: feedbackChecks,
+                          });
+                          alert("Feedback Sent!");
+                          setFeedbackText("");
+                          setFeedbackType('bug');
+                          setFeedbackChecks({});
+                          setShowFeedback(false);
+                       } catch (error) {
+                          console.error("Failed to send feedback:", error);
+                          alert("Failed to send feedback. Please try again.");
+                       }
+                    }}>Submit Report</button>
                  </div>
               </div>
            )}
@@ -3644,7 +3972,7 @@ export default function SolitaireEngine({
       )}
 
       {/* Classic Game Layout - Uses absolute positioning from layout() */}
-      {CLASSIC_GAMES[selectedMode] ? (
+      {CLASSIC_GAMES[selectedMode] && !selectedMode.startsWith('spider') ? (
         <div
           className="flex-1 w-full mx-auto pb-40 overflow-x-auto overflow-visible relative"
           style={{ height: 'calc(100vh - 140px)' }}
@@ -3695,14 +4023,23 @@ export default function SolitaireEngine({
 
                 return pile.cards.map((card, idx) => {
                   let top = 0;
-                  if (config.fan === 'down' && config.fanSpacing) {
-                    top = idx * config.fanSpacing;
+                  let left = 0;
+
+                  if (config.fan === 'down') {
+                    // Calculate top offset based on all previous cards
+                    const prevCards = pile.cards.slice(0, idx);
+                    top = prevCards.reduce((acc, c) => {
+                      // Face-up cards: use fanSpacing, face-down cards: use 15% of cardWidth
+                      return acc + (c.faceUp ? (config.fanSpacing || 25) : (cardWidth * 0.15));
+                    }, 0);
+                  } else if (config.fan === 'right') {
+                    left = idx * (config.fanSpacing || 20);
                   }
 
                   // Override the renderCard positioning for classic games
                   const classicCard = renderCard(card, idx, config.id);
                   return (
-                    <div key={`${card.id}-${idx}`} className="absolute" style={{ top: `${top}px`, left: 0, zIndex: idx }}>
+                    <div key={`${card.id}-${idx}`} className="absolute" style={{ top: `${top}px`, left: `${left}px`, zIndex: idx }}>
                       {classicCard}
                     </div>
                   );
@@ -3734,20 +4071,14 @@ export default function SolitaireEngine({
           })()}
         </div>
       ) : (
-        /* Coronata Mode Layout - Uses flex/grid */
-        <div className={`flex-1 w-full mx-auto p-[2px] pb-40 overflow-x-auto overflow-visible`} style={{ transform: `scale(${zoomScale})`, transformOrigin: 'top center' }}>
+        /* Coronata Mode Layout - Uses flex/grid with dynamic card sizing */
+        <div className={`flex-1 w-full mx-auto px-1 py-[2px] pb-40 overflow-x-auto overflow-visible`}>
           <div className="flex justify-center mb-4">
             <div className="grid gap-[2px] transition-transform duration-700" style={{
                gridTemplateColumns: `repeat(${foundationPiles.length + (gameState.piles['shadow-realm'] ? 1 : 0)}, minmax(0, 50px))`,
                transform: (() => {
-                  const pendingFlips = gameState.effectState?.pendingFlips || [];
-                  let scaleX = 1;
-                  let scaleY = 1;
-                  pendingFlips.forEach((flip: string) => {
-                     if (flip === 'horizontal') scaleX *= -1;
-                     if (flip === 'vertical') scaleY *= -1;
-                  });
-                  return pendingFlips.length > 0 ? `scale(${scaleX}, ${scaleY})` : 'none';
+                  const rotation = gameState.effectState?.rotation || 0;
+                  return rotation !== 0 ? `rotate(${rotation}deg)` : 'none';
                })()
             }}>
                   {/* Shadow Realm Pile */}
@@ -3816,17 +4147,11 @@ export default function SolitaireEngine({
           )}
 
           <div className="flex justify-center">
-            <div className="grid gap-x-[2px] h-full transition-transform duration-700" style={{
-               gridTemplateColumns: `repeat(${tableauCount}, minmax(0, 50px))`,
+            <div className="grid gap-[2px] h-full transition-transform duration-700" style={{
+               gridTemplateColumns: `repeat(${tableauCount}, minmax(0, ${tableauCardWidth}px))`,
                transform: (() => {
-                  const pendingFlips = gameState.effectState?.pendingFlips || [];
-                  let scaleX = 1;
-                  let scaleY = 1;
-                  pendingFlips.forEach((flip: string) => {
-                     if (flip === 'horizontal') scaleX *= -1;
-                     if (flip === 'vertical') scaleY *= -1;
-                  });
-                  return pendingFlips.length > 0 ? `scale(${scaleX}, ${scaleY})` : 'none';
+                  const rotation = gameState.effectState?.rotation || 0;
+                  return rotation !== 0 ? `rotate(${rotation}deg)` : 'none';
                })()
             }}>
                  {tableauPiles.map(pile => {
@@ -3865,7 +4190,31 @@ export default function SolitaireEngine({
                               </div>
                            );
                         })()}
-                        {pile.cards.map((c, idx) => renderCard(c, idx, pile.id))}
+                        {pile.cards.map((c, idx) => {
+                           // Spider-specific stacking with face-up/face-down spacing
+                           if (selectedMode.startsWith('spider')) {
+                              // Calculate cumulative offset based on previous cards
+                              let topOffset = 0;
+                              const prevCards = pile.cards.slice(0, idx);
+                              const scaledCardWidth = 50 * zoomScale;
+                              const scaledCardHeight = 73 * zoomScale;
+
+                              prevCards.forEach(card => {
+                                 // Face-down cards: 15% of scaled card width
+                                 // Face-up cards: 22% of scaled card height
+                                 topOffset += card.faceUp ? (scaledCardHeight * 0.22) : (scaledCardWidth * 0.15);
+                              });
+
+                              return (
+                                 <div key={`${c.id}-${idx}`} className="absolute" style={{ top: `${topOffset}px`, left: 0, zIndex: idx }}>
+                                    {renderCard(c, idx, pile.id)}
+                                 </div>
+                              );
+                           }
+
+                           // Regular Coronata stacking
+                           return renderCard(c, idx, pile.id);
+                        })}
                     </div>
                  )})}
             </div>
@@ -4029,7 +4378,24 @@ export default function SolitaireEngine({
                                     ))}
                                  </div>
                               </div>
-                              <button className="w-full bg-emerald-600 text-white py-2 rounded font-bold" onClick={() => { alert("Feedback Sent!"); setActiveDrawer('pause'); }}>Submit Report</button>
+                              <button className="w-full bg-emerald-600 text-white py-2 rounded font-bold" onClick={async () => {
+                                 try {
+                                    const { submitFeedback } = await import('./services/simpleLogger');
+                                    await submitFeedback({
+                                       feedbackType,
+                                       feedback: feedbackText,
+                                       relatedEffects: feedbackChecks,
+                                    });
+                                    alert("Feedback Sent!");
+                                    setFeedbackText("");
+                                    setFeedbackType('bug');
+                                    setFeedbackChecks({});
+                                    setActiveDrawer('pause');
+                                 } catch (error) {
+                                    console.error("Failed to send feedback:", error);
+                                    alert("Failed to send feedback. Please try again.");
+                                 }
+                              }}>Submit Report</button>
                            </div>
                         ) : activeDrawer === 'resign' ? (
                            <div className="flex flex-col gap-4 text-center">
@@ -4405,102 +4771,145 @@ export default function SolitaireEngine({
             )}
 
             {/* Bottom Bar - Different for Classic vs Coronata modes */}
-            {!CLASSIC_GAMES[selectedMode] ? (
+            {!CLASSIC_GAMES[selectedMode] || selectedMode.startsWith('spider') ? (
                <>
-                  {/* Coronata Mode - Compact HUD: left menu card, centered hand (rendered above), right discard card */}
-                  <div className="relative w-full h-[73px] flex items-end justify-center">
-                     {/* Left card-shaped menu button (Bag of Holding icon) */}
-                               <div className="absolute left-[1px] bottom-0">
-                                    <button
-                                       onClick={() => {
-                                          // If drawer is locked and active, respect the lock
-                                          if (nonClosableDrawer && activeDrawer === nonClosableDrawer && (activeDrawer === 'inventory' || activeDrawer === 'pause')) return;
-                                          // If inventory or pause is open, close them; otherwise open inventory
-                                          if (activeDrawer === 'inventory' || activeDrawer === 'pause') {
-                                             setActiveDrawer(null);
-                                             setNonClosableDrawer(null);
-                                          } else {
-                                             toggleDrawer('inventory');
-                                          }
-                                       }}
-                                       className={`relative w-[50px] h-[73px] rounded border border-slate-700 shadow-md overflow-hidden bg-slate-800 flex items-center justify-center pointer-events-auto`} aria-label="Inventory">
-                                        <img src="/icons/bagofholding.png" alt="Bag of Holding" className="w-7 h-7" />
-                                    </button>
-                               </div>
-
-                     {/* Center: player's hand with overlapping cards */}
-                    <div className="absolute left-[52px] right-[52px] bottom-0 flex items-center justify-center pointer-events-none">
-                       <div className="relative flex items-center justify-center" style={{
-                          width: (() => {
-                             const numCards = gameState.piles.hand.cards.length;
-                             if (numCards === 0) return '0px';
-                             const availableWidth = typeof window !== 'undefined' ? window.innerWidth - 104 : 256;
-                             const cardWidth = 50;
-                             const totalWidth = numCards * cardWidth;
-                             return totalWidth <= availableWidth ? `${totalWidth}px` : `${availableWidth}px`;
-                          })(),
-                          height: '73px'
-                       }}>
-                          {gameState.piles.hand.cards.map((c, i) => {
-                             const numCards = gameState.piles.hand.cards.length;
-                             const availableWidth = typeof window !== 'undefined' ? window.innerWidth - 104 : 256;
-                             const cardWidth = 50;
-                             const totalWidth = numCards * cardWidth;
-                             const spacing = totalWidth <= availableWidth ? cardWidth : Math.max(10, (availableWidth - cardWidth) / Math.max(1, numCards - 1));
-
-                             return (
-                                <div key={`hand-overlap-${c.id}-${i}`} className="absolute pointer-events-auto" style={{ left: `${i * spacing}px`, zIndex: i }}>
-                                   {renderHandCardHUD(c, i)}
-                                </div>
-                             );
-                          })}
-                       </div>
-                    </div>
-
-                     {/* Right card-shaped discard/draw button (no card back) */}
-                     <div className="absolute right-[1px] bottom-0">
-                        <button type="button" onClick={() => discardAndDrawHand()} aria-label="Discard/Draw" className="relative w-[50px] h-[73px] rounded border border-blue-700 shadow-md overflow-hidden bg-blue-900 flex items-center justify-center pointer-events-auto hover:brightness-110">
-                           <img src="/icons/foundation.png" alt="Discard" className="w-6 h-6 opacity-90" />
-                           {gameState.piles.deck.cards.length > 0 && (
-                              <span className="absolute -top-1 -right-1 bg-slate-700 text-[14px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
-                           )}
+                  {selectedMode.startsWith('spider') ? (
+                     /* Spider Mode - Show stock pile and completed runs */
+                     <div className="relative w-full h-[73px] flex items-end justify-center gap-2 px-2">
+                        {/* Left: Menu button */}
+                        <button
+                           onClick={() => toggleDrawer('pause')}
+                           className="relative w-[50px] h-[73px] rounded border border-slate-700 shadow-md overflow-hidden bg-slate-800 flex items-center justify-center pointer-events-auto hover:brightness-110"
+                           aria-label="Menu">
+                           <Menu size={24} className="text-slate-400" />
                         </button>
-                     </div>
-                  </div>
 
-                  {/* Coronata Mode - Run Progress Bar (between player hand & score bar) */}
-                  <div className="flex justify-between px-1 my-2 gap-0.5 relative group">
-                     {runPlan.map((enc, i) => {
-                        const eff = effectsRegistry.find(e => e.id === enc.effectId);
-                        const isCompleted = i < gameState.runIndex;
-                        const isCurrent = i === gameState.runIndex;
-                        const iconClass = isCompleted ? 'opacity-80' : isCurrent ? 'opacity-100' : 'opacity-40 grayscale';
-                        const iconStyle = isCurrent ? { filter: 'brightness(1.5) saturate(1.5) hue-rotate(-15deg)' } : {};
-                        const isCurrentCurse = isCurrent && enc.type === 'curse';
-                        return (
+                        {/* Center: Stock pile - click to deal to all tableaus */}
+                        <div className="flex-1 flex items-center justify-center">
                            <button
-                              key={i}
                               type="button"
-                              className={`w-8 h-8 rounded flex items-center justify-center transition-all ${isCompleted ? 'bg-green-500/10 border-2 border-green-500' : isCurrent ? 'bg-orange-500/10 border-2 border-orange-500 animate-pulse' : 'bg-slate-700/10 border-2 border-slate-700'}`}
-                              onClick={() => isCurrentCurse ? toggleDrawer('curse') : alert(`${enc.type.toUpperCase()}: ${eff?.name || 'Level ' + (i+1)}\n${eff?.description || 'Score goal: ' + enc.goal}`)}
-                              aria-label={`Encounter ${i + 1} ${enc.type} ${eff?.name ?? ''}`}>
-                                             <span className={`w-8 h-8 object-contain aspect-square stroke-2 fill-none ${iconClass}`} style={{ ...iconStyle, stroke: 'currentColor', fill: 'none' }}>
-                                                <ResponsiveIcon name={enc.effectId} fallbackType="curse" size={32} className="w-8 h-8" alt={eff?.name || ''} />
-                                             </span>
+                              onClick={() => handleCardClick('stock', 0)}
+                              disabled={!gameState.piles.stock || gameState.piles.stock.cards.length === 0}
+                              className="relative w-[50px] h-[73px] rounded border border-slate-600 shadow-md overflow-hidden bg-gradient-to-br from-slate-700 to-slate-800 flex flex-col items-center justify-center pointer-events-auto hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                              aria-label="Deal from stock">
+                              <div className="text-xs text-slate-400 font-bold">STOCK</div>
+                              {gameState.piles.stock && gameState.piles.stock.cards.length > 0 && (
+                                 <span className="text-2xl font-bold text-white">{gameState.piles.stock.cards.length}</span>
+                              )}
+                              {(!gameState.piles.stock || gameState.piles.stock.cards.length === 0) && (
+                                 <span className="text-sm text-slate-600">Empty</span>
+                              )}
                            </button>
-                        );
-                     })}
-                  </div>
+                        </div>
 
-                  {/* Coronata Mode - Score Bar (below player hand) */}
-                  <div className="flex items-center gap-2 mt-0 mb-2">
-                     <div className="flex-1">
-                        <div className="w-full bg-slate-800 h-5 rounded-full overflow-hidden border border-slate-700 relative flex items-center justify-center px-1">
-                           <div className="absolute inset-0 bg-emerald-500 h-full transition-all duration-500" style={{ width: `${Math.min(100, (gameState.score / gameState.currentScoreGoal) * 100)}%` }} />
-                           <span className="relative z-10 text-[9px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{gameState.score} / {gameState.currentScoreGoal}</span>
+                        {/* Right: Completed runs indicator */}
+                        <div className="relative w-[50px] h-[73px] rounded border border-green-700/50 shadow-md overflow-hidden bg-gradient-to-br from-green-900/30 to-slate-800 flex flex-col items-center justify-center">
+                           <div className="text-xs text-green-400/70 font-bold">DONE</div>
+                           <span className="text-2xl font-bold text-green-400">
+                              {gameState.piles.completed ? Math.floor(gameState.piles.completed.cards.length / 13) : 0}
+                           </span>
+                           <div className="text-[9px] text-green-500/50">/ 8</div>
                         </div>
                      </div>
-                  </div>
+                  ) : (
+                     /* Coronata Mode - Compact HUD: left menu card, centered hand/stock, right discard card */
+                     <div className="relative w-full h-[73px] flex items-end justify-center">
+                        {/* Left card-shaped menu button (Bag of Holding icon) */}
+                                  <div className="absolute left-[1px] bottom-0">
+                                       <button
+                                          onClick={() => {
+                                             // If drawer is locked and active, respect the lock
+                                             if (nonClosableDrawer && activeDrawer === nonClosableDrawer && (activeDrawer === 'inventory' || activeDrawer === 'pause')) return;
+                                             // If inventory or pause is open, close them; otherwise open inventory
+                                             if (activeDrawer === 'inventory' || activeDrawer === 'pause') {
+                                                setActiveDrawer(null);
+                                                setNonClosableDrawer(null);
+                                             } else {
+                                                toggleDrawer('inventory');
+                                             }
+                                          }}
+                                          className={`relative w-[50px] h-[73px] rounded border border-slate-700 shadow-md overflow-hidden bg-slate-800 flex items-center justify-center pointer-events-auto`} aria-label="Inventory">
+                                           <img src="/icons/bagofholding.png" alt="Bag of Holding" className="w-7 h-7" />
+                                       </button>
+                                  </div>
+
+                        {/* Center: player's hand with overlapping cards */}
+                       <div className="absolute left-[52px] right-[52px] bottom-0 flex items-center justify-center pointer-events-none">
+                          <div className="relative flex items-center justify-center" style={{
+                             width: (() => {
+                                const numCards = gameState.piles.hand.cards.length;
+                                if (numCards === 0) return '0px';
+                                const availableWidth = typeof window !== 'undefined' ? window.innerWidth - 104 : 256;
+                                const cardWidth = 50;
+                                const totalWidth = numCards * cardWidth;
+                                return totalWidth <= availableWidth ? `${totalWidth}px` : `${availableWidth}px`;
+                             })(),
+                             height: '73px'
+                          }}>
+                             {gameState.piles.hand.cards.map((c, i) => {
+                                const numCards = gameState.piles.hand.cards.length;
+                                const availableWidth = typeof window !== 'undefined' ? window.innerWidth - 104 : 256;
+                                const cardWidth = 50;
+                                const totalWidth = numCards * cardWidth;
+                                const spacing = totalWidth <= availableWidth ? cardWidth : Math.max(10, (availableWidth - cardWidth) / Math.max(1, numCards - 1));
+
+                                return (
+                                   <div key={`hand-overlap-${c.id}-${i}`} className="absolute pointer-events-auto" style={{ left: `${i * spacing}px`, zIndex: i }}>
+                                      {renderHandCardHUD(c, i)}
+                                   </div>
+                                );
+                             })}
+                          </div>
+                       </div>
+
+                        {/* Right card-shaped discard/draw button (no card back) */}
+                        <div className="absolute right-[1px] bottom-0">
+                           <button type="button" onClick={() => discardAndDrawHand()} aria-label="Discard/Draw" className="relative w-[50px] h-[73px] rounded border border-blue-700 shadow-md overflow-hidden bg-blue-900 flex items-center justify-center pointer-events-auto hover:brightness-110">
+                              <img src="/icons/foundation.png" alt="Discard" className="w-6 h-6 opacity-90" />
+                              {gameState.piles.deck.cards.length > 0 && (
+                                 <span className="absolute -top-1 -right-1 bg-slate-700 text-[14px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
+                              )}
+                           </button>
+                        </div>
+                     </div>
+                  )}
+
+                  {/* Coronata Mode - Run Progress Bar and Score Bar (not shown for Spider) */}
+                  {!selectedMode.startsWith('spider') && (
+                     <>
+                        <div className="flex justify-between px-1 my-2 gap-0.5 relative group">
+                           {runPlan.map((enc, i) => {
+                              const eff = effectsRegistry.find(e => e.id === enc.effectId);
+                              const isCompleted = i < gameState.runIndex;
+                              const isCurrent = i === gameState.runIndex;
+                              const iconClass = isCompleted ? 'opacity-80' : isCurrent ? 'opacity-100' : 'opacity-40 grayscale';
+                              const iconStyle = isCurrent ? { filter: 'brightness(1.5) saturate(1.5) hue-rotate(-15deg)' } : {};
+                              const isCurrentCurse = isCurrent && enc.type === 'curse';
+                              return (
+                                 <button
+                                    key={i}
+                                    type="button"
+                                    className={`w-8 h-8 rounded flex items-center justify-center transition-all ${isCompleted ? 'bg-green-500/10 border-2 border-green-500' : isCurrent ? 'bg-orange-500/10 border-2 border-orange-500 animate-pulse' : 'bg-slate-700/10 border-2 border-slate-700'}`}
+                                    onClick={() => isCurrentCurse ? toggleDrawer('curse') : alert(`${enc.type.toUpperCase()}: ${eff?.name || 'Level ' + (i+1)}\n${eff?.description || 'Score goal: ' + enc.goal}`)}
+                                    aria-label={`Encounter ${i + 1} ${enc.type} ${eff?.name ?? ''}`}>
+                                                   <span className={`w-8 h-8 object-contain aspect-square stroke-2 fill-none ${iconClass}`} style={{ ...iconStyle, stroke: 'currentColor', fill: 'none' }}>
+                                                      <ResponsiveIcon name={enc.effectId} fallbackType="curse" size={32} className="w-8 h-8" alt={eff?.name || ''} />
+                                                   </span>
+                                 </button>
+                              );
+                           })}
+                        </div>
+
+                        <div className="flex items-center gap-2 mt-0 mb-2">
+                           <div className="flex-1">
+                              <div className="w-full bg-slate-800 h-5 rounded-full overflow-hidden border border-slate-700 relative flex items-center justify-center px-1">
+                                 <div className="absolute inset-0 bg-emerald-500 h-full transition-all duration-500" style={{ width: `${Math.min(100, (gameState.score / gameState.currentScoreGoal) * 100)}%` }} />
+                                 <span className="relative z-10 text-[9px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{gameState.score} / {gameState.currentScoreGoal}</span>
+                              </div>
+                           </div>
+                        </div>
+                     </>
+                  )}
                </>
             ) : (
                <>

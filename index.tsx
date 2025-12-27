@@ -4,6 +4,7 @@ import App from './App';
 import './index.css';
 import { EFFECTS_REGISTRY } from './data/effects';
 import { WANDER_REGISTRY } from './data/wanders';
+import { AuthProvider } from './contexts/AuthContext';
 
 const CONFIG = { effectsRegistry: EFFECTS_REGISTRY, wanderRegistry: WANDER_REGISTRY };
 
@@ -15,8 +16,10 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <div className='dark'>
-      <App effectsRegistry={CONFIG.effectsRegistry} wanderRegistry={CONFIG.wanderRegistry} />
-    </div>
+    <AuthProvider>
+      <div className='dark'>
+        <App effectsRegistry={CONFIG.effectsRegistry} wanderRegistry={CONFIG.wanderRegistry} />
+      </div>
+    </AuthProvider>
   </React.StrictMode>
 );
