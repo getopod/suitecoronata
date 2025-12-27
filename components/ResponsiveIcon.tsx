@@ -83,8 +83,33 @@ const ICON_SYNONYMS: Record<string, string> = {
   
   // Native Effects Mappings
   alchemist: 'alchemy',
-  'fog-of-war': 'fogofwar',
+  'fog-of-war': 'fog_of_war',
+  fog_of_war: 'fog_of_war',
   'moon-toad-cheeks': 'moontoadcheeks',
+
+  // User-specified icon mappings
+  whore: 'whore',
+  russian_roulette: 'russianroulette',
+  russianroulette: 'russianroulette',
+  executive_order: 'executiveorder',
+  executiveorder: 'executiveorder',
+  metrocard: 'Metro Card',
+  metro_card: 'Metro Card',
+  'Metro Card': 'Metro Card',
+  get_out_of_jail: 'Get Out of Jail',
+  'Get Out of Jail': 'Get Out of Jail',
+  breaking_entering: 'breakingandentering',
+  'breaking & entering': 'breakingandentering',
+  breakingandentering: 'breakingandentering',
+  venture_capitol: 'venturecapitol',
+  venturecapitol: 'venturecapitol',
+  profile: 'profile',
+  glossary: 'notglossary',
+  newgame: 'newgame',
+  'new game': 'newgame',
+  howto: 'howto',
+  'how to': 'howto',
+  moves: 'moves',
  };
 
 

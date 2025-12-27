@@ -34,7 +34,7 @@ const createKlondike = (drawCount: number): GameRules => {
             const tableauY = topRowY + cardH + Math.max(10, h * 0.02);
             
             configs.push({ id: 'stock', type: 'stock', x: startX, y: topRowY, fan: 'none' });
-            configs.push({ id: 'waste', type: 'waste', x: startX + cardW + gap, y: topRowY, fan: 'none' }); 
+            configs.push({ id: 'waste', type: 'waste', x: startX + cardW + gap, y: topRowY, fan: drawCount > 1 ? 'right' : 'none', fanSpacing: drawCount > 1 ? 15 : undefined }); 
         
             for (let i = 0; i < 4; i++) {
             configs.push({ 
@@ -164,6 +164,14 @@ const createKlondike = (drawCount: number): GameRules => {
                 return isAlternatingColor(targetTop, leadCard) && isConsecutiveDescending(targetTop, leadCard);
             }
             return false;
+        },
+
+        onPostMove: (gameState) => {
+            // Implement standard Klondike scoring
+            // This is called after a move is made
+            // Note: The move has already been applied to gameState
+            // We'll track scoring based on pile changes in the main app
+            return null;
         },
 
         winCondition: (gameState) => {

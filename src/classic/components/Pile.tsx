@@ -44,7 +44,7 @@ export const Pile: React.FC<PileProps> = ({
             boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.3)'
         }}
         onClick={() => {
-            if (cards.length === 0) onCardClick(0);
+            if (cards.length === 0) onCardClick(-1);
         }}
       >
         {/* Visual hint for empty stock recycling */}
@@ -61,7 +61,10 @@ export const Pile: React.FC<PileProps> = ({
                 {(() => {
                     // Extract suit from pile ID (e.g., "foundation-H", "foundation-hearts")
                     const suitMatch = config.id.match(/foundation-?([HDCS]|hearts|diamonds|clubs|spades)/i);
-                    if (!suitMatch) return <span className="text-white/20">🃏</span>;
+                    if (!suitMatch) {
+                        // For numbered foundations (Klondike, etc.), show generic Ace symbol
+                        return <span className="text-white/20 text-lg font-bold">A</span>;
+                    }
 
                     const suitChar = suitMatch[1].toUpperCase()[0];
                     const suitSymbol = suitChar === 'H' ? '♥' : suitChar === 'D' ? '♦' : suitChar === 'C' ? '♣' : '♠';
@@ -84,13 +87,28 @@ export const Pile: React.FC<PileProps> = ({
         const isSelected = card.id === selectedCardId;
         let topOffset = 0;
         let leftOffset = 0;
+        let shouldHide = false;
 
         if (config.fan === 'down') {
           const prevCards = cards.slice(0, index);
           topOffset = prevCards.reduce((acc, c) => acc + (c.faceUp ? (config.fanSpacing || 25) : (cardWidth * 0.15)), 0);
         } else if (config.fan === 'right') {
-          leftOffset = index * (config.fanSpacing || 20);
+          // For waste pile in draw-3, only show top 3 cards with offset
+          if (config.type === 'waste' && cards.length > 3) {
+            // Hide cards that aren't in the top 3
+            if (index < cards.length - 3) {
+              shouldHide = true;
+            } else {
+              // Offset only the visible top 3 cards
+              const visibleIndex = index - (cards.length - 3);
+              leftOffset = visibleIndex * (config.fanSpacing || 20);
+            }
+          } else {
+            leftOffset = index * (config.fanSpacing || 20);
+          }
         }
+
+        if (shouldHide) return null;
 
         return (
             <div

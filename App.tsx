@@ -1442,8 +1442,12 @@ export default function SolitaireEngine({
             const moved = attemptMove(gameState.selectedCardIds, selectedPileId, pileId);
             if (moved) {
               clearSelection();
-              return;
+            } else {
+              // Move failed - clear old selection and select new card
+              clearSelection();
+              selectCardAndCompute(pileId, cardIndex);
             }
+            return;
           } else {
             // Select this card
             selectCardAndCompute(pileId, cardIndex);
@@ -1640,18 +1644,43 @@ export default function SolitaireEngine({
 
       // Perform the move
       const newSourceCards = sourcePile.cards.filter(c => !cardIds.includes(c.id));
+      let scoreChange = 0;
+      let cardFlipped = false;
+
       // Auto-flip top card when exposed (standard solitaire behavior)
       if (sourcePile.type === 'tableau' && newSourceCards.length > 0) {
         const newTop = newSourceCards[newSourceCards.length - 1];
-        if (!newTop.faceUp) newSourceCards[newSourceCards.length - 1] = { ...newTop, faceUp: true };
+        if (!newTop.faceUp) {
+          newSourceCards[newSourceCards.length - 1] = { ...newTop, faceUp: true };
+          cardFlipped = true;
+          scoreChange += 5; // +5 for flipping a card
+        }
       }
       const newTargetCards = [...targetPile.cards, ...movingCards];
       const newPiles = { ...gameState.piles, [sourcePileId]: { ...sourcePile, cards: newSourceCards }, [targetPileId]: { ...targetPile, cards: newTargetCards } };
+
+      // Calculate score change for Klondike
+      if (selectedMode.startsWith('klondike')) {
+        if (targetPileId.startsWith('foundation')) {
+          if (sourcePileId === 'waste') {
+            scoreChange += 10; // Waste to foundation
+          } else if (sourcePileId.startsWith('tableau')) {
+            scoreChange += 10; // Tableau to foundation
+          }
+        } else if (targetPileId.startsWith('tableau')) {
+          if (sourcePileId === 'waste') {
+            scoreChange += 5; // Waste to tableau
+          } else if (sourcePileId.startsWith('foundation')) {
+            scoreChange -= 15; // Foundation to tableau (penalty)
+          }
+        }
+      }
 
       setGameState(prev => ({
         ...prev,
         piles: newPiles,
         moves: prev.moves + 1,
+        score: prev.score + scoreChange,
         history: [...prev.history, prev]
       }));
 
@@ -2412,11 +2441,11 @@ export default function SolitaireEngine({
 
       </div>
       <div className="grid grid-cols-3 gap-3 sm:gap-6 w-full max-w-sm sm:max-w-md mx-auto px-2">
-         <button type="button" onClick={() => setShowModes(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><Play fill="currentcolor" className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none"/></button>
-         <button type="button" onClick={() => setShowFeedback(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><Bug className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none"/></button>
-         <button type="button" onClick={() => setShowGlossary(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/glossary.png" alt="Glossary" className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none" /></button>
-         <button type="button" onClick={() => setShowUpdates(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><RefreshCw className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none"/></button>
-         <button type="button" onClick={() => setShowProfile(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><User className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none"/></button>
+         <button type="button" onClick={() => setShowModes(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/play.png" alt="Play" className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none" /></button>
+         <button type="button" onClick={() => setShowFeedback(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/feedback.png" alt="Feedback" className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none" /></button>
+         <button type="button" onClick={() => setShowGlossary(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/notglossary.png" alt="Glossary" className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none" /></button>
+         <button type="button" onClick={() => setShowUpdates(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/history.png" alt="Updates" className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none" /></button>
+         <button type="button" onClick={() => setShowProfile(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/profile.png" alt="Profile" className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none" /></button>
          <button type="button" onClick={() => setShowSettings(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/settings.png" alt="Settings" className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none" /></button>
       </div>
 
@@ -2586,16 +2615,15 @@ export default function SolitaireEngine({
                        <button
                           key={tab}
                           onClick={() => setProfileTab(tab)}
-                          className={`flex-1 py-2 px-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all ${
+                          className={`flex-1 py-3 px-3 rounded-lg font-bold text-sm flex items-center justify-center transition-all ${
                              profileTab === tab
                                 ? 'bg-slate-700 text-white'
                                 : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
                           }`}>
-                          {tab === 'stats' && <BarChart3 size={16} />}
-                          {tab === 'feats' && <img src="/icons/feats.png" alt="" className="w-4 h-4" />}
-                          {tab === 'recaps' && <img src="/icons/run history.png" alt="" className="w-4 h-4" />}
-                          {tab === 'account' && <LogIn size={16} />}
-                          {tab === 'recaps' ? 'History' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                          {tab === 'stats' && <img src="/icons/coin.png" alt="Stats" className="w-6 h-6" />}
+                          {tab === 'feats' && <img src="/icons/feats.png" alt="Feats" className="w-6 h-6" />}
+                          {tab === 'recaps' && <img src="/icons/history.png" alt="History" className="w-6 h-6" />}
+                          {tab === 'account' && <img src="/icons/login.png" alt="Account" className="w-6 h-6" />}
                        </button>
                     ))}
                  </div>
@@ -2847,7 +2875,7 @@ export default function SolitaireEngine({
                                    <>
                                       <div className="text-center">
                                          <div className="bg-slate-800/50 rounded-2xl p-6 mb-6">
-                                            <User size={48} className="mx-auto text-slate-500 mb-3" />
+                                            <img src="/icons/login.png" alt="Account" className="w-12 h-12 mx-auto mb-3" />
                                             <div className="text-sm text-slate-400 mb-1">not signed in</div>
                                             <p className="text-slate-300">Link your account to save your progress</p>
                                          </div>
@@ -2975,7 +3003,7 @@ export default function SolitaireEngine({
                                 {/* Not logged in view */}
                                 <div className="text-center">
                                    <div className="bg-slate-800/50 rounded-2xl p-6 mb-6">
-                                      <User size={48} className="mx-auto text-slate-500 mb-3" />
+                                      <img src="/icons/login.png" alt="Account" className="w-12 h-12 mx-auto mb-3" />
                                       <div className="text-sm text-slate-400 mb-1">not signed in</div>
                                       <p className="text-slate-300">Link your account to save your progress</p>
                                    </div>
@@ -4067,12 +4095,21 @@ export default function SolitaireEngine({
               const isHighlighted = highlightedMoves.foundationIds.includes(config.id) || highlightedMoves.tableauIds.includes(config.id);
 
               // Convert coronata cards to classic format
-              const classicCards = pile.cards.map(c => ({
-                id: c.id,
-                rank: c.rank,
-                suit: c.suit as 'H' | 'D' | 'C' | 'S',
-                faceUp: c.faceUp !== false,
-              }));
+              const classicCards = pile.cards.map(c => {
+                // Convert coronata suit format to classic format
+                const suitMap: Record<string, 'H' | 'D' | 'C' | 'S'> = {
+                  'hearts': 'H',
+                  'diamonds': 'D',
+                  'clubs': 'C',
+                  'spades': 'S'
+                };
+                return {
+                  id: c.id,
+                  rank: c.rank,
+                  suit: suitMap[c.suit] || 'H',
+                  faceUp: c.faceUp !== false,
+                };
+              });
 
               const selectedCardId = selectedPileId === config.id && selectedCardIndex !== null
                 ? pile.cards[selectedCardIndex]?.id
@@ -4308,8 +4345,8 @@ export default function SolitaireEngine({
                      <div className="max-w-md mx-auto">
                         {activeDrawer === 'pause' ? (
                            <div className="grid grid-cols-5 gap-1">
-                           <button className=" rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600"><img src="/icons/save.png" alt="" className="w-8 h-8" /></button>
-                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('resign')}><img src="/icons/resign.png" alt="" className="w-8 h-8" /></button>
+                           <button className=" rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600"><img src="/icons/notsave.png" alt="" className="w-8 h-8" /></button>
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('resign')}><img src="/icons/broken-heart.png" alt="" className="w-8 h-8" /></button>
                               <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('feedback')}><img src="/icons/feedback.png" alt="" className="w-8 h-8" /></button>
                               <button
                                  className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600"
@@ -4334,7 +4371,7 @@ export default function SolitaireEngine({
                                        setElapsedTime(0);
                                     }
                                  }}>
-                                 <Play size={32} />
+                                 <img src="/icons/newgame.png" alt="" className="w-8 h-8" />
                               </button>
                               <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><img src="/icons/settings.png" alt="" className="w-8 h-8" /></button>
                            </div>
@@ -4871,7 +4908,7 @@ export default function SolitaireEngine({
                            onClick={() => toggleDrawer('pause')}
                            className="relative w-[50px] h-[73px] rounded border border-slate-700 shadow-md overflow-hidden bg-slate-800 flex items-center justify-center pointer-events-auto hover:brightness-110"
                            aria-label="Menu">
-                           <Menu size={24} className="text-slate-400" />
+                           <img src="/icons/pause.png" alt="Pause" className="w-7 h-7" />
                         </button>
 
                         {/* Center: Stock pile - click to deal to all tableaus */}
@@ -5011,7 +5048,7 @@ export default function SolitaireEngine({
                            onClick={() => toggleDrawer('pause')}
                            className={`relative w-[50px] h-[73px] rounded border border-slate-700 shadow-md overflow-hidden bg-slate-800 flex items-center justify-center pointer-events-auto hover:brightness-110 ${activeDrawer === 'pause' ? 'bg-slate-700' : ''}`}
                            aria-label="Pause">
-                           <Menu size={24} className="text-slate-400" />
+                           <img src="/icons/pause.png" alt="Pause" className="w-7 h-7" />
                         </button>
                      </div>
 
@@ -5020,36 +5057,36 @@ export default function SolitaireEngine({
                         {/* How to Play button */}
                         <button
                            onClick={() => toggleDrawer('howtoplay')}
-                           className={`px-3 h-[73px] bg-slate-800 hover:bg-slate-700 rounded border border-slate-700 flex items-center justify-center ${activeDrawer === 'howtoplay' ? 'bg-slate-700' : ''}`}>
-                           <span className="text-2xl">❓</span>
+                           className={`w-[50px] h-[73px] bg-slate-800 hover:bg-slate-700 rounded border border-slate-700 flex items-center justify-center ${activeDrawer === 'howtoplay' ? 'bg-slate-700' : ''}`}>
+                           <img src="/icons/howto.png" alt="How to Play" className="w-7 h-7" />
                         </button>
 
                         {/* Move Count */}
-                        <div className="flex-1 h-[73px] rounded border border-slate-700 bg-slate-800 flex flex-col items-center justify-center">
-                           <Play size={18} className="text-slate-400" />
-                           <span className="text-sm font-bold text-slate-300">{gameState.moves}</span>
+                        <div className="w-[50px] h-[73px] rounded border border-slate-700 bg-slate-800 flex flex-col items-center justify-center">
+                           <img src="/icons/moves.png" alt="Moves" className="w-5 h-5" />
+                           <span className="text-xs font-bold text-slate-300">{gameState.moves}</span>
                         </div>
 
                         {/* Score */}
-                        <div className="flex-1 h-[73px] rounded border border-slate-700 bg-slate-800 flex flex-col items-center justify-center">
-                           <span className="text-lg">📊</span>
-                           <span className="text-sm font-bold text-yellow-400">{gameState.score}</span>
+                        <div className="w-[50px] h-[73px] rounded border border-slate-700 bg-slate-800 flex flex-col items-center justify-center">
+                           <img src="/icons/coin.png" alt="Score" className="w-5 h-5" />
+                           <span className="text-xs font-bold text-yellow-400">{gameState.score}</span>
                         </div>
 
                         {/* Timer */}
-                        <div className="flex-1 h-[73px] rounded border border-slate-700 bg-slate-800 flex flex-col items-center justify-center">
-                           <Clock size={18} className="text-slate-400" />
-                           <span className="text-sm font-bold text-slate-300">{formatTime(elapsedTime)}</span>
+                        <div className="w-[50px] h-[73px] rounded border border-slate-700 bg-slate-800 flex flex-col items-center justify-center">
+                           <Clock size={16} className="text-slate-400" />
+                           <span className="text-[10px] font-bold text-slate-300">{formatTime(elapsedTime)}</span>
                         </div>
 
                         {/* Mode-specific: Spider completed runs */}
                         {selectedMode.startsWith('spider') && (
-                           <div className="h-[73px] rounded border border-green-700/50 bg-gradient-to-br from-green-900/30 to-slate-800 flex flex-col items-center justify-center px-3">
-                              <div className="text-[10px] text-green-400/70 font-bold">DONE</div>
-                              <span className="text-xl font-bold text-green-400">
+                           <div className="w-[50px] h-[73px] rounded border border-green-700/50 bg-gradient-to-br from-green-900/30 to-slate-800 flex flex-col items-center justify-center">
+                              <div className="text-[10px] text-green-400/70 font-bold">RUN</div>
+                              <span className="text-lg font-bold text-green-400">
                                  {gameState.piles.completed ? Math.floor(gameState.piles.completed.cards.length / 13) : 0}
                               </span>
-                              <div className="text-[9px] text-green-500/50">/ 8</div>
+                              <div className="text-[9px] text-green-500/50">/8</div>
                            </div>
                         )}
                      </div>
