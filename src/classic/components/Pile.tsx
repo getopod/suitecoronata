@@ -57,20 +57,20 @@ export const Pile: React.FC<PileProps> = ({
         )}
         {/* Foundation suit symbol */}
         {config.type === 'foundation' && cards.length === 0 && (
-            <div className="w-full h-full flex items-center justify-center text-2xl">
+            <div className="w-full h-full flex items-center justify-center text-5xl">
                 {(() => {
                     // Extract suit from pile ID (e.g., "foundation-H", "foundation-hearts")
                     const suitMatch = config.id.match(/foundation-?([HDCS]|hearts|diamonds|clubs|spades)/i);
                     if (!suitMatch) {
                         // For numbered foundations (Klondike, etc.), show generic Ace symbol
-                        return <span className="text-white/20 text-lg font-bold">A</span>;
+                        return <span className="text-white/20 text-3xl font-bold">A</span>;
                     }
 
                     const suitChar = suitMatch[1].toUpperCase()[0];
                     const suitSymbol = suitChar === 'H' ? '♥' : suitChar === 'D' ? '♦' : suitChar === 'C' ? '♣' : '♠';
                     const suitColor = (suitChar === 'H' || suitChar === 'D') ? 'text-red-600/30' : 'text-white/20';
 
-                    return <span className={suitColor}>{suitSymbol}</span>;
+                    return <span className={`${suitColor} text-5xl`}>{suitSymbol}</span>;
                 })()}
             </div>
         )}

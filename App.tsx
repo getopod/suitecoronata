@@ -483,7 +483,7 @@ export default function SolitaireEngine({
   const [selectedMode, setSelectedMode] = useState('coronata');
   const [glossaryTab, setGlossaryTab] = useState<'blessings'|'exploits'|'curses'|'patterns'>('blessings');
   const [feedbackTab, setFeedbackTab] = useState<'blessings'|'exploits'|'curses'|'patterns'>('exploits');
-  const [profileTab, setProfileTab] = useState<'stats'|'feats'|'recaps'|'account'>('stats');
+  const [profileTab, setProfileTab] = useState<'stats'|'feats'|'recaps'|'account'>(!auth.user || auth.isAnonymous ? 'account' : 'stats');
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [isSignup, setIsSignup] = useState(false);
@@ -1835,7 +1835,7 @@ export default function SolitaireEngine({
           spawnFloating(`+${scoreDelta}`, centerX, centerY, 'text-blue-400');
         }
         if (coinDelta > 0) {
-          spawnFloating(`🪙+${coinDelta}`, centerX, centerY + 20, 'text-amber-400');
+          spawnFloating(`+${coinDelta}`, centerX, centerY + 20, 'text-amber-400');
         }
         if (multiplier > 1) {
           spawnFloating(`×${multiplier}`, centerX, centerY - 25, 'text-purple-400 text-2xl', true);
@@ -2441,12 +2441,12 @@ export default function SolitaireEngine({
 
       </div>
       <div className="grid grid-cols-3 gap-3 sm:gap-6 w-full max-w-sm sm:max-w-md mx-auto px-2">
-         <button type="button" onClick={() => setShowModes(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/play.png" alt="Play" className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none" /></button>
-         <button type="button" onClick={() => setShowFeedback(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/feedback.png" alt="Feedback" className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none" /></button>
-         <button type="button" onClick={() => setShowGlossary(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/notglossary.png" alt="Glossary" className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none" /></button>
-         <button type="button" onClick={() => setShowUpdates(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/history.png" alt="Updates" className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none" /></button>
-         <button type="button" onClick={() => setShowProfile(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/profile.png" alt="Profile" className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none" /></button>
-         <button type="button" onClick={() => setShowSettings(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/settings.png" alt="Settings" className="w-12 h-12 sm:w-16 sm:h-16 pointer-events-none" /></button>
+         <button type="button" onClick={() => setShowModes(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/play.png" alt="Play" className="w-16 h-16 sm:w-20 sm:h-20 pointer-events-none" /></button>
+         <button type="button" onClick={() => setShowFeedback(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/feedback.png" alt="Feedback" className="w-16 h-16 sm:w-20 sm:h-20 pointer-events-none" /></button>
+         <button type="button" onClick={() => setShowGlossary(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/glossary.png" alt="Glossary" className="w-16 h-16 sm:w-20 sm:h-20 pointer-events-none" /></button>
+         <button type="button" onClick={() => setShowUpdates(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/history.png" alt="Updates" className="w-16 h-16 sm:w-20 sm:h-20 pointer-events-none" /></button>
+         <button type="button" onClick={() => setShowProfile(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/profile.png" alt="Profile" className="w-16 h-16 sm:w-20 sm:h-20 pointer-events-none" /></button>
+         <button type="button" onClick={() => setShowSettings(true)} className="aspect-square flex items-center justify-center hover:bg-slate-700 active:bg-slate-600 transition-colors touch-manipulation rounded-lg p-3 sm:p-4"><img src="/icons/settings.png" alt="Settings" className="w-16 h-16 sm:w-20 sm:h-20 pointer-events-none" /></button>
       </div>
 
            {/* MODES PANEL - Enhanced accordion style */}
@@ -2620,10 +2620,10 @@ export default function SolitaireEngine({
                                 ? 'bg-slate-700 text-white'
                                 : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
                           }`}>
-                          {tab === 'stats' && <img src="/icons/coin.png" alt="Stats" className="w-6 h-6" />}
-                          {tab === 'feats' && <img src="/icons/feats.png" alt="Feats" className="w-6 h-6" />}
-                          {tab === 'recaps' && <img src="/icons/history.png" alt="History" className="w-6 h-6" />}
-                          {tab === 'account' && <img src="/icons/login.png" alt="Account" className="w-6 h-6" />}
+                          {tab === 'stats' && <img src="/icons/coin.png" alt="Stats" className="w-10 h-10" />}
+                          {tab === 'feats' && <img src="/icons/feats.png" alt="Feats" className="w-10 h-10" />}
+                          {tab === 'recaps' && <img src="/icons/history.png" alt="History" className="w-10 h-10" />}
+                          {tab === 'account' && <img src="/icons/login.png" alt="Account" className="w-10 h-10" />}
                        </button>
                     ))}
                  </div>
@@ -2793,7 +2793,7 @@ export default function SolitaireEngine({
                                    </div>
 
                                    {/* Effects Row */}
-                                   <div className="grid grid-cols-3 gap-2 text-xs">
+                                   <div className="grid grid-cols-2 gap-2 text-xs">
                                       {/* Exploits */}
                                       <div className="bg-slate-700/50 rounded-lg p-2">
                                          <div className="flex items-center gap-1 mb-1.5 text-slate-400">
@@ -2803,18 +2803,6 @@ export default function SolitaireEngine({
                                          <div className="flex flex-wrap gap-1">
                                             {run.exploits.map((effectId, i) => (
                                                <ResponsiveIcon name={effectId} fallbackType="exploit" size={20} className="rounded" />
-                                            ))}
-                                         </div>
-                                      </div>
-                                      {/* Curses */}
-                                      <div className="bg-slate-700/50 rounded-lg p-2">
-                                         <div className="flex items-center gap-1 mb-1.5 text-slate-400">
-                                            <img src={categoryIcons.curse} alt="" className="w-[18px] h-[18px]" />
-                                            <span className="uppercase tracking-wider text-[14px]">Curses</span>
-                                         </div>
-                                         <div className="flex flex-wrap gap-1">
-                                            {run.curses.map((effectId, i) => (
-                                               <ResponsiveIcon name={effectId} fallbackType="curse" size={20} className="rounded" />
                                             ))}
                                          </div>
                                       </div>
@@ -3839,7 +3827,7 @@ export default function SolitaireEngine({
                                       </div>
                                    </div>
                                    <div className="text-slate-300 text-sm mt-1">{e.description}</div>
-                                   {Boolean(e.cost) && <div className="text-xs text-yellow-500 mt-1 flex items-center gap-1"><Coins size={10}/> {e.cost}</div>}
+                                   {Boolean(e.cost) && <div className="text-xs text-yellow-500 mt-1 flex items-center gap-1"><img src="/icons/coin.png" alt="Coin" className="w-2.5 h-2.5" /> {e.cost}</div>}
                                 </div>
                              </label>
                           );
@@ -3934,7 +3922,7 @@ export default function SolitaireEngine({
                                <div className={`text-[14px] uppercase px-1.5 py-0.5 rounded font-bold shrink-0 ${rarityColors.text} ${rarityColors.bg} border ${rarityColors.border}`}>{e.rarity || 'Common'}</div>
                              </div>
                              <div className="text-slate-300 text-sm mt-1">{e.description}</div>
-                             {Boolean(e.cost) && <div className="text-xs text-yellow-500 mt-1 flex items-center gap-1"><Coins size={10}/> {e.cost}</div>}
+                             {Boolean(e.cost) && <div className="text-xs text-yellow-500 mt-1 flex items-center gap-1"><img src="/icons/coin.png" alt="Coin" className="w-2.5 h-2.5" /> {e.cost}</div>}
                           </div>
                        </div>
                     );})}
@@ -4325,65 +4313,50 @@ export default function SolitaireEngine({
                            </div>
                         </div>
                      )}
-                     <div className="flex justify-between items-center">
-                        <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">
-                           {activeDrawer === 'pause' ? ''
-                            : activeDrawer === 'shop' ? ''
-                            : activeDrawer === 'feedback' ? 'Feedback'
-                            : activeDrawer === 'test' ? ''
-                            : activeDrawer === 'settings' ? 'Settings'
-                            : activeDrawer === 'howtoplay' ? 'How to Play'
-                            : activeDrawer === 'blessing_select' ? 'Select a Blessing'
-                            : activeDrawer.charAt(0).toUpperCase() + activeDrawer.slice(1)}
-                        </h3>
-                        {nonClosableDrawer === activeDrawer ? (
-                           <div style={{ width: 28 }} />
-                        ) : (
-                           <button onClick={() => { setActiveDrawer(null); setNonClosableDrawer(null); }}><ChevronDown className="text-slate-500" /></button>
-                        )}
-                     </div>
                      <div className="max-w-md mx-auto">
                         {activeDrawer === 'pause' ? (
                            <div className="grid grid-cols-5 gap-1">
-                           <button className=" rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600"><img src="/icons/notsave.png" alt="" className="w-8 h-8" /></button>
-                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('resign')}><img src="/icons/broken-heart.png" alt="" className="w-8 h-8" /></button>
-                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('feedback')}><img src="/icons/feedback.png" alt="" className="w-8 h-8" /></button>
-                              <button
-                                 className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600"
-                                 onClick={() => {
-                                    if (confirm('Start a new game? Your current progress will be lost.')) {
-                                       const classicGame = CLASSIC_GAMES[selectedMode];
-                                       if (classicGame) {
-                                          const newState = classicGame.deal();
-                                          const coronataPiles = convertClassicPilesToCoronata(newState.piles);
-                                          setGameState(prev => ({
-                                             ...initialGameState(selectedMode),
-                                             piles: coronataPiles,
-                                             score: newState.score ?? 0,
-                                             moves: newState.moves ?? 0,
-                                             history: [],
-                                             customData: newState.customData ?? {}
-                                          }));
-                                       } else {
-                                          setGameState(initialGameState(selectedMode));
+                           <button className=" rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600"><img src="/icons/save.png" alt="Save" className="w-9 h-9" /></button>
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('resign')}><img src="/icons/broken-heart.png" alt="Resign" className="w-9 h-9" /></button>
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('feedback')}><img src="/icons/feedback.png" alt="Feedback" className="w-9 h-9" /></button>
+                              {CLASSIC_GAMES[selectedMode] ? (
+                                 <button
+                                    className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600"
+                                    onClick={() => {
+                                       if (confirm('Start a new game? Your current progress will be lost.')) {
+                                          const classicGame = CLASSIC_GAMES[selectedMode];
+                                          if (classicGame) {
+                                             const newState = classicGame.deal();
+                                             const coronataPiles = convertClassicPilesToCoronata(newState.piles);
+                                             setGameState(prev => ({
+                                                ...initialGameState(selectedMode),
+                                                piles: coronataPiles,
+                                                score: newState.score ?? 0,
+                                                moves: newState.moves ?? 0,
+                                                history: [],
+                                                customData: newState.customData ?? {}
+                                             }));
+                                          }
+                                          setActiveDrawer(null);
+                                          setElapsedTime(0);
                                        }
-                                       setActiveDrawer(null);
-                                       setElapsedTime(0);
-                                    }
-                                 }}>
-                                 <img src="/icons/newgame.png" alt="" className="w-8 h-8" />
-                              </button>
-                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><img src="/icons/settings.png" alt="" className="w-8 h-8" /></button>
+                                    }}>
+                                    <RefreshCw size={36} className="text-slate-400" />
+                                 </button>
+                              ) : (
+                                 <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('test')}><img src="/icons/testing.png" alt="Test" className="w-9 h-9" /></button>
+                              )}
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('settings')}><img src="/icons/settings.png" alt="Settings" className="w-9 h-9" /></button>
                            </div>
                         ) : activeDrawer === 'inventory' ? (
                            <div className="grid grid-cols-4 gap-1">
                               {/* Use explicit PNGs per request: exploits.png for exploits */}
-                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('exploit')} aria-label="Exploits"><img src="/icons/exploits.png" alt="Exploits" className="w-8 h-8" /></button>
-                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('blessing')} aria-label="Blessings"><ResponsiveIcon name="blessing" fallbackType="blessing" size={32} className="w-8 h-8" /></button>
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('exploit')} aria-label="Exploits"><img src="/icons/exploits.png" alt="Exploits" className="w-9 h-9" /></button>
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('blessing')} aria-label="Blessings"><ResponsiveIcon name="blessing" fallbackType="blessing" size={36} className="w-9 h-9" /></button>
                               {/* Use fortune.png for the Patterns button */}
-                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('patterns')} aria-label="Patterns"><img src="/icons/fortune.png" alt="Patterns" className="w-8 h-8" /></button>
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('patterns')} aria-label="Patterns"><img src="/icons/fortune.png" alt="Patterns" className="w-9 h-9" /></button>
                               {/* Open the pause drawer (save/resign/test/feedback/settings) */}
-                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('pause')} aria-label="Pause"><img src="/icons/pause.png" alt="Pause" className="w-8 h-8" /></button>
+                              <button className="rounded flex flex-col items-center gap-0.5 text-slate-300 hover:bg-slate-600" onClick={() => setActiveDrawer('pause')} aria-label="Pause"><img src="/icons/pause.png" alt="Pause" className="w-9 h-9" /></button>
                            </div>
                         ) : activeDrawer === 'shop' ? (
                            <div className="flex flex-col gap-2">
@@ -4530,7 +4503,6 @@ export default function SolitaireEngine({
                                     onClick={() => setExpandedSettingsSection(expandedSettingsSection === 'audio' ? null : 'audio')}
                                     className="w-full flex items-center justify-between p-3 hover:bg-slate-800">
                                     <div className="flex items-center gap-2">
-                                       <img src="/icons/volume.png" alt="" className="w-4 h-4" />
                                        <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Audio</h3>
                                     </div>
                                     <ChevronDown size={16} className={`text-slate-500 transition-transform ${expandedSettingsSection === 'audio' ? 'rotate-180' : ''}`} />
@@ -4955,8 +4927,8 @@ export default function SolitaireEngine({
                                                 toggleDrawer('inventory');
                                              }
                                           }}
-                                          className={`relative w-[50px] h-[73px] rounded border border-slate-700 shadow-md overflow-hidden bg-slate-800 flex items-center justify-center pointer-events-auto`} aria-label="Inventory">
-                                           <img src="/icons/bagofholding.png" alt="Bag of Holding" className="w-7 h-7" />
+                                          className={`relative w-[50px] h-[73px] rounded border border-slate-700 shadow-md overflow-hidden flex items-center justify-center pointer-events-auto`} aria-label="Inventory">
+                                           <img src="/icons/bagofholding.png" alt="Bag of Holding" className="w-10 h-10" />
                                        </button>
                                   </div>
 
@@ -4991,10 +4963,10 @@ export default function SolitaireEngine({
 
                         {/* Right card-shaped discard/draw button (no card back) */}
                         <div className="absolute right-[1px] bottom-0">
-                           <button type="button" onClick={() => discardAndDrawHand()} aria-label="Discard/Draw" className="relative w-[50px] h-[73px] rounded border border-blue-700 shadow-md overflow-hidden bg-blue-900 flex items-center justify-center pointer-events-auto hover:brightness-110">
-                              <img src="/icons/foundation.png" alt="Discard" className="w-6 h-6 opacity-90" />
+                           <button type="button" onClick={() => discardAndDrawHand()} aria-label="Discard/Draw" className="relative w-[50px] h-[73px] rounded border border-slate-700 shadow-md overflow-hidden flex items-center justify-center pointer-events-auto hover:brightness-110">
+                              <img src="/icons/foundation.png" alt="Discard" className="w-10 h-10 opacity-90" />
                               {gameState.piles.deck.cards.length > 0 && (
-                                 <span className="absolute -top-1 -right-1 bg-slate-700 text-[14px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
+                                 <span className="absolute top-1 right-1 bg-slate-700 text-[14px] px-1 rounded-full border border-slate-500 leading-none">{gameState.piles.deck.cards.length}</span>
                               )}
                            </button>
                         </div>
@@ -5103,7 +5075,7 @@ export default function SolitaireEngine({
                            disabled={!gameState.history || gameState.history.length === 0}
                            className="relative w-[50px] h-[73px] rounded border border-slate-700 shadow-md overflow-hidden bg-slate-800 flex items-center justify-center pointer-events-auto hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
                            aria-label="Undo">
-                           <RefreshCw size={24} className="text-slate-400" />
+                           <img src="/icons/newgame.png" alt="Undo" className="w-7 h-7" />
                         </button>
                      </div>
                   </div>
